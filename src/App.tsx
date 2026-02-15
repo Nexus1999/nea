@@ -3,14 +3,23 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/providers/AuthProvider";
-import Index from "./pages/Index";
+import { AuthProvider, useAuth } from "@/providers/AuthProvider";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import DashboardLayout from "./pages/DashboardLayout";
 import Overview from "./pages/dashboard/Overview";
 import Timetables from "./pages/dashboard/Timetables";
 
 const queryClient = new QueryClient();
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { session, loading } = useAuth();
+  
+  if (loading) return null;
+  if (!session) return <Navigate to="/" replace />;
+  
+  return <>{children}</>;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -20,10 +29,17 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<Login />} />
             
             {/* Dashboard Routes */}
-            <Route path="/dashboard" element={<DashboardLayout />}>
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout />
+                </ProtectedRoute>
+              }
+            >
               <Route index element={<Overview />} />
               <Route path="timetables" element={<Timetables />} />
               {/* Add more routes as needed */}

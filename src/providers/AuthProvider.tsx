@@ -5,19 +5,47 @@ interface AuthContextType {
   user: any;
   loading: boolean;
   userRole: string | null;
+  login: (email: string) => void;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  // Mocking auth state for demonstration
-  const [session] = useState({ user: { email: 'admin@example.com' } });
-  const [user] = useState({ email: 'admin@example.com' });
-  const [loading] = useState(false);
-  const [userRole] = useState('Administrator');
+  const [session, setSession] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check for existing session in localStorage
+    const savedUser = localStorage.getItem('demo_user');
+    if (savedUser) {
+      const userData = JSON.parse(savedUser);
+      setSession({ user: userData });
+      setUser(userData);
+      setUserRole('Administrator');
+    }
+    setLoading(false);
+  }, []);
+
+  const login = (email: string) => {
+    const userData = { email };
+    localStorage.setItem('demo_user', JSON.stringify(userData));
+    setSession({ user: userData });
+    setUser(userData);
+    setUserRole('Administrator');
+  };
+
+  const logout = () => {
+    localStorage.removeItem('demo_user');
+    setSession(null);
+    setUser(null);
+    setUserRole(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, userRole }}>
+    <AuthContext.Provider value={{ session, user, loading, userRole, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
