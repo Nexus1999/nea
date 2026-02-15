@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import DashboardLayout from "./pages/DashboardLayout";
 import Overview from "./pages/dashboard/Overview";
 import Timetables from "./pages/dashboard/Timetables";
+import Teachers from "./pages/miscellaneous/Teachers";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,10 @@ const App = () => (
             >
               <Route index element={<Overview />} />
               <Route path="timetables" element={<Timetables />} />
+              
+              {/* Miscellaneous Routes */}
+              <Route path="miscellaneous/jobs" element={<Teachers />} />
+              
               {/* Add more routes as needed */}
               <Route path="*" element={<div className="p-4">Page under construction</div>} />
             </Route>

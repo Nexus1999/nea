@@ -58,7 +58,7 @@ const navItems = [
     subItems: [
       {
         path: '/dashboard/miscellaneous/overview',label: 'OverView',icon: LayoutDashboard,key: 'MiscellaneousOverview',},
-       {path: '/dashboard/miscellaneous/jobs',label: 'Teachers',icon: Users,key: 'MiscellaneousTeachers',
+       {path: '/dashboard/miscellaneous/jobs',label: 'Teachers inventory',icon: Users,key: 'MiscellaneousTeachers',
       },
     ],
   },
@@ -107,7 +107,7 @@ const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType 
   'secondary': { label: 'Secondary Schools', icon: Building },
   'colleges': { label: 'Teachers Colleges', icon: Building },
   'overview': { label: 'Overview', icon: LayoutDashboard },
-  'jobs': { label: 'Teachers', icon: Users },
+  'jobs': { label: 'Teachers inventory', icon: Users },
   'teachers-management': { label: 'Teachers Management', icon: Users },
   'details': { label: 'Details', icon: FileText },
   'special-needs': { label: 'Special Needs', icon: Accessibility },
@@ -217,7 +217,7 @@ const DashboardLayout = () => {
       const previousSegment = index > 0 ? segments[index - 1] : undefined;
       const config = getBreadcrumbConfig(segment, previousSegment);
       const { label, icon: Icon } = config;
-      const pathTo = `/dashboard/${segments.slice(0, index + 1).join('/')}`;
+      const pathTo = `/dashboard/\${segments.slice(0, index + 1).join('/')}`;
       
       const content = (
         <span className="flex items-center gap-1">
@@ -281,7 +281,7 @@ const DashboardLayout = () => {
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className={`
           flex-shrink-0 h-full bg-gradient-to-b from-gray-900 to-gray-800 shadow-2xl z-50
-          ${isMobileSidebarOpen ? "fixed translate-x-0" : "fixed -translate-x-full"}
+          \${isMobileSidebarOpen ? "fixed translate-x-0" : "fixed -translate-x-full"}
           lg:relative lg:translate-x-0
           flex flex-col overflow-y-auto scrollbar-hidden
         `}
@@ -289,7 +289,7 @@ const DashboardLayout = () => {
       >
         <div className="flex flex-col h-full">
           <div className="p-6 border-b border-white/10 flex justify-between items-center h-20">
-            <div className={`flex items-center gap-3 ${isDesktopSidebarCollapsed ? 'justify-center w-full' : ''}`}>
+            <div className={`flex items-center gap-3 \${isDesktopSidebarCollapsed ? 'justify-center w-full' : ''}`}>
               <div className="p-2.5 bg-gradient-to-br from-red-500 via-orange-500 to-yellow-400 rounded-xl shadow-lg ring-2 ring-white/20">
                 <NectaLogo className="w-6 h-6" />
               </div>
@@ -327,16 +327,16 @@ const DashboardLayout = () => {
                     <CollapsibleTrigger asChild>
                       <motion.div
                         whileHover={{ x: 2 }}
-                        className={`flex items-center justify-between gap-3 p-3 rounded-lg transition-colors cursor-pointer ${
+                        className={`flex items-center justify-between gap-3 p-3 rounded-lg transition-colors cursor-pointer \${
                           isActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
-                        } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
+                        } \${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
                       >
                         <div className="flex items-center gap-3">
                           <item.icon className="h-5 w-5" />
-                          {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">{item.label}</span>}
+                          {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">\${item.label}</span>}
                         </div>
                         {!isDesktopSidebarCollapsed && (
-                          <ChevronDown className={`h-4 w-4 transition-transform ${isSubMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
+                          <ChevronDown className={`h-4 w-4 transition-transform \${isSubMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
                         )}
                       </motion.div>
                     </CollapsibleTrigger>
@@ -347,12 +347,12 @@ const DashboardLayout = () => {
                           <Link key={subItem.key} to={subItem.path} onClick={() => setIsMobileSidebarOpen(false)}>
                             <motion.div
                               whileHover={{ x: 2 }}
-                              className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                              className={`flex items-center gap-3 p-3 rounded-lg transition-colors \${
                                 isSubItemActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
-                              } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
+                              } \${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
                             >
                               <subItem.icon className="h-5 w-5" />
-                              {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">{subItem.label}</span>}
+                              {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">\${subItem.label}</span>}
                             </motion.div>
                           </Link>
                         );
@@ -366,12 +366,12 @@ const DashboardLayout = () => {
                 <Link key={item.key} to={item.path} onClick={() => setIsMobileSidebarOpen(false)}>
                   <motion.div
                     whileHover={{ x: 2 }}
-                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors \${
                       isActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
-                    } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
+                    } \${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
                   >
                     <item.icon className="h-5 w-5" />
-                    {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">{item.label}</span>}
+                    {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">\${item.label}</span>}
                   </motion.div>
                 </Link>
               );
@@ -379,7 +379,7 @@ const DashboardLayout = () => {
           </nav>
 
           <div className="p-4 border-t border-white/10 space-y-2">
-            <div className={`flex items-center gap-3 p-2 bg-white/5 rounded-lg ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}>
+            <div className={`flex items-center gap-3 p-2 bg-white/5 rounded-lg \${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}>
               <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center ring-2 ring-white/20">
                 <User className="w-5 h-5 text-white" />
               </div>
@@ -392,9 +392,9 @@ const DashboardLayout = () => {
             </div>
             <button
               onClick={handleLogout}
-              className={`w-full flex items-center justify-start text-gray-300 hover:bg-white/10 hover:text-white p-3 rounded-lg transition-colors ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
+              className={`w-full flex items-center justify-start text-gray-300 hover:bg-white/10 hover:text-white p-3 rounded-lg transition-colors \${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
             >
-              <LogOut className={`h-5 w-5 ${!isDesktopSidebarCollapsed ? 'mr-3' : ''}`} />
+              <LogOut className={`h-5 w-5 \${!isDesktopSidebarCollapsed ? 'mr-3' : ''}`} />
               {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">Logout</span>}
             </button>
           </div>
