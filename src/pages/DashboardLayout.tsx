@@ -138,7 +138,7 @@ const DashboardLayout = () => {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { session, user, loading, userRole } = useAuth();
+  const { session, user, loading, userRole, logout } = useAuth();
   const params = useParams();
   const [summaryNames, setSummaryNames] = useState<Record<string, string>>({});
 
@@ -153,18 +153,22 @@ const DashboardLayout = () => {
 
   useEffect(() => {
     if (!loading && !session) {
-      showStyledSwal({
-        icon: "warning",
-        title: "Session Error",
-        html: "Your session has expired. Please login again.",
-      }).then(() => {
-        navigate("/", { replace: true, state: { sessionExpired: true } });
-      });
+      navigate("/", { replace: true });
     }
   }, [session, loading, navigate]);
 
-  const handleLogout = async (isAuto = false) => {
-    navigate("/", { replace: true, state: { sessionExpired: isAuto } });
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Logout failed:", error);
+      showStyledSwal({
+        icon: "error",
+        title: "Logout Failed",
+        text: "An error occurred while trying to log out. Please try again."
+      });
+    }
   };
 
   useEffect(() => {
@@ -381,13 +385,13 @@ const DashboardLayout = () => {
               </div>
               {!isDesktopSidebarCollapsed && (
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-white truncate">{user?.username || "User"}</p>
+                  <p className="text-sm font-semibold text-white truncate">{user?.email || "User"}</p>
                   <p className="text-xs text-gray-400">{userRole || "Loading Role..."}</p>
                 </div>
               )}
             </div>
             <button
-              onClick={() => handleLogout(false)}
+              onClick={handleLogout}
               className={`w-full flex items-center justify-start text-gray-300 hover:bg-white/10 hover:text-white p-3 rounded-lg transition-colors ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
             >
               <LogOut className={`h-5 w-5 ${!isDesktopSidebarCollapsed ? 'mr-3' : ''}`} />
@@ -417,10 +421,10 @@ const DashboardLayout = () => {
             <div ref={userMenuRef} className="relative">
               <div className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-100 transition-colors" onClick={() => setUserMenuOpen(!userMenuOpen)}>
                 <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-semibold">
-                  {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
+                  {user?.email ? user.email.charAt(0).toUpperCase() : "U"}
                 </div>
                 <div className="hidden md:flex flex-col">
-                  <p className="text-sm font-semibold text-gray-800">{user?.username || "User"}</p>
+                  <p className="text-sm font-semibold text-gray-800">{user?.email || "User"}</p>
                   <p className="text-xs text-gray-600">{userRole || "Loading Role..."}</p>
                 </div>
                 <ChevronDown size={16} className="text-gray-600" />
@@ -435,7 +439,7 @@ const DashboardLayout = () => {
                     className="absolute right-0 mt-2 w-60 bg-white rounded-lg shadow-lg py-2 z-50 origin-top-right"
                   >
                     <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
-                      <p className="font-semibold">{user?.username || "User"}</p>
+                      <p className="font-semibold">{user?.email || "User"}</p>
                       <p className="text-xs text-gray-500">{userRole || "Loading Role..."}</p>
                     </div>
                     <Link to="/dashboard/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={() => setUserMenuOpen(false)}>
@@ -447,7 +451,7 @@ const DashboardLayout = () => {
                     <button
                       onClick={() => {
                         setUserMenuOpen(false);
-                        handleLogout(false);
+                        handleLogout();
                       }}
                       className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
