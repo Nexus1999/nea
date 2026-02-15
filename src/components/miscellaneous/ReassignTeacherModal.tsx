@@ -89,7 +89,7 @@ const ReassignTeacherModal = ({
           teacher_name, 
           phone, 
           workstation,
-          districts (district_name)
+          districts:district_number (district_name)
         `)
         .eq('status', 'active');
 
@@ -128,7 +128,7 @@ const ReassignTeacherModal = ({
     try {
       const { data: yearlyJobs } = await supabase
         .from('teacher_assignments')
-        .select(`job_id`)
+        .select(`job_id, jobassignments!inner(name)`)
         .eq('teacher_id', formData.newTeacher.id)
         .gte('assigned_at', '2026-01-01')
         .lte('assigned_at', '2026-12-31');
@@ -144,7 +144,8 @@ const ReassignTeacherModal = ({
       if ((yearlyJobs && yearlyJobs.length > 0) || hasStationConflict) {
         let message = "";
         if (yearlyJobs && yearlyJobs.length > 0) {
-          message += `This teacher has already participated in ${yearlyJobs.length} jobs this year. `;
+          const jobNames = yearlyJobs.map((j: any) => j.jobassignments.name).join(', ');
+          message += `This teacher has already participated in: ${jobNames}. `;
         }
         if (hasStationConflict) {
           message += `This teacher is already assigned to this job. `;

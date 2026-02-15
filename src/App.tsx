@@ -14,6 +14,7 @@ import AssignTeachers from "./pages/miscellaneous/AssignTeachers";
 import JobAssignments from "./pages/miscellaneous/JobAssignments";
 import TeacherSubmissionPage from "./pages/TeacherSubmissionPage";
 import Index from "./pages/Index";
+import PrimaryTeachersManagementPage from "./pages/miscellaneous/TeachersManagement";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
               <Route path="miscellaneous/jobs" element={<Teachers />} />
               <Route path="miscellaneous/jobs/assignments/:id" element={<JobAssignments />} />
               <Route path="miscellaneous/jobs/assign/:id" element={<AssignTeachers />} />
+              <Route path="miscellaneous/jobs/teachers-management" element={<PrimaryTeachersManagementPage />} />
               
               {/* Add more routes as needed */}
               <Route path="*" element={<div className="p-4">Page under construction</div>} />
