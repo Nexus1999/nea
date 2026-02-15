@@ -126,6 +126,7 @@ const ReassignTeacherModal = ({
 
     setLoading(true);
     try {
+      // Check if teacher has already participated in ANY job in 2026
       const { data: yearlyJobs } = await supabase
         .from('teacher_assignments')
         .select(`job_id, jobassignments!inner(name)`)
@@ -133,6 +134,7 @@ const ReassignTeacherModal = ({
         .gte('assigned_at', '2026-01-01')
         .lte('assigned_at', '2026-12-31');
 
+      // Check if teacher is already in THIS specific job
       const { data: stationConflicts } = await supabase
         .from('teacher_assignments')
         .select(`id`)

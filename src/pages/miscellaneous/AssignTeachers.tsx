@@ -283,7 +283,7 @@ const AssignTeachersPage = () => {
       if (error) throw error;
 
       showSuccess(`Successfully assigned ${selectedTeachers.length} teachers.`);
-      navigate(`/dashboard/miscellaneous/jobs`);
+      navigate(`/dashboard/miscellaneous/jobs/assignments/${id}`);
     } catch (err: any) {
       showError(err.message);
     } finally {
