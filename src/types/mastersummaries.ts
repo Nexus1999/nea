@@ -1,0 +1,1 @@
+export type SpecialNeedType = 'HI' | 'BR' | 'LV' | 'PI';
