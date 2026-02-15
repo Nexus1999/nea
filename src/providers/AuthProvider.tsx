@@ -5,7 +5,7 @@ interface AuthContextType {
   user: any;
   loading: boolean;
   userRole: string | null;
-  login: (email: string) => void;
+  login: (username: string) => void;
   logout: () => void;
 }
 
@@ -18,7 +18,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for existing session in localStorage
     const savedUser = localStorage.getItem('demo_user');
     if (savedUser) {
       const userData = JSON.parse(savedUser);
@@ -29,8 +28,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(false);
   }, []);
 
-  const login = (email: string) => {
-    const userData = { email };
+  const login = (username: string) => {
+    const userData = { username };
     localStorage.setItem('demo_user', JSON.stringify(userData));
     setSession({ user: userData });
     setUser(userData);

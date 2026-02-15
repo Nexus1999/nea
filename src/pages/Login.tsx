@@ -10,10 +10,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { showSuccess, showError } from '@/utils/toast';
 import NectaLogo from '@/components/NectaLogo';
-import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import { Lock, User, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,12 +26,12 @@ const Login = () => {
 
     // Simulate API call
     setTimeout(() => {
-      if (email && password) {
-        login(email);
+      if (username && password) {
+        login(username);
         showSuccess("Successfully logged in!");
         navigate('/dashboard');
       } else {
-        showError("Please enter both email and password.");
+        showError("Please enter both username and password.");
       }
       setIsLoading(false);
     }, 1000);
@@ -64,16 +64,16 @@ const Login = () => {
           <form onSubmit={handleSubmit}>
             <CardContent className="grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="username">Username</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="admin@example.com" 
+                    id="username" 
+                    type="text" 
+                    placeholder="admin_user" 
                     className="pl-10"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     required
                   />
                 </div>

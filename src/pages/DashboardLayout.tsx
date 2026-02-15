@@ -381,7 +381,7 @@ const DashboardLayout = () => {
               </div>
               {!isDesktopSidebarCollapsed && (
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-white truncate">{user?.email || "User"}</p>
+                  <p className="text-sm font-semibold text-white truncate">{user?.username || "User"}</p>
                   <p className="text-xs text-gray-400">{userRole || "Loading Role..."}</p>
                 </div>
               )}
@@ -417,10 +417,10 @@ const DashboardLayout = () => {
             <div ref={userMenuRef} className="relative">
               <div className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-100 transition-colors" onClick={() => setUserMenuOpen(!userMenuOpen)}>
                 <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-semibold">
-                  {user?.email ? user.email.charAt(0).toUpperCase() : "U"}
+                  {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
                 </div>
                 <div className="hidden md:flex flex-col">
-                  <p className="text-sm font-semibold text-gray-800">{user?.email || "User"}</p>
+                  <p className="text-sm font-semibold text-gray-800">{user?.username || "User"}</p>
                   <p className="text-xs text-gray-600">{userRole || "Loading Role..."}</p>
                 </div>
                 <ChevronDown size={16} className="text-gray-600" />
@@ -435,7 +435,7 @@ const DashboardLayout = () => {
                     className="absolute right-0 mt-2 w-60 bg-white rounded-lg shadow-lg py-2 z-50 origin-top-right"
                   >
                     <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
-                      <p className="font-semibold">{user?.email || "User"}</p>
+                      <p className="font-semibold">{user?.username || "User"}</p>
                       <p className="text-xs text-gray-500">{userRole || "Loading Role..."}</p>
                     </div>
                     <Link to="/dashboard/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={() => setUserMenuOpen(false)}>
