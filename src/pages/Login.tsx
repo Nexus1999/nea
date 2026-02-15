@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { User, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { User, Lock, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import NectaLogo from '@/components/NectaLogo';
 import { motion } from 'framer-motion';
 import { showError, showSuccess } from '@/utils/toast';
@@ -28,31 +28,34 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username || !password) return;
+    
     setLoading(true);
 
     try {
-      // 1. Try to find the email associated with this username
+      // 1. Find the email associated with this username
+      // We need a public policy on the profiles table to allow this lookup
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('email')
         .eq('username', username)
-        .single();
+        .maybeSingle();
 
-      let loginEmail = username; // Fallback to username if it's actually an email
-
-      if (profile && !profileError) {
-        loginEmail = profile.email;
+      if (profileError) throw profileError;
+      
+      if (!profile) {
+        throw new Error("Username not found. Please check your credentials.");
       }
 
       // 2. Sign in with the resolved email
       const { error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
+        email: profile.email,
         password: password,
       });
 
       if (error) throw error;
       
-      showSuccess("Welcome back!");
+      showSuccess(`Welcome back, ${username}!`);
       navigate('/dashboard');
     } catch (error: any) {
       showError(error.message || "Invalid username or password");
@@ -91,6 +94,10 @@ const Login = () => {
 
         <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
           <CardHeader className="pt-10 pb-6 px-8">
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck className="w-5 h-5 text-green-600" />
+              <span className="text-xs font-bold text-green-600 uppercase tracking-wider">Secure Access</span>
+            </div>
             <CardTitle className="text-2xl font-bold text-gray-800">Sign In</CardTitle>
             <CardDescription className="text-gray-500">Enter your username to access your account</CardDescription>
           </CardHeader>
