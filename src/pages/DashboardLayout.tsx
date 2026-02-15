@@ -108,6 +108,7 @@ const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType;
   'overview': { label: 'Overview', icon: LayoutDashboard },
   'jobs': { label: 'Teachers inventory', icon: Users },
   'teachers-management': { label: 'Teachers Management', icon: Users },
+  'supervisors-management': { label: 'Supervisors Management', icon: Users },
   'details': { label: 'Details', icon: FileText },
   'special-needs': { label: 'Special Needs', icon: Accessibility },
   'labels': { label: 'Labels', icon: Tags },

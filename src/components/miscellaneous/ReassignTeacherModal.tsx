@@ -89,8 +89,6 @@ const ReassignTeacherModal = ({
           teacher_name, 
           phone, 
           workstation,
-          region_code,
-          district_number,
           districts:district_number (district_name)
         `)
         .eq('status', 'active');
@@ -102,9 +100,7 @@ const ReassignTeacherModal = ({
         teacher_name: t.teacher_name || '',
         phone: t.phone || 'N/A',
         workstation: t.workstation || 'N/A',
-        region_code: t.region_code, // Captured for the NOT NULL constraint
-        district_number: t.district_number, // Captured for the NOT NULL constraint
-        district_name: t.districts?.district_name || 'N/A',
+        district: t.districts?.district_name || 'N/A',
         searchBlob: `${t.teacher_name} ${t.workstation} ${t.districts?.district_name}`.toLowerCase()
       })));
     } catch (err) {
@@ -118,7 +114,7 @@ const ReassignTeacherModal = ({
     setFormData(prev => ({
       ...prev,
       newTeacher: teacher,
-      newDistrict: teacher?.district_name || '',
+      newDistrict: teacher?.district || '',
       newWorkstation: teacher?.workstation || '',
       newPhone: teacher?.phone || ''
     }));
@@ -130,16 +126,14 @@ const ReassignTeacherModal = ({
 
     setLoading(true);
     try {
-      // 1. Check if teacher already participated in 2026
-      const { data: yearlyJobs, error: yearlyError } = await supabase
+      // Check for 2026 assignments
+      const { data: yearlyJobs } = await supabase
         .from('teacher_assignments')
-        .select(`job_id, jobassignments(name)`)
+        .select(`job_id, jobassignments!inner(name)`)
         .eq('teacher_id', formData.newTeacher.id)
-        .eq('assignment_year', 2026);
+        .gte('assigned_at', '2026-01-01')
+        .lte('assigned_at', '2026-12-31');
 
-      if (yearlyError) throw yearlyError;
-
-      // 2. Check if teacher is already in THIS specific job
       const { data: stationConflicts } = await supabase
         .from('teacher_assignments')
         .select(`id`)
@@ -147,16 +141,15 @@ const ReassignTeacherModal = ({
         .eq('teacher_id', formData.newTeacher.id);
 
       const hasStationConflict = stationConflicts && stationConflicts.length > 0;
-      const hasYearlyConflict = yearlyJobs && yearlyJobs.length > 0;
 
-      if (hasYearlyConflict || hasStationConflict) {
+      if ((yearlyJobs && yearlyJobs.length > 0) || hasStationConflict) {
         let message = "";
-        if (hasYearlyConflict) {
-          const jobNames = yearlyJobs.map((j: any) => j.jobassignments?.name).filter(Boolean).join(', ');
-          message += `Teacher has already participated in: ${jobNames || 'Another Job'}. `;
+        if (yearlyJobs && yearlyJobs.length > 0) {
+          const jobNames = Array.from(new Set(yearlyJobs.map((j: any) => j.jobassignments.name))).join(', ');
+          message += `This teacher has already participated in: ${jobNames}. `;
         }
         if (hasStationConflict) {
-          message += `Teacher is already assigned to this specific job list. `;
+          message += `This teacher is already assigned to this specific job. `;
         }
 
         setDialogConfig({
@@ -164,28 +157,31 @@ const ReassignTeacherModal = ({
           type: 'reassign',
           description: message
         });
-        setLoading(false); // Stop loading to allow dialog to show
+        setLoading(false);
         return;
       }
 
       await executeUpdate();
-    } catch (err: any) {
-      showError("Validation failed: " + err.message);
+    } catch (err) {
+      showError("Validation failed");
       setLoading(false);
     }
   };
 
   const executeUpdate = async () => {
+    // FIX: Get ID directly from prop to avoid any closure issues
+    const assignmentId = currentTeacher?.assignmentId;
+    if (!assignmentId) {
+      showError("Critical Error: Missing Assignment ID");
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
         .from('teacher_assignments')
-        .update({ 
-          teacher_id: formData.newTeacher.id,
-          region_code: formData.newTeacher.region_code,     // Fix: NOT NULL requirement
-          district_number: formData.newTeacher.district_number // Fix: NOT NULL requirement
-        })
-        .eq('id', currentTeacher.assignmentId);
+        .update({ teacher_id: formData.newTeacher.id })
+        .eq('id', assignmentId);
 
       if (error) throw error;
 
@@ -202,87 +198,159 @@ const ReassignTeacherModal = ({
 
   return (
     <>
-      <Dialog open={isOpen} onClose={onClose} fullWidth maxWidth="sm">
+      <Dialog
+        open={isOpen}
+        onClose={onClose}
+        fullWidth
+        maxWidth="sm"
+        // FIX: Ensure main dialog doesn't block the Alert
+        sx={{ zIndex: 1200 }} 
+        PaperProps={{
+          sx: { borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }
+        }}
+      >
         <Box sx={{ p: 3, pb: 2, borderBottom: '1px solid #e5e7eb', position: 'relative' }}>
-          <IconButton onClick={onClose} size="small" sx={{ position: 'absolute', right: 16, top: 16 }}>
+          <IconButton onClick={onClose} size="small" sx={{ position: 'absolute', right: 16, top: 16, color: '#64748b' }}>
             <X size={18} />
           </IconButton>
-          <Typography variant="h6" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AccountCircle /> Reassign Teacher
+          
+          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '18px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AccountCircle sx={{ fontSize: 20 }} /> Reassign Teacher
           </Typography>
         </Box>
 
-        <DialogContent sx={{ p: 3 }}>
-            {/* Current Teacher Info (Read Only) */}
+        <DialogContent sx={{ p: 3, bgcolor: '#ffffff' }}>
             <Box sx={{ mb: 3 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 1.5, display: 'block' }}>
-                CURRENT TEACHER
+              <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#64748b', mb: 1.5, display: 'block' }}>
+                Current Teacher
               </Typography>
-              <TextField label="Name" value={formData.currentName} fullWidth readOnly size="small" sx={{ mb: 1.5 }} />
-              <Box sx={{ display: 'flex', gap: 1.5 }}>
-                <TextField label="District" value={formData.currentDistrict} fullWidth readOnly size="small" />
-                <TextField label="Workstation" value={formData.currentWorkstation} fullWidth readOnly size="small" />
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <TextField
+                  label="Teacher Name"
+                  value={formData.currentName}
+                  fullWidth
+                  InputProps={{ 
+                    readOnly: true, 
+                    startAdornment: <InputAdornment position="start"><AccountCircle sx={{ fontSize: 18, color: '#64748b' }} /></InputAdornment> 
+                  }}
+                  size="small"
+                />
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <TextField label="District" value={formData.currentDistrict} fullWidth size="small" InputProps={{ readOnly: true }} />
+                  <TextField label="Workstation" value={formData.currentWorkstation} fullWidth size="small" InputProps={{ readOnly: true }} />
+                </Box>
               </Box>
             </Box>
 
-            {/* New Teacher Search */}
             <Box>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 1.5, display: 'block' }}>
-                NEW ASSIGNMENT
+              <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#64748b', mb: 1.5, display: 'block' }}>
+                New Teacher
               </Typography>
-              <Autocomplete
-                options={teachers}
-                getOptionLabel={(option: any) => option.teacher_name}
-                filterOptions={filter}
-                value={formData.newTeacher}
-                onChange={(_, val) => handleTeacherSelect(val)}
-                loading={fetching}
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Search by name or district..." size="small" />
-                )}
-                renderOption={(props, option: any) => (
-                  <Box component="li" {...props} key={option.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start !important' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.teacher_name}</Typography>
-                    <Typography variant="caption">{option.district_name} • {option.workstation}</Typography>
-                  </Box>
-                )}
-              />
               
-              <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5 }}>
-                <TextField label="New District" value={formData.newDistrict} fullWidth readOnly size="small" />
-                <TextField label="New Workstation" value={formData.newWorkstation} fullWidth readOnly size="small" />
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <Autocomplete
+                  options={teachers}
+                  getOptionLabel={(option: any) => option.teacher_name}
+                  filterOptions={filter}
+                  autoHighlight
+                  disableListWrap
+                  renderOption={(props, option: any) => {
+                    const { key, ...otherProps } = props;
+                    return (
+                      <Box component="li" key={option.id} {...otherProps} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start !important', py: 1.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.teacher_name}</Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                          {option.district} • {option.workstation}
+                        </Typography>
+                      </Box>
+                    );
+                  }}
+                  value={formData.newTeacher}
+                  onChange={(_, val) => handleTeacherSelect(val)}
+                  loading={fetching}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      placeholder="Search by name, district, or station..."
+                      size="small"
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Search size={18} color="#64748b" />
+                          </InputAdornment>
+                        ),
+                        endAdornment: (
+                          <React.Fragment>
+                            {fetching ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </React.Fragment>
+                        ),
+                      }}
+                    />
+                  )}
+                />
+                
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <TextField label="District" value={formData.newDistrict} fullWidth size="small" InputProps={{ readOnly: true }} />
+                  <TextField label="Workstation" value={formData.newWorkstation} fullWidth size="small" InputProps={{ readOnly: true }} />
+                </Box>
+                <TextField label="Phone Number" value={formData.newPhone} fullWidth size="small" InputProps={{ readOnly: true }} />
               </Box>
             </Box>
         </DialogContent>
 
-        <DialogActions sx={{ p: 3 }}>
+        <DialogActions sx={{ p: 3, pt: 2, borderTop: '1px solid #e5e7eb', justifyContent: 'flex-end' }}>
           <Button 
-            className="bg-slate-900 text-white w-full h-11" 
+            variant="default" 
+            size="sm" 
+            className="bg-slate-900 hover:bg-black text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-8" 
             disabled={loading || !formData.newTeacher}
             onClick={validateAndSubmit}
           >
-            {loading ? <CircularProgress size={20} color="inherit" /> : <><UserPlus className="mr-2 h-4 w-4" /> Reassign Teacher</>}
+            {loading ? (
+              <CircularProgress size={14} sx={{ color: 'white', mr: 1 }} />
+            ) : (
+              <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            {loading ? 'Validating...' : 'Reassign Teacher'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Conflict Alert */}
-      <AlertDialog open={dialogConfig.open} onOpenChange={(val) => setDialogConfig({ ...dialogConfig, open: val })}>
-        <AlertDialogContent>
+      {/* FIXED ALERT DIALOG: Added forced zIndex */}
+      <AlertDialog 
+        open={dialogConfig.open} 
+        onOpenChange={(val) => setDialogConfig({ ...dialogConfig, open: val })}
+      >
+        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6 z-[9999]">
           <AlertDialogHeader>
-            <div className="flex flex-col items-center">
-              <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
-              <AlertDialogTitle>Duplicate Assignment Detected</AlertDialogTitle>
-              <AlertDialogDescription className="text-center">
-                {dialogConfig.description}
-                <br /><br />
-                Do you want to force this reassignment anyway?
-              </AlertDialogDescription>
+            <div className="flex flex-col items-center text-center mb-2">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-indigo-50 text-indigo-600`}>
+                <AlertTriangle className="h-7 w-7" />
+              </div>
+              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
+                Potential Conflict
+              </AlertDialogTitle>
             </div>
+            <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
+              {dialogConfig.description}
+              <br/><br/>
+              Are you sure you want to proceed with this assignment?
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={executeUpdate} className="bg-red-600">
+
+          <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
+            <AlertDialogCancel className="flex-1 h-11 border-slate-200 text-slate-500 hover:text-slate-900 font-bold uppercase text-[10px] tracking-widest rounded-xl mt-0">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                executeUpdate();
+              }}
+              className="flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-sm bg-red-600 hover:bg-red-700 text-white"
+            >
               Confirm Reassignment
             </AlertDialogAction>
           </AlertDialogFooter>

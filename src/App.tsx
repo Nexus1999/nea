@@ -15,6 +15,8 @@ import JobAssignments from "./pages/miscellaneous/JobAssignments";
 import TeacherSubmissionPage from "./pages/TeacherSubmissionPage";
 import Index from "./pages/Index";
 import PrimaryTeachersManagementPage from "./pages/miscellaneous/TeachersManagement";
+import SupervisionsPage from "./pages/supervisors/SupervisionsPage";
+import SupervisorsManagementPage from "./pages/supervisors/SupervisorsManagementPage";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +52,11 @@ const App = () => (
             >
               <Route index element={<Overview />} />
               <Route path="timetables" element={<Timetables />} />
+
+               {/* Supervisors Routes */}
+              <Route path="supervisors" element={<SupervisionsPage />} />
+              <Route path="supervisors/supervisors-management" element={<SupervisorsManagementPage />} />
+
               
               {/* Miscellaneous Routes */}
               <Route path="miscellaneous/jobs" element={<Teachers />} />
