@@ -11,6 +11,7 @@ import Overview from "./pages/dashboard/Overview";
 import Timetables from "./pages/dashboard/Timetables";
 import Teachers from "./pages/miscellaneous/Teachers";
 import AssignTeachers from "./pages/miscellaneous/AssignTeachers";
+import JobAssignments from "./pages/miscellaneous/JobAssignments";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +48,8 @@ const App = () => (
               
               {/* Miscellaneous Routes */}
               <Route path="miscellaneous/jobs" element={<Teachers />} />
-              <Route path="miscellaneous/jobs/assignments/:id" element={<AssignTeachers />} />
+              <Route path="miscellaneous/jobs/assignments/:id" element={<JobAssignments />} />
+              <Route path="miscellaneous/jobs/assign/:id" element={<AssignTeachers />} />
               
               {/* Add more routes as needed */}
               <Route path="*" element={<div className="p-4">Page under construction</div>} />

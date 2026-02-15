@@ -80,7 +80,7 @@ const PrimaryTeacherAssignments = () => {
   const handleDeleteAssignment = async (record: JobAssignment) => {
     showStyledSwal({
       title: 'Confirm Deletion',
-      html: `Delete assignment <b>\${record.name}</b>?`,
+      html: `Delete assignment <b>${record.name}</b>?`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Delete',
@@ -106,11 +106,11 @@ const PrimaryTeacherAssignments = () => {
   const handleExportCSV = (item: JobAssignment) => {
     const headers = ["Name", "Section", "Total Required", "Start Date", "End Date", "Status"];
     const row = [item.name, item.section, item.total_required, item.start_date, item.end_date, item.status];
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\\n" + row.join(",");
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + row.join(",");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `\${item.name}_assignment.csv`);
+    link.setAttribute("download", `${item.name}_assignment.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -224,14 +224,14 @@ const PrimaryTeacherAssignments = () => {
                         <div className="flex justify-end gap-1">
                           <Button 
                             variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                            title="View Summary" onClick={() => navigate(`/supervisions/summary/\${item.id}`)}
+                            title="View Summary" onClick={() => navigate(`/supervisions/summary/${item.id}`)}
                           >
                             <FileText className="h-4 w-4" />
                           </Button>
 
                           <Button 
                             variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                            title="Manage Assignments" onClick={() => navigate(`/dashboard/miscellaneous/jobs/assignments/\${item.id}`)}
+                            title="Manage Assignments" onClick={() => navigate(`/dashboard/miscellaneous/jobs/assignments/${item.id}`)}
                           >
                             <UserPlus className="h-4 w-4" />
                           </Button>
