@@ -278,9 +278,13 @@ const DashboardLayout = () => {
           flex-shrink-0 h-full bg-gradient-to-b from-gray-900 to-gray-800 shadow-2xl z-50
           ${isMobileSidebarOpen ? "fixed translate-x-0" : "fixed -translate-x-full"}
           lg:relative lg:translate-x-0
-          flex flex-col overflow-y-auto scrollbar-hidden
+          flex flex-col overflow-y-auto scrollbar-none
         `}
-        style={{ width: isMobileSidebarOpen ? "288px" : (isDesktopSidebarCollapsed ? "90px" : "288px") }}
+        style={{ 
+          width: isMobileSidebarOpen ? "288px" : (isDesktopSidebarCollapsed ? "90px" : "288px"),
+          msOverflowStyle: 'none',
+          scrollbarWidth: 'none'
+        }}
       >
         <div className="flex flex-col h-full">
           <div className="p-6 border-b border-white/10 flex justify-between items-center h-20">
@@ -290,7 +294,7 @@ const DashboardLayout = () => {
               </div>
               {!isDesktopSidebarCollapsed && (
                 <div>
-                  <h1 className="text-white font-black text-lg">Neas</h1>
+                  <h1 className="text-white font-black text-lg">NEAS</h1>
                   <p className="text-xs text-gray-400 font-medium">Admin System</p>
                 </div>
               )}

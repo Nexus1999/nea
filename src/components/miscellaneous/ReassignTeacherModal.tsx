@@ -311,7 +311,7 @@ const ReassignTeacherModal = ({
         <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6">
           <AlertDialogHeader>
             <div className="flex flex-col items-center text-center mb-2">
-              <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-indigo-50 text-indigo-600">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-indigo-50 text-indigo-600`}>
                 <AlertTriangle className="h-7 w-7" />
               </div>
               <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
