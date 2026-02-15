@@ -90,7 +90,7 @@ const navItems = [
   { path: '/dashboard/profile', label: 'Profile', icon: User, key: 'Profile' },
 ];
 
-const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType }> = {
+const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType; path?: string }> = {
   'timetables': { label: 'Timetables', icon: Clock },
   'budgets': { label: 'Budgets', icon: DollarSign },
   'mastersummaries': { label: 'Master Summaries', icon: Database },
@@ -114,7 +114,7 @@ const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType 
   'versions': { label: 'Versions', icon: GitBranch },
   'summary': { label: 'Summary', icon: FileText },
   'management': { label: 'Management', icon: UserCog },
-  'assignments': { label: 'Assignments', icon: FileText },
+  'assignments': { label: 'Assignments', icon: FileText, path: '/dashboard/miscellaneous/jobs' },
   'users': { label: 'Users', icon: Users },
   'roles': { label: 'Roles', icon: UserCog },
   'permissions': { label: 'Permissions', icon: Shield },
@@ -149,14 +149,14 @@ const DashboardLayout = () => {
 
   useEffect(() => {
     if (!loading && !session) {
-      navigate("/", { replace: true });
+      navigate("/login", { replace: true });
     }
   }, [session, loading, navigate]);
 
   const handleLogout = async () => {
     try {
       await logout();
-      navigate("/", { replace: true });
+      navigate("/login", { replace: true });
     } catch (error) {
       console.error("Logout failed:", error);
       showStyledSwal({
@@ -211,8 +211,8 @@ const DashboardLayout = () => {
       const isLast = index === segments.length - 1;
       const previousSegment = index > 0 ? segments[index - 1] : undefined;
       const config = getBreadcrumbConfig(segment, previousSegment);
-      const { label, icon: Icon } = config;
-      const pathTo = `/dashboard/${segments.slice(0, index + 1).join('/')}`;
+      const { label, icon: Icon, path: customPath } = config;
+      const pathTo = customPath || `/dashboard/${segments.slice(0, index + 1).join('/')}`;
       
       const content = (
         <span className="flex items-center gap-1">

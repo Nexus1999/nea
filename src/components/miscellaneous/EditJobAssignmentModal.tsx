@@ -4,13 +4,12 @@ import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Save, Edit3, Users2 } from "lucide-react";
+import { Loader2, Save, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 
@@ -20,8 +19,6 @@ const assignmentSchema = z.object({
   start_date: z.string().min(1, "Start date is required"),
   end_date: z.string().min(1, "End date is required"),
   total_required: z.coerce.number().min(1, "Teachers required count is needed"),
-  male_quota: z.coerce.number().min(0).max(100).optional().default(0),
-  female_quota: z.coerce.number().min(0).max(100).optional().default(0),
   status: z.enum(["pending", "active", "completed"]),
 }).refine((data) => {
   return new Date(data.end_date) >= new Date(data.start_date);
@@ -32,7 +29,6 @@ const assignmentSchema = z.object({
 
 export const EditJobAssignmentModal = ({ open, onOpenChange, onSuccess, assignment }: any) => {
   const [loading, setLoading] = useState(false);
-  const [showQuotas, setShowQuotas] = useState(false);
 
   const form = useForm<z.infer<typeof assignmentSchema>>({
     resolver: zodResolver(assignmentSchema),
@@ -42,8 +38,6 @@ export const EditJobAssignmentModal = ({ open, onOpenChange, onSuccess, assignme
       start_date: "",
       end_date: "",
       total_required: 0,
-      male_quota: 0,
-      female_quota: 0,
       status: "pending",
     },
   });
@@ -51,11 +45,13 @@ export const EditJobAssignmentModal = ({ open, onOpenChange, onSuccess, assignme
   useEffect(() => {
     if (open && assignment) {
       form.reset({
-        ...assignment,
-        male_quota: assignment.male_quota || 0,
-        female_quota: assignment.female_quota || 0,
+        name: assignment.name,
+        section: assignment.section,
+        start_date: assignment.start_date,
+        end_date: assignment.end_date,
+        total_required: assignment.total_required,
+        status: assignment.status,
       });
-      setShowQuotas(assignment.male_quota > 0 || assignment.female_quota > 0);
     }
   }, [open, assignment, form]);
 
@@ -149,41 +145,6 @@ export const EditJobAssignmentModal = ({ open, onOpenChange, onSuccess, assignme
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="rounded-lg border bg-slate-50/50 p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users2 className="h-4 w-4 text-slate-500" />
-                  <span className="text-sm font-medium">Gender Quotas (%)</span>
-                </div>
-                <Switch checked={showQuotas} onCheckedChange={setShowQuotas} />
-              </div>
-
-              {showQuotas && (
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
-                  <FormField
-                    control={form.control}
-                    name="male_quota"
-                    render={({ field }) => (
-                      <FormItem className="space-y-1">
-                        <FormLabel className="text-[10px] uppercase font-bold text-blue-600">Male %</FormLabel>
-                        <FormControl><Input type="number" placeholder="%" className="h-8 bg-white" {...field} /></FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="female_quota"
-                    render={({ field }) => (
-                      <FormItem className="space-y-1">
-                        <FormLabel className="text-[10px] uppercase font-bold text-pink-600">Female %</FormLabel>
-                        <FormControl><Input type="number" placeholder="%" className="h-8 bg-white" {...field} /></FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

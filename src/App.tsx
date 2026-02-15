@@ -12,6 +12,8 @@ import Timetables from "./pages/dashboard/Timetables";
 import Teachers from "./pages/miscellaneous/Teachers";
 import AssignTeachers from "./pages/miscellaneous/AssignTeachers";
 import JobAssignments from "./pages/miscellaneous/JobAssignments";
+import TeacherSubmissionPage from "./pages/TeacherSubmissionPage";
+import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
 
@@ -32,7 +34,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Login />} />
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/portal/:jobId" element={<TeacherSubmissionPage />} />
             
             {/* Dashboard Routes */}
             <Route 

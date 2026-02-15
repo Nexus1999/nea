@@ -72,6 +72,16 @@ const JobAssignmentsPage = () => {
 
       if (error) throw error;
 
+      // Fetch region and district names separately to avoid complex join issues
+      const regionCodes = [...new Set(data.map((item: any) => item.primaryteachers?.region_code).filter(Boolean))];
+      const districtNumbers = [...new Set(data.map((item: any) => item.primaryteachers?.district_number).filter(Boolean))];
+
+      const { data: regions } = await supabase.from('regions').select('region_code, region_name').in('region_code', regionCodes);
+      const { data: districts } = await supabase.from('districts').select('district_number, district_name').in('district_number', districtNumbers);
+
+      const regionMap = Object.fromEntries(regions?.map(r => [r.region_code, r.region_name]) || []);
+      const districtMap = Object.fromEntries(districts?.map(d => [d.district_number, d.district_name]) || []);
+
       const formatted = data.map((item: any) => ({
         assignmentId: item.id,
         teacherId: item.teacher_id,
@@ -79,8 +89,8 @@ const JobAssignmentsPage = () => {
         sex: item.primaryteachers?.sex || 'N/A',
         phone: item.primaryteachers?.phone || 'N/A',
         workstation: item.primaryteachers?.workstation || 'N/A',
-        region: item.primaryteachers?.region_code || 'N/A',
-        district: item.primaryteachers?.district_number || 'N/A',
+        region: regionMap[item.primaryteachers?.region_code] || 'N/A',
+        district: districtMap[item.primaryteachers?.district_number] || 'N/A',
         account_name: item.primaryteachers?.account_name || '',
         account_number: item.primaryteachers?.account_number || '',
         bank_name: item.primaryteachers?.bank_name || '',
