@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Sparkles, ArrowRight, CheckCircle2, Users, FileText, Shield } from "lucide-react";
 
-const Index = () => {
+const DetailsPortal = () => {
   const jobId = "48d88269-5fa4-4670-9704-dddef9303e29";
 
   return (
@@ -94,4 +94,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default DetailsPortal;

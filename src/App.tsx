@@ -13,7 +13,7 @@ import Teachers from "./pages/miscellaneous/Teachers";
 import AssignTeachers from "./pages/miscellaneous/AssignTeachers";
 import JobAssignments from "./pages/miscellaneous/JobAssignments";
 import TeacherSubmissionPage from "./pages/TeacherSubmissionPage";
-import Index from "./pages/Index";
+import DetailsPortal from "./pages/DetailsPortal";
 import PrimaryTeachersManagementPage from "./pages/miscellaneous/TeachersManagement";
 import SupervisionsPage from "./pages/supervisors/SupervisionsPage";
 import SupervisorsManagementPage from "./pages/supervisors/SupervisorsManagementPage";
@@ -37,7 +37,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<Login />} />
             <Route path="/login" element={<Login />} />
             <Route path="/portal/:jobId" element={<TeacherSubmissionPage />} />
             
