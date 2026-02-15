@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   userRole: string | null;
+  username: string | null;
   logout: () => Promise<void>;
 }
 
@@ -17,13 +18,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchUserRole(session.user.id);
+      if (session?.user) fetchUserData(session.user.id);
       setLoading(false);
     });
 
@@ -32,9 +34,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchUserRole(session.user.id);
+        fetchUserData(session.user.id);
       } else {
         setUserRole(null);
+        setUsername(null);
       }
       setLoading(false);
     });
@@ -42,20 +45,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserRole = async (userId: string) => {
+  const fetchUserData = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('roles(name)')
+        .select('username, roles(name)')
         .eq('id', userId)
         .single();
       
       if (data && !error) {
+        setUsername(data.username);
         // @ts-ignore
         setUserRole(data.roles?.name || 'User');
       }
     } catch (err) {
-      console.error('Error fetching role:', err);
+      console.error('Error fetching user data:', err);
     }
   };
 
@@ -64,7 +68,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, userRole, logout }}>
+    <AuthContext.Provider value={{ session, user, loading, userRole, username, logout }}>
       {children}
     </AuthContext.Provider>
   );
