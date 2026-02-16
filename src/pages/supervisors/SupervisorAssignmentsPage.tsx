@@ -125,7 +125,10 @@ const SupervisorAssignmentsPage = () => {
 
       // 1. Map Center Assignments
       const centerRows = centers.map((c) => {
-        const assign = assignmentsFromDb.find(a => a.center_no === c.center_number && !a.is_reserve);
+        const assign = assignmentsFromDb.find(a => 
+          a.center_no === c.center_number && 
+          !(a.is_reserve === true || a.is_reserve === 1)
+        );
         return {
           id: `center-${c.center_number}`,
           region: c.region,
@@ -141,7 +144,7 @@ const SupervisorAssignmentsPage = () => {
 
       // 2. Map Reserve Assignments (District Reserves)
       const reserveRows = assignmentsFromDb
-        .filter(a => a.is_reserve)
+        .filter(a => a.is_reserve === true || a.is_reserve === 1)
         .map((r) => ({
           id: `reserve-${r.id}`,
           region: r.region,
@@ -247,8 +250,8 @@ const SupervisorAssignmentsPage = () => {
         item.phone.toLowerCase().includes(searchStr) ||
         item.workstation.toLowerCase().includes(searchStr);
 
-      const matchesRegion = selectedRegion === 'all' || item.region === selectedRegion;
-      const matchesDistrict = selectedDistrict === 'all' || item.district === selectedDistrict;
+      const matchesRegion = selectedRegion === 'all' || (item.region && item.region.trim() === selectedRegion.trim());
+      const matchesDistrict = selectedDistrict === 'all' || (item.district && item.district.trim() === selectedDistrict.trim());
       return matchesSearch && matchesRegion && matchesDistrict;
     });
   }, [allData, search, selectedRegion, selectedDistrict]);
