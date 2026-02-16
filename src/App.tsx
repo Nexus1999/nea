@@ -19,6 +19,7 @@ import DetailsPortal from "./pages/DetailsPortal";
 import PrimaryTeachersManagementPage from "./pages/miscellaneous/TeachersManagement";
 import SupervisionsPage from "./pages/supervisors/SupervisionsPage";
 import SupervisorsManagementPage from "./pages/supervisors/SupervisorsManagementPage";
+import SupervisorAssignmentsPage from "./pages/supervisors/SupervisorAssignmentsPage";
 
 const queryClient = new QueryClient();
 
@@ -60,7 +61,7 @@ const App = () => (
                {/* Supervisors Routes */}
               <Route path="supervisors" element={<SupervisionsPage />} />
               <Route path="supervisors/supervisors-management" element={<SupervisorsManagementPage />} />
-
+              <Route path="supervisors/supervisors-assignments" element={<SupervisorAssignmentsPage />} />
               
               {/* Miscellaneous Routes */}
               <Route path="miscellaneous/jobs" element={<Teachers />} />

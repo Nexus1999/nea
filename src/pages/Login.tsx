@@ -79,16 +79,15 @@ const Login = () => {
         transition={{ duration: 0.5 }}
         className="w-full max-w-[440px] px-4 z-10"
       >
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-black tracking-tight text-gray-900 mb-2">
-            NEAS <span className="text-red-600">Admin</span>
-          </h1>
-        </div>
+         
 
         <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
           <CardHeader className="pt-10 pb-2 px-8 text-center">
-             <p className="text-gray-500 font-medium">National Examination Administration System</p>
-            <div className="flex justify-center mb-6 mt-4">
+           <h1 className="text-lg font-bold tracking-tight text-gray-900">
+            EXAMINATIONS ADMINISTRATION
+          </h1>
+
+             <div className="flex justify-center mb-6 mt-4">
               <motion.div 
                 initial={{ scale: 0.8 }}
                 animate={{ scale: 1 }}
@@ -165,7 +164,7 @@ const Login = () => {
 
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">
-            © 2024 NECTA • All Rights Reserved
+            © NECTA • All Rights Reserved
           </p>
         </div>
       </motion.div>
