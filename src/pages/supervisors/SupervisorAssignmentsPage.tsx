@@ -12,7 +12,9 @@ import {
   RefreshCw,
   AlertTriangle,
   ShieldAlert,
-  Users
+  Users,
+  MapPin,
+  Building2
 } from "lucide-react";
 import {
   Table,
@@ -21,14 +23,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,25 +40,22 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@/alert-dialog";
+import { Input } from "@/input";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
 import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
 import ReassignSupervisorModal from "@/components/supervisors/ReassignSupervisorModal";
-import { SupervisorDetailsDrawer } from "@/components/supervisors/SupervisorsProfile";
 import abbreviateSchoolName from "@/utils/abbreviateSchoolName";
 
 const SupervisorAssignmentsPage = () => {
   const { id } = useParams(); 
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [reserves, setReserves] = useState<any[]>([]);
+  const [allData, setAllData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [summaryInfo, setSummaryInfo] = useState({ code: '', year: '' });
+  const [summaryInfo, setSummaryInfo] = useState({ code: '', year: '', mid: null as any });
   
   const [regions, setRegions] = useState<string[]>([]);
   const [selectedRegion, setSelectedRegion] = useState('all');
@@ -66,7 +65,6 @@ const SupervisorAssignmentsPage = () => {
   const [itemsPerPage] = useState(15);
   
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
-  const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -102,7 +100,8 @@ const SupervisorAssignmentsPage = () => {
 
       setSummaryInfo({
         code: supervision.mastersummaries.Code || '',
-        year: supervision.mastersummaries.Year || ''
+        year: supervision.mastersummaries.Year || '',
+        mid: supervision.mid
       });
 
       const centersTableMap: Record<string, string> = {
@@ -123,23 +122,20 @@ const SupervisorAssignmentsPage = () => {
       if (assignmentsRes.error) throw assignmentsRes.error;
 
       const centers = centersRes.data || [];
-      const allAssignments = assignmentsRes.data || [];
+      const assignmentsFromDb = assignmentsRes.data || [];
 
       const uniqueRegions = [...new Set(centers.map(c => c.region))].sort();
       setRegions(uniqueRegions);
 
-      // Separate main assignments and reserves
-      const mainAssignments = allAssignments.filter(a => a.is_reserve === false);
-      const reserveAssignments = allAssignments.filter(a => a.is_reserve === true);
-
-      // Format Main Assignments
-      const formattedMain = centers.map((c) => {
-        const assign = mainAssignments.find(a => a.center_no === c.center_number);
+      // 1. Map Center Assignments
+      const centerRows = centers.map((c) => {
+        const assign = assignmentsFromDb.find(a => a.center_no === c.center_number && !a.is_reserve);
         return {
-          sn_id: c.center_number,
+          id: `center-${c.center_number}`,
+          type: 'CENTER',
           region: c.region,
           district: c.district,
-          center_full: `${c.center_number} - ${abbreviateSchoolName(c.center_name || '')}`,
+          location: `${c.center_number} - ${abbreviateSchoolName(c.center_name || '')}`,
           supervisor: assign?.supervisor_name || 'PENDING',
           workstation: assign?.workstation || '—',
           phone: assign?.phone || '—',
@@ -148,19 +144,23 @@ const SupervisorAssignmentsPage = () => {
         };
       });
 
-      // Format Reserves
-      const formattedReserves = reserveAssignments.map((r, i) => ({
-        sn_id: `res-${i}`,
-        region: r.region,
-        district: r.district,
-        supervisor: r.supervisor_name,
-        workstation: r.workstation,
-        phone: r.phone,
-        assignment_id: r.id
-      }));
+      // 2. Map Reserve Assignments (District Reserves)
+      const reserveRows = assignmentsFromDb
+        .filter(a => a.is_reserve)
+        .map((r, i) => ({
+          id: `reserve-${r.id}`,
+          type: 'RESERVE',
+          region: r.region,
+          district: r.district,
+          location: `DISTRICT RESERVE`,
+          supervisor: r.supervisor_name,
+          workstation: r.workstation,
+          phone: r.phone,
+          assignment_id: r.id,
+          is_assigned: true
+        }));
 
-      setAssignments(formattedMain);
-      setReserves(formattedReserves);
+      setAllData([...centerRows, ...reserveRows]);
 
     } catch (err: any) {
       showError(err.message);
@@ -168,8 +168,7 @@ const SupervisorAssignmentsPage = () => {
   };
 
   const handleAssignClick = () => {
-    // Check if assignments already exist for the selected criteria
-    const hasExisting = assignments.some(a => 
+    const hasExisting = allData.some(a => 
       a.is_assigned && 
       (selectedRegion === 'all' || a.region === selectedRegion) &&
       (selectedDistrict === 'all' || a.district === selectedDistrict)
@@ -196,13 +195,15 @@ const SupervisorAssignmentsPage = () => {
       };
 
       const { data, error } = await supabase.functions.invoke('assign-supervisors', { body: payload });
+      
       if (error) throw error;
 
       if (data?.success === false) {
         showError(data.error || "Assignment failed");
       } else {
         showSuccess(data.message || "Assignments generated successfully!");
-        await fetchAssignments();
+        // Small delay to allow DB to settle before re-fetching
+        setTimeout(fetchAssignments, 500);
       }
     } catch (err: any) {
       showError(err.message || "Assignment failed");
@@ -236,26 +237,19 @@ const SupervisorAssignmentsPage = () => {
     }
   };
 
-  const handleResetFilters = () => {
-    setSelectedRegion('all');
-    setSelectedDistrict('all');
-    setSearch('');
-    setCurrentPage(1);
-  };
-
   const availableDistricts = useMemo(() => {
     if (selectedRegion === 'all') return [];
-    const filteredDistricts = assignments
+    const filteredDistricts = allData
       .filter(item => item.region === selectedRegion)
       .map(item => item.district);
     return [...new Set(filteredDistricts)].sort();
-  }, [assignments, selectedRegion]);
+  }, [allData, selectedRegion]);
 
   const filteredData = useMemo(() => {
-    return assignments.filter(item => {
+    return allData.filter(item => {
       const searchStr = search.toLowerCase();
       const matchesSearch = 
-        item.center_full.toLowerCase().includes(searchStr) ||
+        item.location.toLowerCase().includes(searchStr) ||
         item.supervisor.toLowerCase().includes(searchStr) ||
         item.phone.toLowerCase().includes(searchStr) ||
         item.workstation.toLowerCase().includes(searchStr);
@@ -264,15 +258,7 @@ const SupervisorAssignmentsPage = () => {
       const matchesDistrict = selectedDistrict === 'all' || item.district === selectedDistrict;
       return matchesSearch && matchesRegion && matchesDistrict;
     });
-  }, [assignments, search, selectedRegion, selectedDistrict]);
-
-  const filteredReserves = useMemo(() => {
-    return reserves.filter(item => {
-      const matchesRegion = selectedRegion === 'all' || item.region === selectedRegion;
-      const matchesDistrict = selectedDistrict === 'all' || item.district === selectedDistrict;
-      return matchesRegion && matchesDistrict;
-    });
-  }, [reserves, selectedRegion, selectedDistrict]);
+  }, [allData, search, selectedRegion, selectedDistrict]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const currentData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -327,103 +313,100 @@ const SupervisorAssignmentsPage = () => {
         </CardHeader>
 
         <CardContent className="pt-6">
-          <Tabs defaultValue="main" className="w-full">
-            <div className="flex items-center justify-between mb-6">
-              <TabsList className="bg-slate-100 p-1 rounded-xl">
-                <TabsTrigger value="main" className="rounded-lg text-[10px] font-black uppercase px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  Main Assignments ({filteredData.length})
-                </TabsTrigger>
-                <TabsTrigger value="reserves" className="rounded-lg text-[10px] font-black uppercase px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  Reserves ({filteredReserves.length})
-                </TabsTrigger>
-              </TabsList>
-
-              <div className="relative w-full max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                <Input placeholder="Search..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} className="pl-9 h-9 text-xs border-slate-200" />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
+                <Users className="h-4 w-4 text-slate-500" />
+                <span className="text-[10px] font-black uppercase text-slate-700">Total: {filteredData.length}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-lg">
+                <ShieldAlert className="h-4 w-4 text-indigo-500" />
+                <span className="text-[10px] font-black uppercase text-indigo-700">Reserves: {allData.filter(a => a.type === 'RESERVE').length}</span>
               </div>
             </div>
 
-            <TabsContent value="main" className="mt-0">
-              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow className="hover:bg-transparent border-b border-slate-200">
-                      <TableHead className="w-[60px] text-[10px] font-black uppercase text-slate-500">SN</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Region</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">District</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Center</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Supervisor</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Workstation</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Phone</TableHead>
-                      <TableHead className="text-right text-[10px] font-black uppercase text-slate-500 px-6">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentData.map((item, index) => (
-                      <TableRow key={item.sn_id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
-                        <TableCell className="text-slate-400 text-xs font-mono">{((currentPage - 1) * itemsPerPage) + index + 1}</TableCell>
-                        <TableCell className="text-[11px] font-medium uppercase text-slate-600">{item.region}</TableCell>
-                        <TableCell className="text-[11px] uppercase text-slate-600">{item.district}</TableCell>
-                        <TableCell className="text-[11px] font-bold text-slate-800">{item.center_full}</TableCell>
-                        <TableCell>
-                          <span className={cn("text-xs font-bold", !item.is_assigned ? "text-orange-500 italic" : "text-slate-900")}>
-                            {item.supervisor}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-[11px] font-mono text-indigo-600 font-semibold">{item.workstation}</TableCell>
-                        <TableCell className="text-xs font-mono text-slate-600">{item.phone}</TableCell>
-                        <TableCell className="text-right px-6">
-                          {item.is_assigned && (
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-slate-900" onClick={() => {
-                              setSelectedAssignment(item);
-                              setIsReassignModalOpen(true);
-                            }}>
-                              <RefreshCw className="h-3.5 w-3.5 text-blue-600" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {totalPages > 1 && <div className="mt-6 flex justify-center"><PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} /></div>}
-            </TabsContent>
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input placeholder="Search name, workstation..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} className="pl-9 h-9 text-xs border-slate-200" />
+            </div>
+          </div>
 
-            <TabsContent value="reserves" className="mt-0">
-              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow className="hover:bg-transparent border-b border-slate-200">
-                      <TableHead className="w-[60px] text-[10px] font-black uppercase text-slate-500">SN</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Region</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">District</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Supervisor</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Workstation</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Phone</TableHead>
+          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent border-b border-slate-200">
+                  <TableHead className="w-[60px] text-[10px] font-black uppercase text-slate-500">SN</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Type</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Region</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">District</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Location / Center</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Supervisor</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Workstation</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Phone</TableHead>
+                  <TableHead className="text-right text-[10px] font-black uppercase text-slate-500 px-6">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentData.length === 0 && !loading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                      No assignments found for the current selection.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  currentData.map((item, index) => (
+                    <TableRow key={item.id} className={cn(
+                      "hover:bg-slate-50/30 border-b border-slate-100 transition-colors",
+                      item.type === 'RESERVE' && "bg-indigo-50/30"
+                    )}>
+                      <TableCell className="text-slate-400 text-xs font-mono">
+                        {((currentPage - 1) * itemsPerPage) + index + 1}
+                      </TableCell>
+                      <TableCell>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter",
+                          item.type === 'CENTER' ? "bg-slate-100 text-slate-600" : "bg-indigo-100 text-indigo-700"
+                        )}>
+                          {item.type}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-[11px] font-medium uppercase text-slate-600">{item.region}</TableCell>
+                      <TableCell className="text-[11px] uppercase text-slate-600">{item.district}</TableCell>
+                      <TableCell className={cn(
+                        "text-[11px] font-bold",
+                        item.type === 'RESERVE' ? "text-indigo-600 italic" : "text-slate-800"
+                      )}>
+                        {item.type === 'RESERVE' ? <div className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {item.location}</div> : <div className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {item.location}</div>}
+                      </TableCell>
+                      <TableCell>
+                        <span className={cn("text-xs font-bold", !item.is_assigned ? "text-orange-500 italic" : "text-slate-900")}>
+                          {item.supervisor}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-[11px] font-mono text-indigo-600 font-semibold">{item.workstation}</TableCell>
+                      <TableCell className="text-xs font-mono text-slate-600">{item.phone}</TableCell>
+                      <TableCell className="text-right px-6">
+                        {item.is_assigned && (
+                          <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-slate-900" onClick={() => {
+                            setSelectedAssignment(item);
+                            setIsReassignModalOpen(true);
+                          }}>
+                            <RefreshCw className="h-3.5 w-3.5 text-blue-600" />
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredReserves.length === 0 ? (
-                      <TableRow><TableCell colSpan={6} className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest">No reserve supervisors found.</TableCell></TableRow>
-                    ) : (
-                      filteredReserves.map((item, index) => (
-                        <TableRow key={item.sn_id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
-                          <TableCell className="text-slate-400 text-xs font-mono">{index + 1}</TableCell>
-                          <TableCell className="text-[11px] font-medium uppercase text-slate-600">{item.region}</TableCell>
-                          <TableCell className="text-[11px] uppercase text-slate-600">{item.district}</TableCell>
-                          <TableCell className="text-xs font-bold text-slate-900">{item.supervisor}</TableCell>
-                          <TableCell className="text-[11px] font-mono text-indigo-600 font-semibold">{item.workstation}</TableCell>
-                          <TableCell className="text-xs font-mono text-slate-600">{item.phone}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-          </Tabs>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="mt-6 flex justify-center">
+              <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -446,7 +429,7 @@ const SupervisorAssignmentsPage = () => {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
             <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl mt-0">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={dialogConfig.type === 'assign' ? executeReset : executeReset} className={cn("flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white", dialogConfig.type === 'assign' ? "bg-indigo-600 hover:bg-indigo-700" : "bg-red-600 hover:bg-red-700")}>
+            <AlertDialogAction onClick={executeReset} className={cn("flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white", dialogConfig.type === 'assign' ? "bg-indigo-600 hover:bg-indigo-700" : "bg-red-600 hover:bg-red-700")}>
               Confirm Clear
             </AlertDialogAction>
           </AlertDialogFooter>
