@@ -19,7 +19,6 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Check if we have a session (Supabase handles the hash fragment automatically)
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -73,17 +72,24 @@ const ResetPassword = () => {
         className="w-full max-w-[440px] px-4 z-10"
       >
         <div className="text-center mb-8">
-          <div className="inline-flex p-4 bg-white rounded-3xl shadow-xl mb-6 ring-1 ring-gray-100">
-            <NectaLogo className="w-12 h-12 text-red-600" />
-          </div>
           <h1 className="text-4xl font-black tracking-tight text-gray-900 mb-2">
             NEAS <span className="text-red-600">Admin</span>
           </h1>
+          <p className="text-gray-500 font-medium">National Examination Administration System</p>
         </div>
 
         <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
-          <CardHeader className="pt-10 pb-6 px-8">
-            <div className="flex items-center gap-2 mb-2">
+          <CardHeader className="pt-10 pb-2 px-8 text-center">
+            <div className="flex justify-center mb-6">
+              <motion.div 
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                className="p-4 bg-white rounded-3xl shadow-xl ring-1 ring-gray-100"
+              >
+                <NectaLogo className="w-16 h-16" />
+              </motion.div>
+            </div>
+            <div className="flex items-center justify-center gap-2 mb-2">
               <ShieldCheck className="w-5 h-5 text-green-600" />
               <span className="text-xs font-bold text-green-600 uppercase tracking-wider">Secure Reset</span>
             </div>
@@ -144,6 +150,12 @@ const ResetPassword = () => {
             </form>
           </CardContent>
         </Card>
+
+        <div className="mt-8 text-center">
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">
+            © 2024 NECTA • All Rights Reserved
+          </p>
+        </div>
       </motion.div>
     </div>
   );

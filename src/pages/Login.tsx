@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,10 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    document.title = "Log In | NEAS";
+  }, []);
+
+  useEffect(() => {
     if (!authLoading && session) {
       navigate('/dashboard');
     }
@@ -33,7 +37,6 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // 1. Find the email associated with this username
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('email')
@@ -46,7 +49,6 @@ const Login = () => {
         throw new Error("Username not found. Please check your credentials.");
       }
 
-      // 2. Sign in with the resolved email
       const { error } = await supabase.auth.signInWithPassword({
         email: profile.email,
         password: password,
@@ -67,7 +69,6 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] relative overflow-hidden">
-      {/* Background Decorative Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-100 rounded-full blur-[120px] opacity-50" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-100 rounded-full blur-[120px] opacity-50" />
 
@@ -78,13 +79,6 @@ const Login = () => {
         className="w-full max-w-[440px] px-4 z-10"
       >
         <div className="text-center mb-8">
-          <motion.div 
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            className="inline-flex p-4 bg-white rounded-3xl shadow-xl mb-6 ring-1 ring-gray-100"
-          >
-            <NectaLogo className="w-12 h-12 text-red-600" />
-          </motion.div>
           <h1 className="text-4xl font-black tracking-tight text-gray-900 mb-2">
             NEAS <span className="text-red-600">Admin</span>
           </h1>
@@ -92,13 +86,21 @@ const Login = () => {
         </div>
 
         <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
-          <CardHeader className="pt-10 pb-6 px-8">
-            <div className="flex items-center gap-2 mb-2">
+          <CardHeader className="pt-10 pb-2 px-8 text-center">
+            <div className="flex justify-center mb-6">
+              <motion.div 
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                className="p-4 bg-white rounded-3xl shadow-xl ring-1 ring-gray-100"
+              >
+                <NectaLogo className="w-16 h-16" />
+              </motion.div>
+            </div>
+            <div className="flex items-center justify-center gap-2 mb-2">
               <ShieldCheck className="w-5 h-5 text-green-600" />
               <span className="text-xs font-bold text-green-600 uppercase tracking-wider">Secure Access</span>
             </div>
             <CardTitle className="text-2xl font-bold text-gray-800">Sign In</CardTitle>
-            <CardDescription className="text-gray-500">Enter your username to access your account</CardDescription>
           </CardHeader>
           <CardContent className="px-8 pb-10">
             <form onSubmit={handleLogin} className="space-y-6">
