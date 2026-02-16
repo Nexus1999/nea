@@ -120,7 +120,7 @@ const SupervisorAssignmentsPage = () => {
       const centers = centersRes.data || [];
       const assignmentsFromDb = assignmentsRes.data || [];
 
-      // Build regions list from both centers and assignments to ensure reserves are covered
+      // Build regions list from both centers and assignments
       const allRegions = [
         ...centers.map(c => c.region?.trim()),
         ...assignmentsFromDb.map(a => a.region?.trim())
@@ -129,11 +129,11 @@ const SupervisorAssignmentsPage = () => {
       const uniqueRegions = [...new Set(allRegions)].sort();
       setRegions(uniqueRegions);
 
-      // 1. Map Center Assignments
+      // 1. Map Center Assignments (normal centers)
       const centerRows = centers.map((c) => {
         const assign = assignmentsFromDb.find(a => 
           a.center_no === c.center_number && 
-          !a.is_reserve // Truthy check for boolean/int
+          a.center_no !== 'RESERVE'
         );
         return {
           id: `center-${c.center_number}`,
@@ -143,30 +143,30 @@ const SupervisorAssignmentsPage = () => {
           supervisor: assign?.supervisor_name || 'PENDING',
           workstation: assign?.workstation || '—',
           phone: assign?.phone || '—',
-          assignment_id: assign?.id || null,
+          assignment_id: assign?.assignment_id || null,
           is_assigned: !!assign
         };
       });
 
-      // 2. Map Reserve Assignments (District Reserves)
+      // 2. Map Reserve Assignments (using center_no = 'RESERVE')
       const reserveRows = assignmentsFromDb
-        .filter(a => !!a.is_reserve) // Truthy check handles true, 1, etc.
+        .filter(a => a.center_no === 'RESERVE')
         .map((r) => ({
-          id: `reserve-${r.id}`,
+          id: `reserve-${r.assignment_id}`,
           region: r.region?.trim() || 'N/A',
           district: r.district?.trim() || 'N/A',
-          location: `DISTRICT RESERVE`,
-          supervisor: r.supervisor_name,
-          workstation: r.workstation,
-          phone: r.phone,
-          assignment_id: r.id,
+          location: ` RESERVE`,
+          supervisor: r.supervisor_name || '—',
+          workstation: r.workstation || '—',
+          phone: r.phone || '—',
+          assignment_id: r.assignment_id,
           is_assigned: true
         }));
 
       setAllData([...centerRows, ...reserveRows]);
 
     } catch (err: any) {
-      showError(err.message);
+      showError(err.message || "Failed to load assignments");
     }
   };
 
@@ -352,14 +352,22 @@ const SupervisorAssignmentsPage = () => {
                   </TableRow>
                 ) : (
                   currentData.map((item, index) => (
-                    <TableRow key={item.id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
+                    <TableRow 
+                      key={item.id} 
+                      className={cn(
+                        "hover:bg-slate-50/30 border-b border-slate-100 transition-colors",
+                        item.location.startsWith("DISTRICT RESERVE") && "bg-amber-50/40"
+                      )}
+                    >
                       <TableCell className="text-slate-400 text-xs font-mono">
                         {((currentPage - 1) * itemsPerPage) + index + 1}
                       </TableCell>
                       <TableCell className="text-[11px] font-medium uppercase text-slate-600">{item.region}</TableCell>
                       <TableCell className="text-[11px] uppercase text-slate-600">{item.district}</TableCell>
                       <TableCell className="text-[11px] font-bold text-slate-800">
-                        <div className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {item.location}</div>
+                        <div className="flex items-center gap-1">
+                          <Building2 className="h-3 w-3" /> {item.location}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className={cn("text-xs font-bold", !item.is_assigned ? "text-orange-500 italic" : "text-slate-900")}>
