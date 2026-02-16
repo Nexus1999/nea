@@ -71,6 +71,7 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] relative overflow-hidden">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-100 rounded-full blur-[120px] opacity-50" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-100 rounded-full blur-[120px] opacity-50" />
+      
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -82,18 +83,18 @@ const Login = () => {
           <h1 className="text-4xl font-black tracking-tight text-gray-900 mb-2">
             NEAS <span className="text-red-600">Admin</span>
           </h1>
-          <p className="text-gray-500 font-medium">National Examination Administration System</p>
         </div>
 
         <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
           <CardHeader className="pt-10 pb-2 px-8 text-center">
-            <div className="flex justify-center mb-6">
+             <p className="text-gray-500 font-medium">National Examination Administration System</p>
+            <div className="flex justify-center mb-6 mt-4">
               <motion.div 
                 initial={{ scale: 0.8 }}
                 animate={{ scale: 1 }}
-                className="p-4 bg-white rounded-3xl shadow-xl ring-1 ring-gray-100"
+                className="p-6 bg-white rounded-3xl shadow-xl ring-1 ring-gray-100"
               >
-                <NectaLogo className="w-16 h-16" />
+                <NectaLogo className="w-24 h-24" />
               </motion.div>
             </div>
             <div className="flex items-center justify-center gap-2 mb-2">

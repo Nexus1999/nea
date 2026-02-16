@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
+import { showSuccess } from '@/utils/toast';
 
 interface AuthContextType {
   session: Session | null;
@@ -13,12 +14,33 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutes
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+    setUserRole(null);
+    setUsername(null);
+  }, []);
+
+  const resetTimer = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (session) {
+      timeoutRef.current = setTimeout(() => {
+        logout();
+        showSuccess("Logged out due to inactivity");
+      }, INACTIVITY_LIMIT);
+    }
+  }, [session, logout]);
 
   useEffect(() => {
     // Get initial session
@@ -45,6 +67,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (session) {
+      const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+      events.forEach(event => window.addEventListener(event, resetTimer));
+      resetTimer();
+
+      return () => {
+        events.forEach(event => window.removeEventListener(event, resetTimer));
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      };
+    }
+  }, [session, resetTimer]);
+
   const fetchUserData = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -61,10 +96,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (err) {
       console.error('Error fetching user data:', err);
     }
-  };
-
-  const logout = async () => {
-    await supabase.auth.signOut();
   };
 
   return (
