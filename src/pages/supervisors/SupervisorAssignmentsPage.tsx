@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   UserCheck, 
-  Download,
   Search,
   RotateCcw,
   RefreshCw,
@@ -147,7 +146,7 @@ const SupervisorAssignmentsPage = () => {
       // 2. Map Reserve Assignments (District Reserves)
       const reserveRows = assignmentsFromDb
         .filter(a => a.is_reserve)
-        .map((r, i) => ({
+        .map((r) => ({
           id: `reserve-${r.id}`,
           type: 'RESERVE',
           region: r.region,
@@ -186,7 +185,7 @@ const SupervisorAssignmentsPage = () => {
     setIsProcessing(true);
     try {
       const payload = {
-        supervision_id: Number(id),
+        supervision_id: id, // Fixed: Passing the UUID directly
         code: summaryInfo.code,
         year: summaryInfo.year,
         regions: selectedRegion !== 'all' ? [selectedRegion] : [],
@@ -203,7 +202,7 @@ const SupervisorAssignmentsPage = () => {
       } else {
         showSuccess(data.message || "Assignments generated successfully!");
         // Small delay to allow DB to settle before re-fetching
-        setTimeout(fetchAssignments, 500);
+        setTimeout(fetchAssignments, 1000);
       }
     } catch (err: any) {
       showError(err.message || "Assignment failed");
