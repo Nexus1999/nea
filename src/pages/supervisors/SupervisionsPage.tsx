@@ -236,7 +236,7 @@ const SupervisionsPage = () => {
                             size="icon" 
                             className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
                             title="Manage Assignments"
-                            onClick={() => navigate(`/dashboard/supervisors-assignments/${item.id}`)}
+                            onClick={() => navigate(`/dashboard/supervisors/supervisors-assignments/${item.id}`)}
                           >
                             <UserPlus className="h-4 w-4" />
                           </Button>

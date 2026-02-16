@@ -61,7 +61,7 @@ const App = () => (
                {/* Supervisors Routes */}
               <Route path="supervisors" element={<SupervisionsPage />} />
               <Route path="supervisors/supervisors-management" element={<SupervisorsManagementPage />} />
-              <Route path="supervisors/supervisors-assignments" element={<SupervisorAssignmentsPage />} />
+              <Route path="supervisors/supervisors-assignments/:id" element={<SupervisorAssignmentsPage />} />
               
               {/* Miscellaneous Routes */}
               <Route path="miscellaneous/jobs" element={<Teachers />} />
