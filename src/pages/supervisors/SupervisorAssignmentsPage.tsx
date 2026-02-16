@@ -9,10 +9,7 @@ import {
   Search,
   RotateCcw,
   RefreshCw,
-  AlertTriangle,
-  ShieldAlert,
   Users,
-  MapPin,
   Building2
 } from "lucide-react";
 import {
@@ -131,7 +128,6 @@ const SupervisorAssignmentsPage = () => {
         const assign = assignmentsFromDb.find(a => a.center_no === c.center_number && !a.is_reserve);
         return {
           id: `center-${c.center_number}`,
-          type: 'CENTER',
           region: c.region,
           district: c.district,
           location: `${c.center_number} - ${abbreviateSchoolName(c.center_name || '')}`,
@@ -148,7 +144,6 @@ const SupervisorAssignmentsPage = () => {
         .filter(a => a.is_reserve)
         .map((r) => ({
           id: `reserve-${r.id}`,
-          type: 'RESERVE',
           region: r.region,
           district: r.district,
           location: `DISTRICT RESERVE`,
@@ -185,7 +180,7 @@ const SupervisorAssignmentsPage = () => {
     setIsProcessing(true);
     try {
       const payload = {
-        supervision_id: id, // Fixed: Passing the UUID directly
+        supervision_id: id,
         code: summaryInfo.code,
         year: summaryInfo.year,
         regions: selectedRegion !== 'all' ? [selectedRegion] : [],
@@ -201,7 +196,6 @@ const SupervisorAssignmentsPage = () => {
         showError(data.error || "Assignment failed");
       } else {
         showSuccess(data.message || "Assignments generated successfully!");
-        // Small delay to allow DB to settle before re-fetching
         setTimeout(fetchAssignments, 1000);
       }
     } catch (err: any) {
@@ -316,11 +310,7 @@ const SupervisorAssignmentsPage = () => {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
                 <Users className="h-4 w-4 text-slate-500" />
-                <span className="text-[10px] font-black uppercase text-slate-700">Total: {filteredData.length}</span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-lg">
-                <ShieldAlert className="h-4 w-4 text-indigo-500" />
-                <span className="text-[10px] font-black uppercase text-indigo-700">Reserves: {allData.filter(a => a.type === 'RESERVE').length}</span>
+                <span className="text-[10px] font-black uppercase text-slate-700">Total Records: {filteredData.length}</span>
               </div>
             </div>
 
@@ -335,7 +325,6 @@ const SupervisorAssignmentsPage = () => {
               <TableHeader className="bg-slate-50/50">
                 <TableRow className="hover:bg-transparent border-b border-slate-200">
                   <TableHead className="w-[60px] text-[10px] font-black uppercase text-slate-500">SN</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Type</TableHead>
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">Region</TableHead>
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">District</TableHead>
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">Location / Center</TableHead>
@@ -348,34 +337,20 @@ const SupervisorAssignmentsPage = () => {
               <TableBody>
                 {currentData.length === 0 && !loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                    <TableCell colSpan={8} className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                       No assignments found for the current selection.
                     </TableCell>
                   </TableRow>
                 ) : (
                   currentData.map((item, index) => (
-                    <TableRow key={item.id} className={cn(
-                      "hover:bg-slate-50/30 border-b border-slate-100 transition-colors",
-                      item.type === 'RESERVE' && "bg-indigo-50/30"
-                    )}>
+                    <TableRow key={item.id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
                       <TableCell className="text-slate-400 text-xs font-mono">
                         {((currentPage - 1) * itemsPerPage) + index + 1}
                       </TableCell>
-                      <TableCell>
-                        <span className={cn(
-                          "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter",
-                          item.type === 'CENTER' ? "bg-slate-100 text-slate-600" : "bg-indigo-100 text-indigo-700"
-                        )}>
-                          {item.type}
-                        </span>
-                      </TableCell>
                       <TableCell className="text-[11px] font-medium uppercase text-slate-600">{item.region}</TableCell>
                       <TableCell className="text-[11px] uppercase text-slate-600">{item.district}</TableCell>
-                      <TableCell className={cn(
-                        "text-[11px] font-bold",
-                        item.type === 'RESERVE' ? "text-indigo-600 italic" : "text-slate-800"
-                      )}>
-                        {item.type === 'RESERVE' ? <div className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {item.location}</div> : <div className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {item.location}</div>}
+                      <TableCell className="text-[11px] font-bold text-slate-800">
+                        <div className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {item.location}</div>
                       </TableCell>
                       <TableCell>
                         <span className={cn("text-xs font-bold", !item.is_assigned ? "text-orange-500 italic" : "text-slate-900")}>
@@ -414,7 +389,7 @@ const SupervisorAssignmentsPage = () => {
           <AlertDialogHeader>
             <div className="flex flex-col items-center text-center mb-2">
               <div className={cn("w-14 h-14 rounded-full flex items-center justify-center mb-4", dialogConfig.type === 'assign' ? 'bg-indigo-50 text-indigo-600' : 'bg-red-50 text-red-600')}>
-                {dialogConfig.type === 'assign' ? <ShieldAlert className="h-7 w-7" /> : <AlertTriangle className="h-7 w-7" />}
+                <RotateCcw className="h-7 w-7" />
               </div>
               <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
                 {dialogConfig.type === 'assign' ? 'Existing Assignments' : 'Clear Assignments?'}
