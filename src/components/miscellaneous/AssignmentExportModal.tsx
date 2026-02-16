@@ -122,18 +122,7 @@ export const AssignmentExportModal: React.FC<ExportModalProps> = ({
     doc.save(`${jobDetails.name}_Requisition_Letter.pdf`);
   };
 
-  const exportAttendance = (values: z.infer<typeof exportSchema>) => {
-    const doc = new jsPDF('l', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    doc.setFontSize(14);
-    doc.text("ATTENDANCE SHEET", pageWidth / 2, 15, { align: "center" });
-    doc.setFontSize(11);
-    doc.text(`${jobDetails.name.toUpperCase()} - ${jobDetails.section}`, pageWidth / 2, 22, { align: "center" });
-
-    const headers = ['S/N', 'Full Name', 'Workstation'];
-    
-    // Generate dates between start and end
+  const exportAttendanceExcel = (values: z.infer<typeof exportSchema>) => {
     const dates: string[] = [];
     if (jobDetails.start_date && jobDetails.end_date) {
       let current = new Date(jobDetails.start_date);
@@ -150,29 +139,26 @@ export const AssignmentExportModal: React.FC<ExportModalProps> = ({
       }
     }
 
-    const tableHeaders = [...headers, ...dates, 'Signature'];
+    const processedData = data.map((item, index) => {
+      const row: any = {
+        "S/N": index + 1,
+        "FULL NAME": item.fullname,
+        "WORKSTATION": item.workstation,
+      };
 
-    autoTable(doc, {
-      startY: 30,
-      head: [tableHeaders],
-      body: data.map((item, i) => [
-        i + 1, 
-        item.fullname, 
-        item.workstation,
-        ...dates.map(() => ''),
-        ''
-      ]),
-      theme: 'grid',
-      headStyles: { fillColor: [40, 40, 40], fontSize: 8 },
-      styles: { fontSize: 7, cellPadding: 2 },
-      columnStyles: {
-        0: { cellWidth: 10 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 35 }
-      }
+      // Add date columns
+      dates.forEach(date => {
+        row[date] = ""; // Empty for manual filling or attendance tracking
+      });
+
+      row["SIGNATURE"] = "";
+      return row;
     });
 
-    doc.save(`${jobDetails.name}_Attendance_Sheet.pdf`);
+    const ws = XLSX.utils.json_to_sheet(processedData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance Sheet");
+    XLSX.writeFile(wb, `${jobDetails.name}_Attendance_Sheet.xlsx`);
   };
 
   const onSubmit = async (values: z.infer<typeof exportSchema>) => {
@@ -191,7 +177,7 @@ export const AssignmentExportModal: React.FC<ExportModalProps> = ({
         } else if (values.docType === "requisition_letter") {
           exportToPDF(values);
         } else {
-          exportAttendance(values);
+          exportAttendanceExcel(values);
         }
         setProgress(100);
         showSuccess("Document generated successfully");
@@ -260,7 +246,7 @@ export const AssignmentExportModal: React.FC<ExportModalProps> = ({
                       )}
                     >
                       <RadioGroupItem value="attendance_sheet" id="attendance_sheet" className="sr-only" />
-                      <CalendarCheck className="mb-2 h-5 w-5 text-blue-600" />
+                      <FileSpreadsheet className="mb-2 h-5 w-5 text-blue-600" />
                       <span className="text-[9px] font-black uppercase">Attendance</span>
                     </Label>
                   </RadioGroup>

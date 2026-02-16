@@ -5,11 +5,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  UserPlus, Search, RotateCcw, Phone, AlertTriangle, RefreshCw, Link, Download 
+  UserPlus, Search, RotateCcw, Phone, AlertTriangle, RefreshCw, Link, Download, UserMinus 
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+} from "@/table";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -30,7 +30,7 @@ const JobAssignmentsPage = () => {
   const [loading, setLoading] = useState(true);
   const [resetLoading, setResetLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [jobDetails, setJobDetails] = useState({ name: '', section: '' });
+  const [jobDetails, setJobDetails] = useState({ name: '', section: '', total_required: 0, start_date: '', end_date: '' });
   
   const [dialogConfig, setDialogConfig] = useState({ open: false, type: 'reset' });
   const [reassignModal, setReassignModal] = useState({ open: false, teacher: null as any });
@@ -49,7 +49,7 @@ const JobAssignmentsPage = () => {
     try {
       const { data: job, error: jobError } = await supabase
         .from('jobassignments')
-        .select('name, section')
+        .select('name, section, total_required, start_date, end_date')
         .eq('id', id)
         .single();
 
@@ -72,7 +72,6 @@ const JobAssignmentsPage = () => {
 
       if (error) throw error;
 
-      // Fetch region and district names separately to avoid complex join issues
       const regionCodes = [...new Set(data.map((item: any) => item.primaryteachers?.region_code).filter(Boolean))];
       const districtNumbers = [...new Set(data.map((item: any) => item.primaryteachers?.district_number).filter(Boolean))];
 
@@ -94,7 +93,29 @@ const JobAssignmentsPage = () => {
         account_name: item.primaryteachers?.account_name || '',
         account_number: item.primaryteachers?.account_number || '',
         bank_name: item.primaryteachers?.bank_name || '',
+        isPlaceholder: false
       }));
+
+      // Add placeholders if needed
+      const totalRequired = job.total_required || 0;
+      const currentCount = formatted.length;
+      
+      if (currentCount < totalRequired) {
+        const placeholdersNeeded = totalRequired - currentCount;
+        for (let i = 0; i < placeholdersNeeded; i++) {
+          formatted.push({
+            assignmentId: `placeholder-${i}`,
+            teacherId: null,
+            fullname: 'VACANT SLOT',
+            sex: '-',
+            phone: '-',
+            workstation: '-',
+            region: '-',
+            district: '-',
+            isPlaceholder: true
+          });
+        }
+      }
 
       setAssignments(formatted);
     } catch (err: any) {
@@ -121,7 +142,7 @@ const JobAssignmentsPage = () => {
       if (error) throw error;
       
       showSuccess("All assignments have been cleared");
-      setAssignments([]);
+      fetchInitialData(); // Refresh to show placeholders
       setDialogConfig({ ...dialogConfig, open: false });
     } catch (err: any) {
       showError(err.message);
@@ -144,6 +165,16 @@ const JobAssignmentsPage = () => {
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const currentData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const handleReassignClick = (item: any) => {
+    if (item.isPlaceholder) {
+      // For placeholders, we need to create a new assignment record first or handle it in the modal
+      // For simplicity, let's pass a flag to the modal that it's a new assignment
+      setReassignModal({ open: true, teacher: { ...item, isNew: true } });
+    } else {
+      setReassignModal({ open: true, teacher: item });
+    }
+  };
+
   return (
     <div className="space-y-4 p-4">
       <Card className="w-full relative min-h-[600px] border-none shadow-sm">
@@ -158,9 +189,15 @@ const JobAssignmentsPage = () => {
             <CardTitle className="text-2xl font-black uppercase tracking-tight text-slate-900">
               {jobDetails.name || "Loading..."}
             </CardTitle>
-            <p className="text-[10px] font-bold text-slate-500 mt-1 tracking-[0.2em] uppercase">
-              Section: {jobDetails.section || "N/A"}
-            </p>
+            <div className="flex items-center gap-4 mt-1">
+              <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase">
+                Section: {jobDetails.section || "N/A"}
+              </p>
+              <span className="w-1 h-1 bg-slate-300 rounded-full" />
+              <p className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase">
+                Required: {jobDetails.total_required}
+              </p>
+            </div>
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
@@ -168,12 +205,9 @@ const JobAssignmentsPage = () => {
                 variant="default" 
                 size="sm" 
                 className="bg-slate-900 hover:bg-black text-[10px] font-black uppercase tracking-wider rounded-lg h-9" 
-                onClick={() => {
-                  if (assignments.length > 0) setDialogConfig({ open: true, type: 'assign' });
-                  else navigate(`/dashboard/miscellaneous/jobs/assign/${id}`);
-                }}
+                onClick={() => navigate(`/dashboard/miscellaneous/jobs/assign/${id}`)}
             >
-                <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Assign Teacher
+                <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Auto-Assign
             </Button>
 
             <Button 
@@ -241,22 +275,33 @@ const JobAssignmentsPage = () => {
                   </TableRow>
                 ) : (
                   currentData.map((item, index) => (
-                    <TableRow key={item.assignmentId} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
+                    <TableRow key={item.assignmentId} className={cn(
+                      "hover:bg-slate-50/30 border-b border-slate-100 transition-colors",
+                      item.isPlaceholder && "bg-slate-50/50 italic"
+                    )}>
                       <TableCell className="text-slate-400 text-xs font-mono">
                         {((currentPage - 1) * itemsPerPage) + index + 1}
                       </TableCell>
                       <TableCell className="text-sm text-slate-600 font-medium">{item.region}</TableCell>
                       <TableCell className="text-sm text-slate-600 font-medium">{item.district}</TableCell>
-                      <TableCell className="text-sm text-slate-800">{item.fullname}</TableCell>
+                      <TableCell className={cn(
+                        "text-sm",
+                        item.isPlaceholder ? "text-slate-400 font-bold" : "text-slate-800 font-medium"
+                      )}>
+                        {item.fullname}
+                      </TableCell>
                       <TableCell className="text-center">
-                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded font-black text-[9px] ${item.sex === 'M' ? 'bg-indigo-50 text-indigo-600' : 'bg-pink-50 text-pink-600'}`}>
+                        <span className={cn(
+                          "inline-flex items-center justify-center w-6 h-6 rounded font-black text-[9px]",
+                          item.isPlaceholder ? "bg-slate-100 text-slate-400" : (item.sex === 'M' ? 'bg-indigo-50 text-indigo-600' : 'bg-pink-50 text-pink-600')
+                        )}>
                           {item.sex}
                         </span>
                       </TableCell>
                       <TableCell className="text-sm text-slate-600 font-medium">{item.workstation}</TableCell>
                       <TableCell className="text-sm text-slate-600 font-medium">
                         <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3 text-slate-300" />
+                          {!item.isPlaceholder && <Phone className="h-3 w-3 text-slate-300" />}
                           {item.phone}
                         </div>
                       </TableCell>
@@ -264,10 +309,13 @@ const JobAssignmentsPage = () => {
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={() => setReassignModal({ open: true, teacher: item })}
-                          className="h-8 w-8 p-0 border-slate-200 hover:border-slate-900 rounded-lg transition-all"
+                          onClick={() => handleReassignClick(item)}
+                          className={cn(
+                            "h-8 w-8 p-0 rounded-lg transition-all",
+                            item.isPlaceholder ? "border-indigo-200 text-indigo-600 hover:bg-indigo-50" : "border-slate-200 hover:border-slate-900"
+                          )}
                         >
-                          <RefreshCw className="h-3.5 w-3.5" />
+                          {item.isPlaceholder ? <UserPlus className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -288,7 +336,7 @@ const JobAssignmentsPage = () => {
       <AssignmentExportModal 
         open={exportModalOpen}
         onOpenChange={setExportModalOpen}
-        data={assignments}
+        data={assignments.filter(a => !a.isPlaceholder)}
         jobDetails={jobDetails}
       />
 
@@ -307,7 +355,7 @@ const JobAssignmentsPage = () => {
             </div>
             <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
               {dialogConfig.type === 'assign' && `This job already has teachers assigned. To assign new ones, the current list must be cleared.`}
-              {dialogConfig.type === 'reset' && `This action will permanently remove all ${assignments.length} assigned teachers from this specific job record.`}
+              {dialogConfig.type === 'reset' && `This action will permanently remove all assigned teachers from this specific job record.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
 

@@ -126,7 +126,20 @@ const ReassignTeacherModal = ({
 
     setLoading(true);
     try {
-      // Check for 2026 assignments
+      // Check for existing assignments for this job specifically
+      const { data: stationConflicts } = await supabase
+        .from('teacher_assignments')
+        .select(`id`)
+        .eq('job_id', jobId)
+        .eq('teacher_id', formData.newTeacher.id);
+
+      if (stationConflicts && stationConflicts.length > 0) {
+        showError("This teacher is already assigned to this job. Please select a different teacher.");
+        setLoading(false);
+        return;
+      }
+
+      // Check for other 2026 assignments
       const { data: yearlyJobs } = await supabase
         .from('teacher_assignments')
         .select(`job_id, jobassignments!inner(name)`)
@@ -134,28 +147,12 @@ const ReassignTeacherModal = ({
         .gte('assigned_at', '2026-01-01')
         .lte('assigned_at', '2026-12-31');
 
-      const { data: stationConflicts } = await supabase
-        .from('teacher_assignments')
-        .select(`id`)
-        .eq('job_id', jobId)
-        .eq('teacher_id', formData.newTeacher.id);
-
-      const hasStationConflict = stationConflicts && stationConflicts.length > 0;
-
-      if ((yearlyJobs && yearlyJobs.length > 0) || hasStationConflict) {
-        let message = "";
-        if (yearlyJobs && yearlyJobs.length > 0) {
-          const jobNames = Array.from(new Set(yearlyJobs.map((j: any) => j.jobassignments.name))).join(', ');
-          message += `This teacher has already participated in: ${jobNames}. `;
-        }
-        if (hasStationConflict) {
-          message += `This teacher is already assigned to this specific job. `;
-        }
-
+      if (yearlyJobs && yearlyJobs.length > 0) {
+        const jobNames = Array.from(new Set(yearlyJobs.map((j: any) => j.jobassignments.name))).join(', ');
         setDialogConfig({
           open: true,
           type: 'reassign',
-          description: message
+          description: `This teacher has already participated in: ${jobNames}. Are you sure you want to proceed?`
         });
         setLoading(false);
         return;
@@ -169,27 +166,37 @@ const ReassignTeacherModal = ({
   };
 
   const executeUpdate = async () => {
-    // FIX: Get ID directly from prop to avoid any closure issues
-    const assignmentId = currentTeacher?.assignmentId;
-    if (!assignmentId) {
-      showError("Critical Error: Missing Assignment ID");
-      return;
-    }
-
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('teacher_assignments')
-        .update({ teacher_id: formData.newTeacher.id })
-        .eq('id', assignmentId);
+      if (currentTeacher?.isNew) {
+        // Create new assignment for placeholder
+        const { error } = await supabase
+          .from('teacher_assignments')
+          .insert({
+            job_id: jobId,
+            teacher_id: formData.newTeacher.id,
+            assignment_year: 2026
+          });
+        if (error) throw error;
+        showSuccess('Teacher assigned successfully');
+      } else {
+        // Update existing assignment
+        const assignmentId = currentTeacher?.assignmentId;
+        if (!assignmentId) throw new Error("Missing Assignment ID");
 
-      if (error) throw error;
+        const { error } = await supabase
+          .from('teacher_assignments')
+          .update({ teacher_id: formData.newTeacher.id })
+          .eq('id', assignmentId);
 
-      showSuccess('Teacher reassigned successfully');
+        if (error) throw error;
+        showSuccess('Teacher reassigned successfully');
+      }
+
       onAssignmentUpdated();
       onClose();
     } catch (err: any) {
-      showError(err.message || 'Failed to reassign');
+      showError(err.message || 'Failed to process assignment');
     } finally {
       setLoading(false);
       setDialogConfig(prev => ({ ...prev, open: false }));
@@ -203,7 +210,6 @@ const ReassignTeacherModal = ({
         onClose={onClose}
         fullWidth
         maxWidth="sm"
-        // FIX: Ensure main dialog doesn't block the Alert
         sx={{ zIndex: 1200 }} 
         PaperProps={{
           sx: { borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }
@@ -215,36 +221,38 @@ const ReassignTeacherModal = ({
           </IconButton>
           
           <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '18px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AccountCircle sx={{ fontSize: 20 }} /> Reassign Teacher
+            <AccountCircle sx={{ fontSize: 20 }} /> {currentTeacher?.isNew ? 'Assign Teacher' : 'Reassign Teacher'}
           </Typography>
         </Box>
 
         <DialogContent sx={{ p: 3, bgcolor: '#ffffff' }}>
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#64748b', mb: 1.5, display: 'block' }}>
-                Current Teacher
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <TextField
-                  label="Teacher Name"
-                  value={formData.currentName}
-                  fullWidth
-                  InputProps={{ 
-                    readOnly: true, 
-                    startAdornment: <InputAdornment position="start"><AccountCircle sx={{ fontSize: 18, color: '#64748b' }} /></InputAdornment> 
-                  }}
-                  size="small"
-                />
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
-                  <TextField label="District" value={formData.currentDistrict} fullWidth size="small" InputProps={{ readOnly: true }} />
-                  <TextField label="Workstation" value={formData.currentWorkstation} fullWidth size="small" InputProps={{ readOnly: true }} />
+            {!currentTeacher?.isNew && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#64748b', mb: 1.5, display: 'block' }}>
+                  Current Teacher
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <TextField
+                    label="Teacher Name"
+                    value={formData.currentName}
+                    fullWidth
+                    InputProps={{ 
+                      readOnly: true, 
+                      startAdornment: <InputAdornment position="start"><AccountCircle sx={{ fontSize: 18, color: '#64748b' }} /></InputAdornment> 
+                    }}
+                    size="small"
+                  />
+                  <Box sx={{ display: 'flex', gap: 1.5 }}>
+                    <TextField label="District" value={formData.currentDistrict} fullWidth size="small" InputProps={{ readOnly: true }} />
+                    <TextField label="Workstation" value={formData.currentWorkstation} fullWidth size="small" InputProps={{ readOnly: true }} />
+                  </Box>
                 </Box>
               </Box>
-            </Box>
+            )}
 
             <Box>
               <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#64748b', mb: 1.5, display: 'block' }}>
-                New Teacher
+                {currentTeacher?.isNew ? 'Select Teacher' : 'New Teacher'}
               </Typography>
               
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -313,12 +321,11 @@ const ReassignTeacherModal = ({
             ) : (
               <UserPlus className="h-3.5 w-3.5 mr-1.5" />
             )}
-            {loading ? 'Validating...' : 'Reassign Teacher'}
+            {loading ? 'Validating...' : (currentTeacher?.isNew ? 'Assign Teacher' : 'Reassign Teacher')}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* FIXED ALERT DIALOG: Added forced zIndex */}
       <AlertDialog 
         open={dialogConfig.open} 
         onOpenChange={(val) => setDialogConfig({ ...dialogConfig, open: val })}
@@ -335,8 +342,6 @@ const ReassignTeacherModal = ({
             </div>
             <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
               {dialogConfig.description}
-              <br/><br/>
-              Are you sure you want to proceed with this assignment?
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -351,7 +356,7 @@ const ReassignTeacherModal = ({
               }}
               className="flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-sm bg-red-600 hover:bg-red-700 text-white"
             >
-              Confirm Reassignment
+              Confirm Assignment
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
