@@ -5,7 +5,7 @@ import { useLocation, useNavigate, Link, Outlet, useParams } from "react-router-
 import {
   Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags, Shield, FileText, Settings,
   Menu, Bell, User, ChevronDown, LogOut, X, Users, LayoutDashboard, ChevronRight,
-  Globe, MapPin, BookOpen, GraduationCap, Accessibility, GitBranch
+  Globe, MapPin, BookOpen, GraduationCap, Accessibility, GitBranch, UserCheck, PlusCircle, Eye
 } from "lucide-react";
 import {
   Breadcrumb,
@@ -91,6 +91,7 @@ const navItems = [
 ];
 
 const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType; path?: string }> = {
+  // Core Sections
   'timetables': { label: 'Timetables', icon: Clock },
   'budgets': { label: 'Budgets', icon: DollarSign },
   'mastersummaries': { label: 'Master Summaries', icon: Database },
@@ -102,28 +103,47 @@ const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType;
   'reports': { label: 'Reports', icon: FileText },
   'settings': { label: 'Settings', icon: Settings },
   'profile': { label: 'Profile', icon: User },
+
+  // Supervisor Specifics
+  'supervisors-management': { label: 'Management', icon: Users },
+  'supervisors-assignments': { label: 'Assignments', icon: UserCheck },
+  
+  // Institution Specifics
   'primary': { label: 'Primary Schools', icon: Building },
   'secondary': { label: 'Secondary Schools', icon: Building },
   'colleges': { label: 'Teachers Colleges', icon: Building },
+  
+  // Miscellaneous Specifics
   'overview': { label: 'Overview', icon: LayoutDashboard },
-  'jobs': { label: 'Teachers inventory', icon: Users },
+  'jobs': { label: 'Teachers Inventory', icon: Users },
   'teachers-management': { label: 'Teachers Management', icon: Users },
-  'supervisors-management': { label: 'Supervisors Management', icon: Users },
+  'assignments': { label: 'Assignments', icon: FileText, path: '/dashboard/miscellaneous/jobs' },
+
+  // Common Action Placeholders (Easily editable)
+  'add': { label: 'Add New', icon: PlusCircle },
+  'new': { label: 'Create', icon: PlusCircle },
+  'edit': { label: 'Edit Record', icon: PenLine },
+  'view': { label: 'View Details', icon: Eye },
   'details': { label: 'Details', icon: FileText },
-  'special-needs': { label: 'Special Needs', icon: Accessibility },
-  'labels': { label: 'Labels', icon: Tags },
-  'versions': { label: 'Versions', icon: GitBranch },
   'summary': { label: 'Summary', icon: FileText },
   'management': { label: 'Management', icon: UserCog },
-  'assignments': { label: 'Assignments', icon: FileText, path: '/dashboard/miscellaneous/jobs' },
+
+  // Security Specifics
   'users': { label: 'Users', icon: Users },
   'roles': { label: 'Roles', icon: UserCog },
   'permissions': { label: 'Permissions', icon: Shield },
   'audit-logs': { label: 'Audit Logs', icon: FileText },
+
+  // Settings Specifics
   'regions': { label: 'Regions', icon: Globe },
   'districts': { label: 'Districts', icon: MapPin },
   'examinations': { label: 'Examinations', icon: BookOpen },
   'subjects': { label: 'Subjects', icon: GraduationCap },
+
+  // Other
+  'special-needs': { label: 'Special Needs', icon: Accessibility },
+  'labels': { label: 'Labels', icon: Tags },
+  'versions': { label: 'Versions', icon: GitBranch },
 };
 
 const DashboardLayout = () => {
@@ -187,7 +207,7 @@ const DashboardLayout = () => {
 
   const getBreadcrumbConfig = (segment: string, previousSegment?: string) => {
     if (isDynamicId(segment)) {
-      if (previousSegment === 'assignments') return { label: 'Assignment Details', icon: FileText };
+      if (previousSegment === 'assignments' || previousSegment === 'supervisors-assignments') return { label: 'Assignment Details', icon: FileText };
       if (previousSegment === 'special-needs') {
         const fullName = specialNeedFullNames[segment as SpecialNeedType];
         if (fullName) return { label: fullName, icon: Accessibility };
