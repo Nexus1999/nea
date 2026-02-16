@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Lock, Loader2, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Lock, Loader2, CheckCircle2 } from 'lucide-react';
 import NectaLogo from '@/components/NectaLogo';
 import { motion } from 'framer-motion';
 import { showError, showSuccess } from '@/utils/toast';
@@ -89,11 +89,6 @@ const ResetPassword = () => {
                 <NectaLogo className="w-24 h-24" />
               </motion.div>
             </div>
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <ShieldCheck className="w-5 h-5 text-green-600" />
-              <span className="text-xs font-bold text-green-600 uppercase tracking-wider">Secure Reset</span>
-            </div>
-            <CardTitle className="text-2xl font-bold text-gray-800">Set New Password</CardTitle>
             <CardDescription className="text-gray-500">
               Please enter your new password below.
             </CardDescription>
