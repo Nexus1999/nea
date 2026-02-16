@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +34,6 @@ const Login = () => {
 
     try {
       // 1. Find the email associated with this username
-      // We need a public policy on the profiles table to allow this lookup
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('email')
@@ -109,10 +108,10 @@ const Login = () => {
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-red-500 transition-colors">
                     <User size={18} />
                   </div>
-                  <Input 
+                  <input 
                     id="username"
                     placeholder="Enter your username"
-                    className="pl-11 h-12 bg-gray-50/50 border-gray-200 rounded-xl focus:ring-red-500 focus:border-red-500 transition-all"
+                    className="flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-11 transition-all"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
@@ -123,19 +122,19 @@ const Login = () => {
               <div className="space-y-2">
                 <div className="flex justify-between items-center ml-1">
                   <Label htmlFor="password" className="text-sm font-semibold text-gray-700">Password</Label>
-                  <button type="button" className="text-xs font-bold text-red-600 hover:text-red-700 transition-colors">
+                  <Link to="/forgot-password" title="Reset your password" className="text-xs font-bold text-red-600 hover:text-red-700 transition-colors">
                     Forgot Password?
-                  </button>
+                  </Link>
                 </div>
                 <div className="relative group">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-red-500 transition-colors">
                     <Lock size={18} />
                   </div>
-                  <Input 
+                  <input 
                     id="password"
                     type="password"
                     placeholder="••••••••"
-                    className="pl-11 h-12 bg-gray-50/50 border-gray-200 rounded-xl focus:ring-red-500 focus:border-red-500 transition-all"
+                    className="flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-11 transition-all"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

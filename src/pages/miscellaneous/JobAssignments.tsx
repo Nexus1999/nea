@@ -21,6 +21,7 @@ import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
 import ReassignTeacherModal from "@/components/miscellaneous/ReassignTeacherModal";
 import { AssignmentExportModal } from "@/components/miscellaneous/AssignmentExportModal";
+import { cn } from "@/lib/utils"
 
 const JobAssignmentsPage = () => {
   const { id } = useParams();
@@ -96,7 +97,6 @@ const JobAssignmentsPage = () => {
         isPlaceholder: false
       }));
 
-      // Add placeholders if needed
       const totalRequired = job.total_required || 0;
       const currentCount = formatted.length;
       
@@ -124,11 +124,21 @@ const JobAssignmentsPage = () => {
       setLoading(false);
     }
   };
- 
+
   const handleAccountsLink = () => {
     const portalUrl = `${window.location.origin}/portal/${id}`;
     navigator.clipboard.writeText(portalUrl);
     showSuccess("Portal Link copied! Share this with teachers.");
+  };
+
+  // Logic to check assignments before navigating to Auto-Assign
+  const handleAutoAssignCheck = () => {
+    const hasExistingAssignments = assignments.some(a => !a.isPlaceholder);
+    if (hasExistingAssignments) {
+      setDialogConfig({ open: true, type: 'assign' });
+    } else {
+      navigate(`/dashboard/miscellaneous/jobs/assign/${id}`);
+    }
   };
 
   const handleResetAssignments = async () => {
@@ -142,8 +152,15 @@ const JobAssignmentsPage = () => {
       if (error) throw error;
       
       showSuccess("All assignments have been cleared");
-      fetchInitialData(); // Refresh to show placeholders
+      
+      const wasAssigning = dialogConfig.type === 'assign';
       setDialogConfig({ ...dialogConfig, open: false });
+
+      if (wasAssigning) {
+        navigate(`/dashboard/miscellaneous/jobs/assign/${id}`);
+      } else {
+        fetchInitialData();
+      }
     } catch (err: any) {
       showError(err.message);
     } finally {
@@ -203,7 +220,7 @@ const JobAssignmentsPage = () => {
                 variant="default" 
                 size="sm" 
                 className="bg-slate-900 hover:bg-black text-[10px] font-black uppercase tracking-wider rounded-lg h-9" 
-                onClick={() => navigate(`/dashboard/miscellaneous/jobs/assign/${id}`)}
+                onClick={handleAutoAssignCheck}
             >
                 <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Auto-Assign
             </Button>
@@ -352,7 +369,7 @@ const JobAssignmentsPage = () => {
               </AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
-              {dialogConfig.type === 'assign' && `This job already has teachers assigned. To assign new ones, the current list must be cleared.`}
+              {dialogConfig.type === 'assign' && `This job already has teachers assigned. To assign new ones, the current list must be cleared first.`}
               {dialogConfig.type === 'reset' && `This action will permanently remove all assigned teachers from this specific job record.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -364,7 +381,10 @@ const JobAssignmentsPage = () => {
             <AlertDialogAction 
               onClick={handleResetAssignments}
               disabled={resetLoading}
-              className="flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl bg-red-600 hover:bg-red-700 text-white"
+              className={cn(
+                "flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white",
+                dialogConfig.type === 'assign' ? "bg-indigo-600 hover:bg-indigo-700" : "bg-red-600 hover:bg-red-700"
+              )}
             >
               {resetLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Confirm Clear"}
             </AlertDialogAction>

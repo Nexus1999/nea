@@ -57,7 +57,7 @@ const navItems = [
     subItems: [
       {
         path: '/dashboard/miscellaneous/overview',label: 'OverView',icon: LayoutDashboard,key: 'MiscellaneousOverview',},
-       {path: '/dashboard/miscellaneous/jobs',label: 'Teachers inventory',icon: Users,key: 'MiscellaneousTeachers',
+       {path: '/dashboard/miscellaneous/jobs',label: 'Teachers Inventory',icon: Users,key: 'MiscellaneousTeachers',
       },
     ],
   },
