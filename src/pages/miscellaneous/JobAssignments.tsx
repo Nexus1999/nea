@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/table";
+} from "@/components/ui/table";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -167,8 +167,6 @@ const JobAssignmentsPage = () => {
 
   const handleReassignClick = (item: any) => {
     if (item.isPlaceholder) {
-      // For placeholders, we need to create a new assignment record first or handle it in the modal
-      // For simplicity, let's pass a flag to the modal that it's a new assignment
       setReassignModal({ open: true, teacher: { ...item, isNew: true } });
     } else {
       setReassignModal({ open: true, teacher: item });
