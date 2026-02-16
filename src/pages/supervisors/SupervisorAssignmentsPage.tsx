@@ -120,19 +120,25 @@ const SupervisorAssignmentsPage = () => {
       const centers = centersRes.data || [];
       const assignmentsFromDb = assignmentsRes.data || [];
 
-      const uniqueRegions = [...new Set(centers.map(c => c.region))].sort();
+      // Build regions list from both centers and assignments to ensure reserves are covered
+      const allRegions = [
+        ...centers.map(c => c.region?.trim()),
+        ...assignmentsFromDb.map(a => a.region?.trim())
+      ].filter(Boolean);
+      
+      const uniqueRegions = [...new Set(allRegions)].sort();
       setRegions(uniqueRegions);
 
       // 1. Map Center Assignments
       const centerRows = centers.map((c) => {
         const assign = assignmentsFromDb.find(a => 
           a.center_no === c.center_number && 
-          !(a.is_reserve === true || a.is_reserve === 1)
+          !a.is_reserve // Truthy check for boolean/int
         );
         return {
           id: `center-${c.center_number}`,
-          region: c.region,
-          district: c.district,
+          region: c.region?.trim() || 'N/A',
+          district: c.district?.trim() || 'N/A',
           location: `${c.center_number} - ${abbreviateSchoolName(c.center_name || '')}`,
           supervisor: assign?.supervisor_name || 'PENDING',
           workstation: assign?.workstation || '—',
@@ -144,11 +150,11 @@ const SupervisorAssignmentsPage = () => {
 
       // 2. Map Reserve Assignments (District Reserves)
       const reserveRows = assignmentsFromDb
-        .filter(a => a.is_reserve === true || a.is_reserve === 1)
+        .filter(a => !!a.is_reserve) // Truthy check handles true, 1, etc.
         .map((r) => ({
           id: `reserve-${r.id}`,
-          region: r.region,
-          district: r.district,
+          region: r.region?.trim() || 'N/A',
+          district: r.district?.trim() || 'N/A',
           location: `DISTRICT RESERVE`,
           supervisor: r.supervisor_name,
           workstation: r.workstation,
@@ -250,8 +256,8 @@ const SupervisorAssignmentsPage = () => {
         item.phone.toLowerCase().includes(searchStr) ||
         item.workstation.toLowerCase().includes(searchStr);
 
-      const matchesRegion = selectedRegion === 'all' || (item.region && item.region.trim() === selectedRegion.trim());
-      const matchesDistrict = selectedDistrict === 'all' || (item.district && item.district.trim() === selectedDistrict.trim());
+      const matchesRegion = selectedRegion === 'all' || item.region === selectedRegion;
+      const matchesDistrict = selectedDistrict === 'all' || item.district === selectedDistrict;
       return matchesSearch && matchesRegion && matchesDistrict;
     });
   }, [allData, search, selectedRegion, selectedDistrict]);
