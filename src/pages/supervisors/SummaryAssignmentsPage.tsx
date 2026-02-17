@@ -6,7 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { 
   School, Users, Globe2, ArrowLeft,
   Building2, MapPin, 
-  Search, Info, BarChart3, CheckCircle2
+  Search, Info, BarChart3, CheckCircle2,
+  UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -34,6 +35,7 @@ interface SummaryStats {
   missing: number;
   progress: number;
   fullyAssigned: boolean;
+  poolAvailable?: number; // New field for available supervisors
 }
 
 interface RegionGroup {
@@ -41,7 +43,7 @@ interface RegionGroup {
   centers: SummaryStats;
   supervisors: SummaryStats;
   fullyAssigned: boolean;
-  districts: Record<string, { centers: SummaryStats; supervisors: SummaryStats; fullyAssigned: boolean }>;
+  districts: Record<string, { centers: SummaryStats; supervisors: SummaryStats; fullyAssigned: boolean; poolAvailable: number }>;
 }
 
 // --- Components ---
@@ -141,15 +143,24 @@ const SummaryAssignmentsPage = () => {
       const centersTable = centersTableMap[supervision.mastersummaries.Code];
       if (!centersTable) throw new Error("Unsupported exam code");
 
-      const [centersRes, assignedSupsRes] = await Promise.all([
+      const [centersRes, assignedSupsRes, poolRes] = await Promise.all([
         supabase.from(centersTable).select("region, district, center_number").eq("mid", supervision.mid).eq("is_latest", 1),
-        supabase.from("supervisorassignments").select("region, district, center_no").eq("supervision_id", supervisionId)
+        supabase.from("supervisorassignments").select("region, district, center_no").eq("supervision_id", supervisionId),
+        supabase.from("supervisors").select("region, district").eq("status", "ACTIVE").eq("is_latest", 1)
       ]);
 
       const filterData = (data: any[]) => data?.filter(item => !EXCLUDED_REGIONS.includes(item.region?.toUpperCase())) || [];
       
       const centers = filterData(centersRes.data);
       const assigned = filterData(assignedSupsRes.data);
+      const pool = filterData(poolRes.data);
+
+      // Create a map of total pool counts per district
+      const poolMap: Record<string, number> = {};
+      pool.forEach(p => {
+        const key = `${p.region}|${p.district}`;
+        poolMap[key] = (poolMap[key] || 0) + 1;
+      });
 
       const regionMap: Record<string, RegionGroup> = {};
 
@@ -171,7 +182,8 @@ const SummaryAssignmentsPage = () => {
           regionMap[rName].districts[dName] = { 
             centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
             supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
-            fullyAssigned: false
+            fullyAssigned: false,
+            poolAvailable: poolMap[`${rName}|${dName}`] || 0
           };
         }
 
@@ -185,6 +197,10 @@ const SummaryAssignmentsPage = () => {
         if (regionMap[rName] && regionMap[rName].districts[dName]) {
           regionMap[rName].supervisors.assigned++;
           regionMap[rName].districts[dName].supervisors.assigned++;
+          
+          // Subtract from available pool for this district
+          regionMap[rName].districts[dName].poolAvailable = Math.max(0, regionMap[rName].districts[dName].poolAvailable - 1);
+
           if (a.center_no !== 'RESERVE') {
             regionMap[rName].centers.assigned++;
             regionMap[rName].districts[dName].centers.assigned++;
@@ -411,6 +427,20 @@ const SummaryAssignmentsPage = () => {
                             <span className="font-black">{dStats.supervisors.assigned}/{dStats.supervisors.required}</span>
                           </div>
                           <Progress value={dStats.supervisors.progress} className="h-1" indicatorClassName="bg-blue-500" />
+                        </div>
+                        
+                        {/* Available Pool Section */}
+                        <div className="flex justify-between items-center pt-2 mt-1 border-t border-black/5">
+                          <div className="flex items-center gap-1.5">
+                            <UserPlus className="h-3 w-3 text-slate-400" />
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Available Pool</span>
+                          </div>
+                          <span className={cn(
+                            "text-xs font-black",
+                            dStats.poolAvailable > 0 ? "text-slate-900" : "text-red-500"
+                          )}>
+                            {dStats.poolAvailable}
+                          </span>
                         </div>
                       </div>
                     </div>
