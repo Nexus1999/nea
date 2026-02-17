@@ -9,8 +9,8 @@ import {
   Search,
   RotateCcw,
   RefreshCw,
-  Users,
-  Building2
+  Building2,
+  Users
 } from "lucide-react";
 import {
   Table,
@@ -120,7 +120,6 @@ const SupervisorAssignmentsPage = () => {
       const centers = centersRes.data || [];
       const assignmentsFromDb = assignmentsRes.data || [];
 
-      // Build regions list from both centers and assignments
       const allRegions = [
         ...centers.map(c => c.region?.trim()),
         ...assignmentsFromDb.map(a => a.region?.trim())
@@ -129,7 +128,6 @@ const SupervisorAssignmentsPage = () => {
       const uniqueRegions = [...new Set(allRegions)].sort();
       setRegions(uniqueRegions);
 
-      // 1. Map Center Assignments (normal centers)
       const centerRows = centers.map((c) => {
         const assign = assignmentsFromDb.find(a => 
           a.center_no === c.center_number && 
@@ -148,14 +146,13 @@ const SupervisorAssignmentsPage = () => {
         };
       });
 
-      // 2. Map Reserve Assignments (using center_no = 'RESERVE')
       const reserveRows = assignmentsFromDb
         .filter(a => a.center_no === 'RESERVE')
         .map((r) => ({
           id: `reserve-${r.assignment_id}`,
           region: r.region?.trim() || 'N/A',
           district: r.district?.trim() || 'N/A',
-          location: ` RESERVE`,
+          location: `RESERVE`,
           supervisor: r.supervisor_name || '—',
           workstation: r.workstation || '—',
           phone: r.phone || '—',
@@ -266,25 +263,36 @@ const SupervisorAssignmentsPage = () => {
   const currentData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4">
       <Card className="w-full relative min-h-[600px] border-none shadow-sm">
         {(loading || isResetting) && (
-          <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-[50] rounded-lg">
-            <Spinner label={isResetting ? "Clearing data..." : "Syncing assignments..."} size="lg" />
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80">
+            <Spinner 
+              size="lg" 
+              label={isResetting ? "Clearing assignments..." : "Loading assignments..."} 
+            />
           </div>
         )}
 
-        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0 pb-6 border-b">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0 pb-6 border-b mb-4">
           <div>
-            <CardTitle className="text-2xl font-black uppercase tracking-tight text-slate-900">Supervision Assignments</CardTitle>
-            <p className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase mt-1">
-              {summaryInfo.code} — {summaryInfo.year}
-            </p>
+            <CardTitle className="text-2xl font-black uppercase tracking-tight text-slate-900">
+              Supervision Assignments
+            </CardTitle>
+            <div className="flex items-center gap-4 mt-1">
+              <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase">
+                {summaryInfo.code || '—'}
+              </p>
+              <span className="w-1 h-1 bg-slate-300 rounded-full" />
+              <p className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase">
+                {summaryInfo.year || '—'}
+              </p>
+            </div>
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
             <Select value={selectedRegion} onValueChange={(val) => { setSelectedRegion(val); setSelectedDistrict('all'); setCurrentPage(1); }}>
-              <SelectTrigger className="w-[150px] h-9 text-[10px] font-bold uppercase">
+              <SelectTrigger className="w-[150px] h-9 text-[10px] font-black uppercase">
                 <SelectValue placeholder="All Regions" />
               </SelectTrigger>
               <SelectContent>
@@ -294,7 +302,7 @@ const SupervisorAssignmentsPage = () => {
             </Select>
 
             <Select value={selectedDistrict} onValueChange={(val) => { setSelectedDistrict(val); setCurrentPage(1); }} disabled={selectedRegion === 'all'}>
-              <SelectTrigger className="w-[150px] h-9 text-[10px] font-bold uppercase">
+              <SelectTrigger className="w-[150px] h-9 text-[10px] font-black uppercase">
                 <SelectValue placeholder="All Districts" />
               </SelectTrigger>
               <SelectContent>
@@ -303,40 +311,52 @@ const SupervisorAssignmentsPage = () => {
               </SelectContent>
             </Select>
 
-            <Button size="sm" className="bg-slate-900 hover:bg-black text-[10px] font-black uppercase tracking-wider h-9" onClick={handleAssignClick} disabled={isProcessing || loading}>
-              {isProcessing ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5 mr-1.5" />}
+            <Button 
+              size="sm" 
+              className="bg-slate-900 hover:bg-black text-[10px] font-black uppercase tracking-wider rounded-lg h-9"
+              onClick={handleAssignClick}
+              disabled={isProcessing || loading}
+            >
+              {isProcessing ? (
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <UserCheck className="h-3.5 w-3.5 mr-1.5" />
+              )}
               Assign
             </Button>
 
-            <Button variant="outline" size="sm" className="border-2 border-slate-200 text-slate-600 hover:border-red-600 hover:text-red-600 text-[10px] font-black uppercase tracking-wider h-9 px-4" onClick={handleResetClick}>
-               <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reset
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="border-2 border-slate-200 text-slate-600 hover:border-red-600 hover:text-red-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-9 px-4 transition-all"
+              onClick={handleResetClick}
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reset
             </Button>
           </div>
         </CardHeader>
 
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
-                <Users className="h-4 w-4 text-slate-500" />
-                <span className="text-[10px] font-black uppercase text-slate-700">Total Records: {filteredData.length}</span>
-              </div>
-            </div>
-
-            <div className="relative w-full max-w-xs">
+        <CardContent>
+          <div className="mb-6">
+            <div className="relative w-full max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <Input placeholder="Search name, workstation..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} className="pl-9 h-9 text-xs border-slate-200" />
+              <Input
+                placeholder="Search location, supervisor, phone..."
+                value={search}
+                onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                className="pl-9 h-10 text-sm border-slate-200 focus:ring-slate-100"
+              />
             </div>
           </div>
 
-          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
             <Table>
               <TableHeader className="bg-slate-50/50">
                 <TableRow className="hover:bg-transparent border-b border-slate-200">
                   <TableHead className="w-[60px] text-[10px] font-black uppercase text-slate-500">SN</TableHead>
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">Region</TableHead>
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">District</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Location / Center</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Center</TableHead>
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">Supervisor</TableHead>
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">Workstation</TableHead>
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">Phone</TableHead>
@@ -356,32 +376,43 @@ const SupervisorAssignmentsPage = () => {
                       key={item.id} 
                       className={cn(
                         "hover:bg-slate-50/30 border-b border-slate-100 transition-colors",
-                        item.location.startsWith("DISTRICT RESERVE") && "bg-amber-50/40"
+                        item.location === "RESERVE" && "bg-amber-50/40"
                       )}
                     >
                       <TableCell className="text-slate-400 text-xs font-mono">
                         {((currentPage - 1) * itemsPerPage) + index + 1}
                       </TableCell>
-                      <TableCell className="text-[11px] font-medium uppercase text-slate-600">{item.region}</TableCell>
-                      <TableCell className="text-[11px] uppercase text-slate-600">{item.district}</TableCell>
-                      <TableCell className="text-[11px] font-bold text-slate-800">
-                        <div className="flex items-center gap-1">
-                          <Building2 className="h-3 w-3" /> {item.location}
+                      <TableCell className="text-sm text-slate-600 font-medium">{item.region}</TableCell>
+                      <TableCell className="text-sm text-slate-600 font-medium">{item.district}</TableCell>
+                      <TableCell className="text-sm font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                          {item.location}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <span className={cn("text-xs font-bold", !item.is_assigned ? "text-orange-500 italic" : "text-slate-900")}>
-                          {item.supervisor}
-                        </span>
+                      <TableCell className={cn(
+                        "text-sm font-medium",
+                        !item.is_assigned ? "text-orange-600 italic" : "text-slate-800"
+                      )}>
+                        {item.supervisor}
                       </TableCell>
-                      <TableCell className="text-[11px] font-mono text-indigo-600 font-semibold">{item.workstation}</TableCell>
-                      <TableCell className="text-xs font-mono text-slate-600">{item.phone}</TableCell>
+                      <TableCell className="text-sm text-indigo-600 font-medium font-mono">
+                        {item.workstation}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-600 font-medium">
+                        {item.phone}
+                      </TableCell>
                       <TableCell className="text-right px-6">
                         {item.is_assigned && (
-                          <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-slate-900" onClick={() => {
-                            setSelectedAssignment(item);
-                            setIsReassignModalOpen(true);
-                          }}>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-slate-900 transition-all"
+                            onClick={() => {
+                              setSelectedAssignment(item);
+                              setIsReassignModalOpen(true);
+                            }}
+                          >
                             <RefreshCw className="h-3.5 w-3.5 text-blue-600" />
                           </Button>
                         )}
@@ -393,9 +424,13 @@ const SupervisorAssignmentsPage = () => {
             </Table>
           </div>
 
-          {totalPages > 1 && (
+          {!loading && totalPages > 1 && (
             <div className="mt-6 flex justify-center">
-              <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+              <PaginationControls 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={setCurrentPage} 
+              />
             </div>
           )}
         </CardContent>
@@ -405,22 +440,33 @@ const SupervisorAssignmentsPage = () => {
         <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6">
           <AlertDialogHeader>
             <div className="flex flex-col items-center text-center mb-2">
-              <div className={cn("w-14 h-14 rounded-full flex items-center justify-center mb-4", dialogConfig.type === 'assign' ? 'bg-indigo-50 text-indigo-600' : 'bg-red-50 text-red-600')}>
+              <div className={cn(
+                "w-14 h-14 rounded-full flex items-center justify-center mb-4",
+                dialogConfig.type === 'assign' ? 'bg-indigo-50 text-indigo-600' : 'bg-red-50 text-red-600'
+              )}>
                 <RotateCcw className="h-7 w-7" />
               </div>
               <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
-                {dialogConfig.type === 'assign' ? 'Existing Assignments' : 'Clear Assignments?'}
+                {dialogConfig.type === 'assign' ? 'Existing Assignments Found' : 'Clear Assignments?'}
               </AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
               {dialogConfig.type === 'assign' 
-                ? `Assignments already exist for the selected criteria. To generate new ones, you must clear the current list first.` 
-                : `This will permanently remove all supervisor assignments for the selected Region/District.`}
+                ? `Assignments already exist for the selected area. Clear them first to generate a new set.` 
+                : `This will permanently delete all supervisor assignments for the selected region/district.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
-            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl mt-0">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={executeReset} className={cn("flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white", dialogConfig.type === 'assign' ? "bg-indigo-600 hover:bg-indigo-700" : "bg-red-600 hover:bg-red-700")}>
+            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl mt-0">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={executeReset}
+              className={cn(
+                "flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white",
+                dialogConfig.type === 'assign' ? "bg-indigo-600 hover:bg-indigo-700" : "bg-red-600 hover:bg-red-700"
+              )}
+            >
               Confirm Clear
             </AlertDialogAction>
           </AlertDialogFooter>
