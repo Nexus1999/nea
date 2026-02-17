@@ -229,7 +229,7 @@ const SupervisionsPage = () => {
                             size="icon" 
                             className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             title="View Summary"
-                            onClick={() => navigate(`/supervisions/summary/${item.id}`)}
+                            onClick={() => navigate(`/dashboard/supervisors/supervisors-summary/${item.id}`)}
                           >
                             <FileText className="h-4 w-4" />
                           </Button>

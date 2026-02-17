@@ -82,8 +82,10 @@ const SupervisorsListsPage = () => {
   const isAllDistrictsSelected = districts.length > 0 && districts.every(d => selectedDistricts.includes(d));
 
   useEffect(() => {
+    document.title = "Supervision Lists | NEAS";
     if (supervisionId) fetchSupervisionDetails();
   }, [supervisionId]);
+  
 
   const fetchSupervisionDetails = async () => {
     setLoading(true);
@@ -212,7 +214,9 @@ const SupervisorsListsPage = () => {
         const url = URL.createObjectURL(blob);
 
         setPreviewUrl(url);
-        setFileName(`Wasimamizi_${code}_${year}_${selectedRegion.replace(/\s+/g, '_')}.pdf`);
+        setFileName(`WASIMAMIZI ${selectedRegion} ${code}-${year}.pdf`
+);
+
         showSuccess("Supervisors list generated successfully!");
       } else {
         throw new Error("No PDF data received from server.");
