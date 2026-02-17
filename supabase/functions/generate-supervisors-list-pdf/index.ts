@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsPDF } from "https://esm.sh/jspdf@2.5.1"
-import "https://esm.sh/jspdf-autotable@3.5.28"
+import autoTable from "https://esm.sh/jspdf-autotable@3.5.28"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,17 +9,24 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     const { supervision_id, code, year, region, districts } = await req.json()
+    
+    console.log(`Generating PDF for Supervision: ${supervision_id}, Region: ${region}`);
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Missing environment variables for Supabase connection.");
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch assignments
     let query = supabase
@@ -28,29 +35,30 @@ serve(async (req) => {
       .eq('supervision_id', supervision_id)
       .eq('region', region)
       .order('district', { ascending: true })
-      .order('center_no', { ascending: true })
+      .order('center_no', { ascending: true });
 
     if (districts && districts.length > 0) {
-      query = query.in('district', districts)
+      query = query.in('district', districts);
     }
 
-    const { data: assignments, error } = await query
-    if (error) throw error
+    const { data: assignments, error: fetchError } = await query;
+    
+    if (fetchError) {
+      console.error("Database fetch error:", fetchError);
+      throw fetchError;
+    }
+
+    if (!assignments || assignments.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No supervisor assignments found for the selected criteria." }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
+    }
+
+    console.log(`Found ${assignments.length} assignments. Starting PDF generation...`);
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-
-    // Helper to add logos
-    // Note: In a real environment, these URLs should be absolute and publicly accessible
-    const baseUrl = Deno.env.get('APP_URL') || 'https://lvekluteykquxyuyetdj.supabase.co/storage/v1/object/public/assets';
-    
-    try {
-      // Attempt to add logos if available
-      // doc.addImage(`${baseUrl}/COAT.png`, 'PNG', 15, 10, 20, 20);
-      // doc.addImage(`${baseUrl}/NECTA.png`, 'PNG', pageWidth - 35, 10, 20, 20);
-    } catch (e) {
-      console.log("Logos not found, skipping images");
-    }
 
     // Header Text
     doc.setFontSize(12);
@@ -70,7 +78,7 @@ serve(async (req) => {
     doc.setFontSize(12);
     doc.text(`LIST OF SUPERVISORS FOR ${code} ${year}`, pageWidth / 2, 48, { align: "center" });
 
-    // Table
+    // Table Data Preparation
     const tableData = assignments.map((a, index) => [
       index + 1,
       a.district,
@@ -80,7 +88,8 @@ serve(async (req) => {
       a.phone
     ]);
 
-    (doc as any).autoTable({
+    // Generate Table
+    autoTable(doc, {
       startY: 55,
       head: [['S/N', 'District', 'Center', 'Supervisor Name', 'Workstation', 'Phone']],
       body: tableData,
@@ -97,9 +106,11 @@ serve(async (req) => {
       margin: { top: 55 }
     });
 
-    // Footer
+    // Footer / Signatures
     const finalY = (doc as any).lastAutoTable.finalY + 20;
-    if (finalY < doc.internal.pageSize.getHeight() - 40) {
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    if (finalY < pageHeight - 40) {
       doc.setFontSize(10);
       doc.text("..........................................", 15, finalY);
       doc.text("REGIONAL EDUCATION OFFICER", 15, finalY + 7);
@@ -108,15 +119,20 @@ serve(async (req) => {
       doc.text("DATE", pageWidth - 75, finalY + 7);
     }
 
+    // Convert to base64
     const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+    console.log("PDF generation complete.");
 
     return new Response(JSON.stringify({ pdfBase64 }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  } catch (error) {
+    });
+
+  } catch (error: any) {
+    console.error("Edge Function Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
-    })
+    });
   }
 })
