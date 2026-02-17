@@ -7,14 +7,7 @@ import {
   Menu, Bell, User, ChevronDown, LogOut, X, Users, LayoutDashboard, ChevronRight,
   Globe, MapPin, BookOpen, GraduationCap, Accessibility, GitBranch, UserCheck, PlusCircle, Eye
 } from "lucide-react";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+ 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { showStyledSwal } from '../utils/alerts';
 import { useAuth } from "@/providers/AuthProvider";
@@ -22,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import NectaLogo from "@/components/NectaLogo";
 import { SpecialNeedType } from "@/types/mastersummaries";
 import Spinner from "@/components/Spinner";
+import DynamicBreadcrumbs from "@/components/DynamicBreadcrumbs";
 
 const specialNeedFullNames: Record<SpecialNeedType, string> = {
   HI: 'Hearing Impairment',
@@ -90,61 +84,7 @@ const navItems = [
   { path: '/dashboard/profile', label: 'Profile', icon: User, key: 'Profile' },
 ];
 
-const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType; path?: string }> = {
-  // Core Sections
-  'timetables': { label: 'Timetables', icon: Clock },
-  'budgets': { label: 'Budgets', icon: DollarSign },
-  'mastersummaries': { label: 'Master Summaries', icon: Database },
-  'stationeries': { label: 'Stationeries', icon: PenLine },
-  'supervisors': { label: 'Supervisions', icon: UserCog },
-  'institutions': { label: 'Institutions', icon: Building },
-  'miscellaneous': { label: 'Miscellaneous', icon: Tags },
-  'security': { label: 'Security', icon: Shield },
-  'reports': { label: 'Reports', icon: FileText },
-  'settings': { label: 'Settings', icon: Settings },
-  'profile': { label: 'Profile', icon: User },
-
-  // Supervisor Specifics
-  'supervisors-management': { label: 'Supervisors', icon: Users },
-  'supervisors-assignments': { label: 'Assignments', icon: UserCheck },
-  
-  // Institution Specifics
-  'primary': { label: 'Primary Schools', icon: Building },
-  'secondary': { label: 'Secondary Schools', icon: Building },
-  'colleges': { label: 'Teachers Colleges', icon: Building },
-  
-  // Miscellaneous Specifics
-  'overview': { label: 'Overview', icon: LayoutDashboard },
-  'jobs': { label: 'Teachers Inventory', icon: Users },
-  'teachers-management': { label: 'Teachers Management', icon: Users },
-  'assignments': { label: 'Assignments', icon: FileText, path: '/dashboard/miscellaneous/jobs' },
-
-  // Common Action Placeholders
-  'add': { label: 'Add New', icon: PlusCircle },
-  'new': { label: 'Create', icon: PlusCircle },
-  'edit': { label: 'Edit Record', icon: PenLine },
-  'view': { label: 'View Details', icon: Eye },
-  'details': { label: 'Details', icon: FileText },
-  'summary': { label: 'Summary', icon: FileText },
-  'management': { label: 'Management', icon: UserCog },
-
-  // Security Specifics
-  'users': { label: 'Users', icon: Users },
-  'roles': { label: 'Roles', icon: UserCog },
-  'permissions': { label: 'Permissions', icon: Shield },
-  'audit-logs': { label: 'Audit Logs', icon: FileText },
-
-  // Settings Specifics
-  'regions': { label: 'Regions', icon: Globe },
-  'districts': { label: 'Districts', icon: MapPin },
-  'examinations': { label: 'Examinations', icon: BookOpen },
-  'subjects': { label: 'Subjects', icon: GraduationCap },
-
-  // Other
-  'special-needs': { label: 'Special Needs', icon: Accessibility },
-  'labels': { label: 'Labels', icon: Tags },
-  'versions': { label: 'Versions', icon: GitBranch },
-};
+ 
 
 const DashboardLayout = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -205,67 +145,7 @@ const DashboardLayout = () => {
     return false;
   };
 
-  const getBreadcrumbConfig = (segment: string, previousSegment?: string) => {
-    if (isDynamicId(segment)) {
-      if (previousSegment === 'assignments' || previousSegment === 'supervisors-assignments') return { label: 'Assignment Details', icon: FileText };
-      if (previousSegment === 'special-needs') {
-        const fullName = specialNeedFullNames[segment as SpecialNeedType];
-        if (fullName) return { label: fullName, icon: Accessibility };
-      }
-      return { label: 'Details', icon: FileText };
-    }
-
-    if (breadcrumbRoutes[segment]) return breadcrumbRoutes[segment];
-
-    return {
-      label: segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' '),
-      icon: FileText,
-    };
-  };
-
-  const buildBreadcrumbs = () => {
-    const pathSegments = location.pathname.split('/').filter(Boolean);
-    const segments = pathSegments.slice(1);
-    const items: React.ReactNode[] = [];
-
-    segments.forEach((segment, index) => {
-      const isLast = index === segments.length - 1;
-      const previousSegment = index > 0 ? segments[index - 1] : undefined;
-      const config = getBreadcrumbConfig(segment, previousSegment);
-      const { label, icon: Icon, path: customPath } = config;
-      const pathTo = customPath || `/dashboard/${segments.slice(0, index + 1).join('/')}`;
-      
-      const content = (
-        <span className="flex items-center gap-1">
-          <Icon className="h-4 w-4" />
-          {label}
-        </span>
-      );
-
-      items.push(
-        <React.Fragment key={pathTo}>
-          <BreadcrumbSeparator>
-            <ChevronRight className="text-gray-400 h-4 w-4" />
-          </BreadcrumbSeparator>
-          <BreadcrumbItem>
-            {isLast ? (
-              <BreadcrumbPage className="text-gray-900 font-bold">
-                {content}
-              </BreadcrumbPage>
-            ) : (
-              <BreadcrumbLink asChild>
-                <Link to={pathTo} className="text-primary hover:text-primary/80 transition-colors">
-                  {content}
-                </Link>
-              </BreadcrumbLink>
-            )}
-          </BreadcrumbItem>
-        </React.Fragment>
-      );
-    });
-
-    return items;
-  };
+ 
 
   const filteredNavItems = navItems.filter(item => true);
 
@@ -485,20 +365,12 @@ const DashboardLayout = () => {
         </header>
 
         <div className="flex-1 p-6 overflow-auto">
-          <div className="flex justify-end mb-4">
-            <Breadcrumb className="hidden md:block">
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <Link to="/dashboard" className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors">
-                      <Home className="h-4 w-4" /> Dashboard
-                    </Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                {buildBreadcrumbs()}
-              </BreadcrumbList>
-            </Breadcrumb>
+           
+          <div className="flex justify-end mb-4 px-2">
+          <div className="max-w-[75%] md:max-w-none">
+            <DynamicBreadcrumbs />
           </div>
+        </div>
           <Outlet />
         </div>
       </div>

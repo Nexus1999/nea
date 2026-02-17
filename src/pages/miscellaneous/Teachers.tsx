@@ -221,13 +221,7 @@ const PrimaryTeacherAssignments = () => {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button 
-                            variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                            title="View Summary" onClick={() => navigate(`/supervisions/summary/${item.id}`)}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
+                        <div className="flex justify-end gap-1">                           
 
                           <Button 
                             variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
@@ -243,12 +237,7 @@ const PrimaryTeacherAssignments = () => {
                             <Edit className="h-4 w-4" />
                           </Button>
 
-                          <Button 
-                            variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            title="Export Data" onClick={() => handleExportCSV(item)}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
+                          
 
                           <Button 
                             variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-red-50"

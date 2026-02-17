@@ -20,6 +20,7 @@ import PrimaryTeachersManagementPage from "./pages/miscellaneous/TeachersManagem
 import SupervisionsPage from "./pages/supervisors/SupervisionsPage";
 import SupervisorsManagementPage from "./pages/supervisors/SupervisorsManagementPage";
 import SupervisorAssignmentsPage from "./pages/supervisors/SupervisorAssignmentsPage";
+import SupervisorsListsPage from "./pages/supervisors/SupervisorsListsPage";
 
 const queryClient = new QueryClient();
 
@@ -62,7 +63,8 @@ const App = () => (
               <Route path="supervisors" element={<SupervisionsPage />} />
               <Route path="supervisors/supervisors-management" element={<SupervisorsManagementPage />} />
               <Route path="supervisors/supervisors-assignments/:id" element={<SupervisorAssignmentsPage />} />
-              
+               <Route path="supervisors/supervisors-list/:id" element={<SupervisorAssignmentsPage />} />
+             
               {/* Miscellaneous Routes */}
               <Route path="miscellaneous/jobs" element={<Teachers />} />
               <Route path="miscellaneous/jobs/assignments/:id" element={<JobAssignments />} />
