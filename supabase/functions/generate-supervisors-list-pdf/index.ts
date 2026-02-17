@@ -22,10 +22,11 @@ const abbreviateSchoolName = (name: string): string => {
     .trim();
 };
 
-// Helper to fetch image and convert to base64
 async function getBase64Image(url: string) {
   try {
+    console.log(`Fetching image from: ${url}`);
     const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
     const blob = await response.blob();
     const buffer = await blob.arrayBuffer();
     const uint8Array = new Uint8Array(buffer);
@@ -35,7 +36,7 @@ async function getBase64Image(url: string) {
     }
     return btoa(binary);
   } catch (e) {
-    console.error("Failed to fetch image:", url, e);
+    console.error(`Error fetching image (${url}):`, e.message);
     return null;
   }
 }
@@ -52,9 +53,23 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Fetch Logos (Assuming they are in the public folder of the app)
-    // We use a placeholder or a known public URL. For this environment, we'll try to fetch from the project's assets.
-    const baseUrl = req.headers.get('origin') || '';
+    // 1. Construct Base URL for assets
+    const referer = req.headers.get('referer');
+    let baseUrl = '';
+    if (referer) {
+      try {
+        const urlObj = new URL(referer);
+        baseUrl = urlObj.origin;
+      } catch (e) {
+        baseUrl = req.headers.get('origin') || '';
+      }
+    } else {
+      baseUrl = req.headers.get('origin') || '';
+    }
+
+    // Ensure baseUrl doesn't end with slash for consistency
+    baseUrl = baseUrl.replace(/\/$/, '');
+
     const coatLogo = await getBase64Image(`${baseUrl}/images/COAT.png`);
     const nectaLogo = await getBase64Image(`${baseUrl}/images/NECTA.jpg`);
 
@@ -150,8 +165,16 @@ serve(async (req) => {
     // 7. Header Function
     const addHeader = (regionName: string, districtName: string) => {
       const logoSize = 60;
-      if (coatLogo) doc.addImage(coatLogo, 'PNG', margin, 30, logoSize, logoSize);
-      if (nectaLogo) doc.addImage(nectaLogo, 'JPEG', pageWidth - margin - logoSize, 30, logoSize, logoSize);
+      if (coatLogo) {
+        try {
+          doc.addImage(coatLogo, 'PNG', margin, 30, logoSize, logoSize);
+        } catch (e) { console.error("Error adding Coat Logo to PDF", e); }
+      }
+      if (nectaLogo) {
+        try {
+          doc.addImage(nectaLogo, 'JPEG', pageWidth - margin - logoSize, 30, logoSize, logoSize);
+        } catch (e) { console.error("Error adding NECTA Logo to PDF", e); }
+      }
 
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
