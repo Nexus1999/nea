@@ -249,7 +249,7 @@ const SupervisionsPage = () => {
                             size="icon"
                             className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
                             title="View Supervisors Lists"
-                            onClick={() => navigate(`/dashboard/supervisors/supervisors-lists/${item.mid}`)}
+                            onClick={() => navigate(`/dashboard/supervisors/supervisors-lists/${item.id}`)}
                           >
                             <Download className="h-4 w-4" />
                           </Button>
