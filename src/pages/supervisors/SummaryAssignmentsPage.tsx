@@ -8,26 +8,33 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ChevronDown, ChevronUp, MapPin, Building, School, Users, AlertCircle, ArrowLeft, BarChart3 } from "lucide-react";
+import { 
+  ChevronDown, ChevronUp, MapPin, Building, School, Users, 
+  AlertCircle, ArrowLeft, BarChart3, CheckCircle2, XCircle 
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 interface SummaryStats {
-  total: number;
+  required: number;
   assigned: number;
+  missing: number;
   progress: number;
+  fullyAssigned: boolean;
 }
 
 interface RegionSummary {
   name: string;
   centers: SummaryStats;
   supervisors: SummaryStats;
+  fullyAssigned: boolean;
 }
 
 interface DistrictSummary {
   name: string;
   centers: SummaryStats;
-  supervisors: SummaryStats & { available?: number };
+  supervisors: SummaryStats & { available: number };
+  fullyAssigned: boolean;
 }
 
 function useAnimatedValue(target: number, duration = 1200) {
@@ -98,7 +105,7 @@ const SummaryCard = ({
 
         <div className="mt-6 space-y-2">
           <div className="flex justify-between text-sm">
-            <span>Assigned</span>
+            <span>Completed</span>
             <span className="font-medium">
               {loading ? <Skeleton className="h-4 w-12 inline-block" /> : value.toLocaleString()}
             </span>
@@ -107,7 +114,7 @@ const SummaryCard = ({
           {total !== undefined && (
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Total: {total.toLocaleString()}</span>
-              <span>Missing: {(total - value).toLocaleString()}</span>
+              <span>Remaining: {Math.max(0, total - value).toLocaleString()}</span>
             </div>
           )}
         </div>
@@ -123,10 +130,10 @@ const SummaryAssignmentsPage = () => {
   const [regions, setRegions] = useState<RegionSummary[]>([]);
   const [districtsByRegion, setDistrictsByRegion] = useState<Record<string, DistrictSummary[]>>({});
   const [overall, setOverall] = useState<{
-    regions: SummaryStats;
-    districts: SummaryStats;
-    centers: SummaryStats;
-    supervisors: SummaryStats;
+    regions: { total: number; assigned: number; progress: number };
+    districts: { total: number; assigned: number; progress: number };
+    centers: { total: number; assigned: number; progress: number };
+    supervisors: { total: number; assigned: number; progress: number };
   } | null>(null);
 
   const [examInfo, setExamInfo] = useState<{ code: string; year: number } | null>(null);
@@ -165,163 +172,166 @@ const SummaryAssignmentsPage = () => {
 
         setExamInfo({ code, year });
 
-        // 2. Get all assignments for this supervision
-        const { data: assignments, error: assignErr } = await supabase
-          .from("supervisorassignments")
-          .select("region, district, center_no, supervisor_name")
-          .eq("supervision_id", supervisionId);
+        // 2. Define centers table mapping
+        const centersTableMap: Record<string, string> = {
+          "SFNA": "primarymastersummary",
+          "SSNA": "primarymastersummary",
+          "PSLE": "primarymastersummary",
+          "FTNA": "secondarymastersummaries",
+          "CSEE": "secondarymastersummaries",
+          "ACSEE": "secondarymastersummaries",
+          "DPEE": "dpeemastersummary",
+          "DPNE": "dpnemastersummary"
+        };
 
-        if (assignErr) throw assignErr;
+        const centersTable = centersTableMap[code];
+        if (!centersTable) throw new Error("Unsupported exam code");
 
-        // 3. Get total centers from appropriate mastersummary table
-        let centersTable: string;
-        switch (code) {
-          case "SFNA":
-          case "SSNA":
-          case "PSLE":
-            centersTable = "primarymastersummary";
-            break;
-          case "FTNA":
-          case "CSEE":
-          case "ACSEE":
-            centersTable = "secondarymastersummaries";
-            break;
-          case "DPEE":
-            centersTable = "dpeemastersummary";
-            break;
-          case "DPNE":
-            centersTable = "dpnemastersummary";
-            break;
-          default:
-            centersTable = "secondarymastersummaries";
-        }
+        // 3. Execute all data queries in parallel (Replicating backend logic)
+        const [centersRes, availableSupsRes, assignedSupsRes] = await Promise.all([
+          // Get centers grouped by region/district
+          supabase.from(centersTable).select("region, district, center_number").eq("mid", mid).eq("is_latest", 1),
+          // Get available supervisors count by district
+          supabase.from("supervisors").select("region, district").eq("status", "ACTIVE").eq("is_latest", 1),
+          // Get assigned supervisors count by district
+          supabase.from("supervisorassignments").select("region, district, center_no, supervisor_name").eq("supervision_id", supervisionId)
+        ]);
 
-        const { data: centers, error: centerErr } = await supabase
-          .from(centersTable)
-          .select("region, district, center_number")
-          .eq("mid", mid)
-          .eq("is_latest", 1);
+        if (centersRes.error) throw centersRes.error;
+        if (availableSupsRes.error) throw availableSupsRes.error;
+        if (assignedSupsRes.error) throw assignedSupsRes.error;
 
-        if (centerErr) throw centerErr;
+        // 4. Process Data into District Map
+        const districtMap = new Map<string, DistrictSummary & { region: string }>();
 
-        // 4. Process data
-        const regionMap = new Map<string, { centers: Set<string>; supervisors: Set<string> }>();
-        const districtMap = new Map<string, Map<string, { centers: Set<string>; supervisors: Set<string> }>>();
-
-        // Process centers (total required)
-        centers?.forEach((c: any) => {
-          const reg = c.region?.trim();
-          const dist = c.district?.trim();
-          const center = c.center_number?.trim();
-
-          if (!reg || !dist || !center) return;
-
-          if (!regionMap.has(reg)) {
-            regionMap.set(reg, { centers: new Set(), supervisors: new Set() });
+        // Initialize districts from centers table
+        centersRes.data.forEach((c: any) => {
+          const key = `${c.region}-${c.district}`;
+          if (!districtMap.has(key)) {
+            districtMap.set(key, {
+              region: c.region,
+              name: c.district,
+              centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
+              supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false, available: 0 },
+              fullyAssigned: false
+            });
           }
-          regionMap.get(reg)!.centers.add(center);
-
-          if (!districtMap.has(reg)) districtMap.set(reg, new Map());
-          const distMap = districtMap.get(reg)!;
-          if (!distMap.has(dist)) distMap.set(dist, { centers: new Set(), supervisors: new Set() });
-          distMap.get(dist)!.centers.add(center);
+          districtMap.get(key)!.centers.required++;
         });
 
-        // Process assignments (assigned supervisors)
-        assignments?.forEach((a: any) => {
-          const reg = a.region?.trim();
-          const dist = a.district?.trim();
-          const supervisor = a.supervisor_name?.trim();
-
-          if (!reg || !dist || !supervisor) return;
-
-          if (regionMap.has(reg)) {
-            regionMap.get(reg)!.supervisors.add(supervisor);
+        // Map available supervisors
+        availableSupsRes.data.forEach((s: any) => {
+          const key = `${s.region}-${s.district}`;
+          if (districtMap.has(key)) {
+            districtMap.get(key)!.supervisors.available++;
           }
+        });
 
-          if (districtMap.has(reg)) {
-            const distMap = districtMap.get(reg)!;
-            if (distMap.has(dist)) {
-              distMap.get(dist)!.supervisors.add(supervisor);
+        // Map assigned supervisors and centers
+        assignedSupsRes.data.forEach((a: any) => {
+          const key = `${a.region}-${a.district}`;
+          if (districtMap.has(key)) {
+            const d = districtMap.get(key)!;
+            d.supervisors.assigned++;
+            // If center_no is not 'RESERVE', it counts as a center assignment
+            if (a.center_no !== 'RESERVE') {
+              d.centers.assigned++;
             }
           }
         });
 
-        // Build final region summaries
-        const regionSummaries: RegionSummary[] = [];
+        // 5. Calculate Progress and Fully Assigned Status for Districts
+        districtMap.forEach((d) => {
+          // Required supervisors = centers + 5 (Reserve logic)
+          d.supervisors.required = d.centers.required + 5;
+          
+          d.centers.missing = Math.max(0, d.centers.required - d.centers.assigned);
+          d.centers.progress = d.centers.required > 0 ? Math.round((d.centers.assigned / d.centers.required) * 100) : 0;
+          d.centers.fullyAssigned = d.centers.assigned >= d.centers.required;
+
+          d.supervisors.missing = Math.max(0, d.supervisors.required - d.supervisors.assigned);
+          d.supervisors.progress = d.supervisors.required > 0 ? Math.round((d.supervisors.assigned / d.supervisors.required) * 100) : 0;
+          d.supervisors.fullyAssigned = d.supervisors.assigned >= d.supervisors.required;
+
+          // District is fully assigned only if BOTH centers and supervisors (including reserve) are met
+          d.fullyAssigned = d.centers.fullyAssigned && d.supervisors.fullyAssigned;
+        });
+
+        // 6. Build Region Map
+        const regionMap = new Map<string, RegionSummary>();
         const districtsByReg: Record<string, DistrictSummary[]> = {};
 
-        regionMap.forEach((stats, regName) => {
-          const totalCenters = stats.centers.size;
-          const assignedSupervisors = stats.supervisors.size;
-          const requiredSupervisors = totalCenters;
-
-          regionSummaries.push({
-            name: regName,
-            centers: {
-              total: totalCenters,
-              assigned: totalCenters,
-              progress: 100,
-            },
-            supervisors: {
-              total: requiredSupervisors,
-              assigned: assignedSupervisors,
-              progress: totalCenters > 0 ? Math.round((assignedSupervisors / requiredSupervisors) * 100) : 0,
-            },
-          });
-
-          const districtSummaries: DistrictSummary[] = [];
-          districtMap.get(regName)?.forEach((dStats, distName) => {
-            const dTotalCenters = dStats.centers.size;
-            const dAssigned = dStats.supervisors.size;
-            const dRequired = dTotalCenters;
-
-            districtSummaries.push({
-              name: distName,
-              centers: {
-                total: dTotalCenters,
-                assigned: dTotalCenters,
-                progress: 100,
-              },
-              supervisors: {
-                total: dRequired,
-                assigned: dAssigned,
-                progress: dTotalCenters > 0 ? Math.round((dAssigned / dRequired) * 100) : 0,
-              },
+        districtMap.forEach((d) => {
+          if (!regionMap.has(d.region)) {
+            regionMap.set(d.region, {
+              name: d.region,
+              centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: true },
+              supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: true },
+              fullyAssigned: true
             });
-          });
+            districtsByReg[d.region] = [];
+          }
 
-          districtsByReg[regName] = districtSummaries.sort((a, b) => a.name.localeCompare(b.name));
+          const r = regionMap.get(d.region)!;
+          r.centers.required += d.centers.required;
+          r.centers.assigned += d.centers.assigned;
+          r.centers.missing += d.centers.missing;
+
+          r.supervisors.required += d.supervisors.required;
+          r.supervisors.assigned += d.supervisors.assigned;
+          r.supervisors.missing += d.supervisors.missing;
+
+          if (!d.fullyAssigned) r.fullyAssigned = false;
+          
+          districtsByReg[d.region].push(d);
         });
 
-        // Overall totals
-        let totalCenters = 0;
-        let totalSupervisorsRequired = 0;
-        let totalSupervisorsAssigned = 0;
-        let totalDistricts = 0;
-
-        regionSummaries.forEach(r => {
-          totalCenters += r.centers.total;
-          totalSupervisorsRequired += r.supervisors.total;
-          totalSupervisorsAssigned += r.supervisors.assigned;
+        // Calculate Region Progress
+        regionMap.forEach((r) => {
+          r.centers.progress = r.centers.required > 0 ? Math.round((r.centers.assigned / r.centers.required) * 100) : 0;
+          r.supervisors.progress = r.supervisors.required > 0 ? Math.round((r.supervisors.assigned / r.supervisors.required) * 100) : 0;
+          r.centers.fullyAssigned = r.centers.assigned >= r.centers.required;
+          r.supervisors.fullyAssigned = r.supervisors.assigned >= r.supervisors.required;
         });
 
-        Object.values(districtsByReg).forEach(dists => {
-          totalDistricts += dists.length;
-        });
+        // 7. Calculate Overall Totals
+        const districtValues = Array.from(districtMap.values());
+        const regionValues = Array.from(regionMap.values());
 
-        setRegions(regionSummaries.sort((a, b) => a.name.localeCompare(b.name)));
+        const fullyAssignedDistricts = districtValues.filter(d => d.fullyAssigned).length;
+        const fullyAssignedRegions = regionValues.filter(r => r.fullyAssigned).length;
+
+        const totalCenters = districtValues.reduce((a, d) => a + d.centers.required, 0);
+        const assignedCenters = districtValues.reduce((a, d) => a + d.centers.assigned, 0);
+
+        const totalSups = districtValues.reduce((a, d) => a + d.supervisors.required, 0);
+        const assignedSups = districtValues.reduce((a, d) => a + d.supervisors.assigned, 0);
+
+        setRegions(regionValues.sort((a, b) => a.name.localeCompare(b.name)));
         setDistrictsByRegion(districtsByReg);
         setOverall({
-          regions: { total: regionSummaries.length, assigned: regionSummaries.length, progress: 100 },
-          districts: { total: totalDistricts, assigned: totalDistricts, progress: 100 },
-          centers: { total: totalCenters, assigned: totalCenters, progress: 100 },
-          supervisors: {
-            total: totalSupervisorsRequired,
-            assigned: totalSupervisorsAssigned,
-            progress: totalSupervisorsRequired > 0 ? Math.round((totalSupervisorsAssigned / totalSupervisorsRequired) * 100) : 0,
+          regions: { 
+            total: regionValues.length, 
+            assigned: fullyAssignedRegions, 
+            progress: regionValues.length > 0 ? Math.round((fullyAssignedRegions / regionValues.length) * 100) : 0 
+          },
+          districts: { 
+            total: districtValues.length, 
+            assigned: fullyAssignedDistricts, 
+            progress: districtValues.length > 0 ? Math.round((fullyAssignedDistricts / districtValues.length) * 100) : 0 
+          },
+          centers: { 
+            total: totalCenters, 
+            assigned: assignedCenters, 
+            progress: totalCenters > 0 ? Math.round((assignedCenters / totalCenters) * 100) : 0 
+          },
+          supervisors: { 
+            total: totalSups, 
+            assigned: assignedSups, 
+            progress: totalSups > 0 ? Math.round((assignedSups / totalSups) * 100) : 0 
           },
         });
+
       } catch (err: any) {
         console.error(err);
         setError(err.message || "Failed to load summary data");
@@ -342,7 +352,7 @@ const SummaryAssignmentsPage = () => {
             Assignments Summary {examInfo ? `— ${examInfo.code} ${examInfo.year}` : ""}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Overview of centers and supervisors allocation
+            Overview of centers and supervisors allocation (including +5 reserve per district)
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
@@ -373,7 +383,7 @@ const SummaryAssignmentsPage = () => {
       ) : overall ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-10">
           <SummaryCard
-            title="Regions"
+            title="Regions (Fully Assigned)"
             value={overall.regions.assigned}
             total={overall.regions.total}
             progress={overall.regions.progress}
@@ -382,7 +392,7 @@ const SummaryAssignmentsPage = () => {
             loading={loading}
           />
           <SummaryCard
-            title="Districts"
+            title="Districts (Fully Assigned)"
             value={overall.districts.assigned}
             total={overall.districts.total}
             progress={overall.districts.progress}
@@ -391,7 +401,7 @@ const SummaryAssignmentsPage = () => {
             loading={loading}
           />
           <SummaryCard
-            title="Centers"
+            title="Centers Assigned"
             value={overall.centers.assigned}
             total={overall.centers.total}
             progress={overall.centers.progress}
@@ -400,7 +410,7 @@ const SummaryAssignmentsPage = () => {
             loading={loading}
           />
           <SummaryCard
-            title="Supervisors"
+            title="Supervisors Assigned"
             value={overall.supervisors.assigned}
             total={overall.supervisors.total}
             progress={overall.supervisors.progress}
@@ -414,7 +424,7 @@ const SummaryAssignmentsPage = () => {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle>Region & District Breakdown</CardTitle>
-          <CardDescription>Centers and supervisors allocation details</CardDescription>
+          <CardDescription>Detailed allocation status per region and district</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -447,7 +457,12 @@ const SummaryAssignmentsPage = () => {
                       ) : (
                         <ChevronDown className="h-5 w-5 text-primary" />
                       )}
-                      <span className="font-medium">{region.name}</span>
+                      <span className="font-bold">{region.name}</span>
+                      {region.fullyAssigned && (
+                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
+                          <CheckCircle2 className="h-3 w-3 mr-1" /> Fully Assigned
+                        </Badge>
+                      )}
                     </div>
                     <Badge variant="secondary">
                       {districtsByRegion[region.name]?.length || 0} districts
@@ -455,49 +470,78 @@ const SummaryAssignmentsPage = () => {
                   </button>
 
                   {expandedRegion === region.name && (
-                    <div className="p-5 pt-3 grid md:grid-cols-2 gap-6 bg-muted/30">
-                      <div>
-                        <div className="text-sm font-medium mb-2.5 flex items-center gap-2">
-                          <School className="h-4 w-4 text-red-600" />
-                          Centers
-                        </div>
-                        <div className="border rounded-lg p-4 bg-white shadow-sm">
-                          <div className="flex justify-between text-sm mb-3">
-                            <span>Total:</span>
-                            <span className="font-medium">{region.centers.total}</span>
+                    <div className="p-5 pt-3 space-y-6 bg-muted/30">
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <div className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                            <School className="h-4 w-4 text-red-600" /> Centers Summary
                           </div>
-                          <Progress
-                            value={region.centers.progress}
-                            className="h-2 mb-2"
-                            indicatorClassName="bg-red-500"
-                          />
+                          <div className="border rounded-xl p-4 bg-white shadow-sm">
+                            <div className="flex justify-between text-sm mb-3">
+                              <span className="font-medium">Total Required:</span>
+                              <span className="font-bold">{region.centers.required}</span>
+                            </div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="font-medium">Assigned:</span>
+                              <span className="font-bold text-red-600">{region.centers.assigned}</span>
+                            </div>
+                            <Progress value={region.centers.progress} className="h-2 mb-2" indicatorClassName="bg-red-500" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                            <Users className="h-4 w-4 text-green-600" /> Supervisors Summary
+                          </div>
+                          <div className="border rounded-xl p-4 bg-white shadow-sm">
+                            <div className="flex justify-between text-sm mb-3">
+                              <span className="font-medium">Total Required (+5):</span>
+                              <span className="font-bold">{region.supervisors.required}</span>
+                            </div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="font-medium">Assigned:</span>
+                              <span className="font-bold text-green-600">{region.supervisors.assigned}</span>
+                            </div>
+                            <Progress value={region.supervisors.progress} className="h-2 mb-2" indicatorClassName="bg-green-500" />
+                          </div>
                         </div>
                       </div>
 
-                      <div>
-                        <div className="text-sm font-medium mb-2.5 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-green-600" />
-                          Supervisors
-                        </div>
-                        <div className="border rounded-lg p-4 bg-white shadow-sm">
-                          <div className="flex justify-between text-sm mb-3">
-                            <span>Required:</span>
-                            <span className="font-medium">{region.supervisors.total}</span>
-                          </div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>Assigned:</span>
-                            <span className="font-medium text-green-700">
-                              {region.supervisors.assigned}
-                            </span>
-                          </div>
-                          <Progress
-                            value={region.supervisors.progress}
-                            className="h-2 mb-2"
-                            indicatorClassName="bg-green-500"
-                          />
-                          <div className="text-xs text-muted-foreground text-right">
-                            {region.supervisors.total - region.supervisors.assigned} missing
-                          </div>
+                      <div className="space-y-3">
+                        <div className="text-xs font-black uppercase tracking-widest text-slate-400 px-1">District Details</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {districtsByRegion[region.name].map((dist) => (
+                            <div key={dist.name} className={cn(
+                              "p-4 rounded-xl border bg-white shadow-sm transition-all",
+                              dist.fullyAssigned ? "border-green-200 bg-green-50/30" : "border-slate-100"
+                            )}>
+                              <div className="flex justify-between items-start mb-3">
+                                <h5 className="text-sm font-bold uppercase tracking-tight truncate pr-2">{dist.name}</h5>
+                                {dist.fullyAssigned ? (
+                                  <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 text-slate-300 shrink-0" />
+                                )}
+                              </div>
+                              
+                              <div className="space-y-3">
+                                <div>
+                                  <div className="flex justify-between text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                    <span>Centers</span>
+                                    <span>{dist.centers.assigned}/{dist.centers.required}</span>
+                                  </div>
+                                  <Progress value={dist.centers.progress} className="h-1" indicatorClassName="bg-red-500" />
+                                </div>
+                                <div>
+                                  <div className="flex justify-between text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                    <span>Supervisors</span>
+                                    <span>{dist.supervisors.assigned}/{dist.supervisors.required}</span>
+                                  </div>
+                                  <Progress value={dist.supervisors.progress} className="h-1" indicatorClassName="bg-green-500" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
