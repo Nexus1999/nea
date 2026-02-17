@@ -8,7 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper to abbreviate school names (replicated from project utils)
 const abbreviateSchoolName = (name: string): string => {
   if (!name) return "";
   return name
@@ -23,6 +22,24 @@ const abbreviateSchoolName = (name: string): string => {
     .trim();
 };
 
+// Helper to fetch image and convert to base64
+async function getBase64Image(url: string) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const buffer = await blob.arrayBuffer();
+    const uint8Array = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < uint8Array.byteLength; i++) {
+      binary += String.fromCharCode(uint8Array[i]);
+    }
+    return btoa(binary);
+  } catch (e) {
+    console.error("Failed to fetch image:", url, e);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -35,7 +52,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Fetch Assignments
+    // 1. Fetch Logos (Assuming they are in the public folder of the app)
+    // We use a placeholder or a known public URL. For this environment, we'll try to fetch from the project's assets.
+    const baseUrl = req.headers.get('origin') || '';
+    const coatLogo = await getBase64Image(`${baseUrl}/images/COAT.png`);
+    const nectaLogo = await getBase64Image(`${baseUrl}/images/NECTA.jpg`);
+
+    // 2. Fetch Assignments
     let query = supabase
       .from('supervisorassignments')
       .select('*')
@@ -58,7 +81,7 @@ serve(async (req) => {
       });
     }
 
-    // 2. Custom Sorting (S centers then P centers for secondary)
+    // 3. Custom Sorting
     let sortedRows = [...rows];
     if (['FTNA', 'CSEE', 'ACSEE'].includes(code)) {
       const pCenters: Record<string, any> = {};
@@ -84,16 +107,11 @@ serve(async (req) => {
       sortedRows.sort((a, b) => a.center_no.localeCompare(b.center_no));
     }
 
-    // 3. Fetch Center Names from Master Summary Tables
+    // 4. Fetch Center Names
     const centersTableMap: Record<string, string> = {
-      SFNA: "primarymastersummary",
-      SSNA: "primarymastersummary",
-      PSLE: "primarymastersummary",
-      FTNA: "secondarymastersummaries",
-      CSEE: "secondarymastersummaries",
-      ACSEE: "secondarymastersummaries",
-      DPEE: "dpeemastersummary",
-      DPNE: "dpnemastersummary",
+      SFNA: "primarymastersummary", SSNA: "primarymastersummary", PSLE: "primarymastersummary",
+      FTNA: "secondarymastersummaries", CSEE: "secondarymastersummaries", ACSEE: "secondarymastersummaries",
+      DPEE: "dpeemastersummary", DPNE: "dpnemastersummary",
     };
     
     const centersTable = centersTableMap[code];
@@ -101,9 +119,7 @@ serve(async (req) => {
     const centerCache: Record<string, string> = {};
 
     if (centersTable && centerNumbers.length > 0) {
-      // Get mid from supervision
       const { data: supData } = await supabase.from('supervisions').select('mid').eq('id', supervision_id).single();
-      
       if (supData?.mid) {
         const { data: cRes } = await supabase
           .from(centersTable)
@@ -117,13 +133,13 @@ serve(async (req) => {
       }
     }
 
-    // 4. Initialize PDF (Landscape A4)
+    // 5. Initialize PDF
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 50;
 
-    // 5. Group by District
+    // 6. Group by District
     const districtsMap: Record<string, any[]> = {};
     sortedRows.forEach(r => {
       const key = r.district.toUpperCase();
@@ -131,8 +147,12 @@ serve(async (req) => {
       districtsMap[key].push(r);
     });
 
-    // 6. Header Function
+    // 7. Header Function
     const addHeader = (regionName: string, districtName: string) => {
+      const logoSize = 60;
+      if (coatLogo) doc.addImage(coatLogo, 'PNG', margin, 30, logoSize, logoSize);
+      if (nectaLogo) doc.addImage(nectaLogo, 'JPEG', pageWidth - margin - logoSize, 30, logoSize, logoSize);
+
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text('JAMHURI YA MUUNGANO WA TANZANIA', pageWidth / 2, 55, { align: 'center' });
@@ -167,18 +187,16 @@ serve(async (req) => {
       doc.line(margin, 170, pageWidth - margin, 170);
     };
 
-    // 7. Generate Pages
+    // 8. Generate Pages
     let first = true;
-    let globalPageNumber = 1;
     const districtKeys = Object.keys(districtsMap).sort();
-    
-    // Calculate total pages (approximate for pagination)
     const rowsPerPage = 20;
-    const totalPages = districtKeys.reduce((total, d) => total + Math.ceil(districtsMap[d].length / rowsPerPage), 0);
 
     for (const districtName of districtKeys) {
       const districtRows = districtsMap[districtName];
       const regionName = districtRows[0].region;
+      const totalPagesForDistrict = Math.ceil(districtRows.length / rowsPerPage);
+      let currentPageForDistrict = 1;
 
       if (!first) doc.addPage();
       addHeader(regionName, districtName);
@@ -215,12 +233,12 @@ serve(async (req) => {
           doc.text("SIRI", pageWidth / 2, 25, { align: 'center' });
           doc.text("SIRI", pageWidth / 2, pageHeight - 20, { align: 'center' });
 
-          // Pagination
+          // Pagination (Reset per district)
           doc.setFontSize(10);
           doc.setTextColor(0, 0, 0);
           doc.setFont('helvetica', 'normal');
-          doc.text(`Ukurasa ${globalPageNumber} / ${totalPages}`, pageWidth - margin, pageHeight - 30, { align: 'right' });
-          globalPageNumber++;
+          doc.text(`Ukurasa ${currentPageForDistrict} / ${totalPagesForDistrict}`, pageWidth - margin, pageHeight - 30, { align: 'right' });
+          currentPageForDistrict++;
         }
       });
 
