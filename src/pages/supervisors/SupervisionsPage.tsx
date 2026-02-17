@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom'; // Corrected for Vite/React Router
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Edit, Trash2, ArrowUpDown, Eye, Users } from "lucide-react";
@@ -27,6 +27,7 @@ import { AddSupervisionModal } from "./../../components/supervisors/AddSupervisi
 
 interface Supervision {
   id: string;
+  mid: number;
   exam_name: string;
   exam_code: string;
   year: number;
@@ -35,7 +36,7 @@ interface Supervision {
 }
 
 const SupervisionsPage = () => {
-  const navigate = useNavigate(); // Hook for SPA navigation
+  const navigate = useNavigate();
   const [supervisions, setSupervisions] = useState<Supervision[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -57,6 +58,7 @@ const SupervisionsPage = () => {
       .from('supervisions')
       .select(`
         id,
+        mid,
         status,
         created_at,
         mastersummaries (
@@ -72,6 +74,7 @@ const SupervisionsPage = () => {
     } else {
       const formattedData = data.map((item: any) => ({
         id: item.id,
+        mid: item.mid,
         status: item.status,
         exam_name: item.mastersummaries?.Examination || 'N/A',
         exam_code: item.mastersummaries?.Code || 'N/A',
@@ -242,14 +245,14 @@ const SupervisionsPage = () => {
                           </Button>
 
                           <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
-                          title="View Supervisors Lists"
-                          onClick={() => navigate(`/dashboard/supervisors/supervisors-lists/${item.id}`)}  // item.id = masterSummaryId
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            title="View Supervisors Lists"
+                            onClick={() => navigate(`/dashboard/supervisors/supervisors-lists/${item.mid}`)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
 
                           <Button 
                             variant="ghost" 
