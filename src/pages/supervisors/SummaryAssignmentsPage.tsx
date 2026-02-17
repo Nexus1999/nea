@@ -5,8 +5,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { 
   School, Users, Globe2, ArrowLeft,
-  ShieldCheck, Building2, MapPin, 
-  Search, Info, BarChart3, CheckCircle2, XCircle
+  Building2, MapPin, 
+  Search, Info, BarChart3, CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -62,7 +62,7 @@ const SummaryCard = ({ title, stats, icon: Icon, colorClass, gradient }: any) =>
             "bg-white border-current font-bold text-[10px]",
             stats.fullyAssigned ? "text-emerald-600" : colorClass
           )}>
-            {stats.fullyAssigned ? "FULLY ASSIGNED" : `${stats.assigned} / ${stats.required}`}
+            {stats.fullyAssigned ? "COMPLETE" : `${stats.assigned} / ${stats.required}`}
           </Badge>
         </div>
 
@@ -77,7 +77,7 @@ const SummaryCard = ({ title, stats, icon: Icon, colorClass, gradient }: any) =>
 
         <div className="mt-6 space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase">Allocation Progress</span>
+            <span className="text-[11px] font-bold text-muted-foreground uppercase">Completion</span>
             <span className="text-xs font-black">{progress}%</span>
           </div>
           <Progress value={progress} className="h-2 bg-black/5" indicatorClassName={colorClass.replace('text-', 'bg-')} />
@@ -85,11 +85,11 @@ const SummaryCard = ({ title, stats, icon: Icon, colorClass, gradient }: any) =>
           <div className="flex justify-between pt-2 border-t border-black/5">
              <div className="flex items-center gap-1.5">
                <div className="h-2 w-2 rounded-full bg-slate-300" />
-               <span className="text-[10px] font-medium text-muted-foreground">{stats.assigned} Assigned</span>
+               <span className="text-[10px] font-medium text-muted-foreground">{stats.assigned} Done</span>
              </div>
              <div className="flex items-center gap-1.5">
                <div className="h-2 w-2 rounded-full bg-slate-800" />
-               <span className="text-[10px] font-medium text-muted-foreground">{stats.missing} Missing</span>
+               <span className="text-[10px] font-medium text-muted-foreground">{stats.missing} Left</span>
              </div>
           </div>
         </div>
@@ -106,6 +106,8 @@ const SummaryAssignmentsPage = () => {
   const [regions, setRegions] = useState<RegionGroup[]>([]);
   const [examInfo, setExamInfo] = useState({ code: '', year: '' });
   const [overallStats, setOverallStats] = useState({
+    regions: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
+    districts: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
     centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
     supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false }
   });
@@ -118,7 +120,6 @@ const SummaryAssignmentsPage = () => {
   const fetchSummaryData = async () => {
     setLoading(true);
     try {
-      // 1. Get supervision details
       const { data: supervision, error: supErr } = await supabase
         .from("supervisions")
         .select(`mid, mastersummaries ( Examination, Code, Year )`)
@@ -140,20 +141,16 @@ const SummaryAssignmentsPage = () => {
       const centersTable = centersTableMap[supervision.mastersummaries.Code];
       if (!centersTable) throw new Error("Unsupported exam code");
 
-      // 2. Fetch all data in parallel
-      const [centersRes, availableSupsRes, assignedSupsRes] = await Promise.all([
+      const [centersRes, assignedSupsRes] = await Promise.all([
         supabase.from(centersTable).select("region, district, center_number").eq("mid", supervision.mid).eq("is_latest", 1),
-        supabase.from("supervisors").select("region, district").eq("status", "ACTIVE").eq("is_latest", 1),
         supabase.from("supervisorassignments").select("region, district, center_no").eq("supervision_id", supervisionId)
       ]);
 
-      // 3. Filter out excluded regions
       const filterData = (data: any[]) => data?.filter(item => !EXCLUDED_REGIONS.includes(item.region?.toUpperCase())) || [];
       
       const centers = filterData(centersRes.data);
       const assigned = filterData(assignedSupsRes.data);
 
-      // 4. Process into Region/District Map
       const regionMap: Record<string, RegionGroup> = {};
 
       centers.forEach(c => {
@@ -182,7 +179,6 @@ const SummaryAssignmentsPage = () => {
         regionMap[rName].districts[dName].centers.required++;
       });
 
-      // Map assigned
       assigned.forEach(a => {
         const rName = a.region || "Other";
         const dName = a.district || "General";
@@ -196,12 +192,11 @@ const SummaryAssignmentsPage = () => {
         }
       });
 
-      // 5. Final Calculations
       let totalCentersReq = 0, totalCentersAss = 0;
       let totalSupsReq = 0, totalSupsAss = 0;
+      let totalDistricts = 0, assignedDistricts = 0;
 
       Object.values(regionMap).forEach(r => {
-        // Supervisors required = centers + (districts * 5)
         const districtCount = Object.keys(r.districts).length;
         r.supervisors.required = r.centers.required + (districtCount * 5);
         
@@ -217,6 +212,7 @@ const SummaryAssignmentsPage = () => {
         totalSupsAss += r.supervisors.assigned;
 
         Object.values(r.districts).forEach(d => {
+          totalDistricts++;
           d.supervisors.required = d.centers.required + 5;
           d.centers.missing = Math.max(0, d.centers.required - d.centers.assigned);
           d.centers.progress = d.centers.required > 0 ? Math.round((d.centers.assigned / d.centers.required) * 100) : 0;
@@ -224,11 +220,29 @@ const SummaryAssignmentsPage = () => {
           d.supervisors.progress = d.supervisors.required > 0 ? Math.round((d.supervisors.assigned / d.supervisors.required) * 100) : 0;
           
           d.fullyAssigned = d.centers.assigned >= d.centers.required && d.supervisors.assigned >= d.supervisors.required;
-          if (!d.fullyAssigned) r.fullyAssigned = false;
+          if (d.fullyAssigned) assignedDistricts++;
+          else r.fullyAssigned = false;
         });
       });
 
+      const totalRegions = Object.keys(regionMap).length;
+      const assignedRegions = Object.values(regionMap).filter(r => r.fullyAssigned).length;
+
       setOverallStats({
+        regions: {
+          required: totalRegions,
+          assigned: assignedRegions,
+          missing: totalRegions - assignedRegions,
+          progress: totalRegions > 0 ? Math.round((assignedRegions / totalRegions) * 100) : 0,
+          fullyAssigned: assignedRegions === totalRegions
+        },
+        districts: {
+          required: totalDistricts,
+          assigned: assignedDistricts,
+          missing: totalDistricts - assignedDistricts,
+          progress: totalDistricts > 0 ? Math.round((assignedDistricts / totalDistricts) * 100) : 0,
+          fullyAssigned: assignedDistricts === totalDistricts
+        },
         centers: { 
           required: totalCentersReq, assigned: totalCentersAss, 
           missing: totalCentersReq - totalCentersAss, 
@@ -292,16 +306,30 @@ const SummaryAssignmentsPage = () => {
       </div>
 
       {/* Grid Summary */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <SummaryCard 
-          title="Centers Allocation" 
+          title="Regions" 
+          stats={overallStats.regions} 
+          icon={Globe2} 
+          colorClass="text-amber-600" 
+          gradient="from-amber-400 to-orange-500"
+        />
+        <SummaryCard 
+          title="Districts" 
+          stats={overallStats.districts} 
+          icon={Building2} 
+          colorClass="text-blue-600" 
+          gradient="from-blue-400 to-indigo-500"
+        />
+        <SummaryCard 
+          title="Centers" 
           stats={overallStats.centers} 
           icon={School} 
           colorClass="text-red-600" 
-          gradient="from-red-400 to-orange-500"
+          gradient="from-red-400 to-rose-500"
         />
         <SummaryCard 
-          title="Supervisors Allocation" 
+          title="Supervisors" 
           stats={overallStats.supervisors} 
           icon={Users} 
           colorClass="text-emerald-600" 
