@@ -8,8 +8,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper to abbreviate school names (replicated from project utils)
+const abbreviateSchoolName = (name: string): string => {
+  if (!name) return "";
+  return name
+    .replace(/\bISLAMIC SEMINARY\b/gi, "ISL SEM")
+    .replace(/\bSECONDARY SCHOOL\b/gi, "SS")
+    .replace(/\bHIGH SCHOOL\b/gi, "SS")
+    .replace(/\bPRIMARY SCHOOL\b/gi, "PS")
+    .replace(/\bTEACHERS'? TRAINING COLLEGE\b/gi, "TC")
+    .replace(/\bTEACHERS'? COLLEGE\b/gi, "TC")
+    .replace(/\bSEMINARY\b/gi, "SEM")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -17,113 +31,203 @@ serve(async (req) => {
   try {
     const { supervision_id, code, year, region, districts } = await req.json()
     
-    console.log(`Generating PDF for Supervision: ${supervision_id}, Region: ${region}`);
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error("Missing environment variables for Supabase connection.");
-    }
-
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch assignments
+    // 1. Fetch Assignments
     let query = supabase
       .from('supervisorassignments')
       .select('*')
-      .eq('supervision_id', supervision_id)
-      .eq('region', region)
-      .order('district', { ascending: true })
-      .order('center_no', { ascending: true });
+      .eq('supervision_id', supervision_id);
+
+    if (region && region !== "all") {
+      query = query.eq('region', region);
+    }
 
     if (districts && districts.length > 0) {
       query = query.in('district', districts);
     }
 
-    const { data: assignments, error: fetchError } = await query;
+    const { data: rows, error: fetchError } = await query;
+    if (fetchError) throw fetchError;
+    if (!rows || rows.length === 0) {
+      return new Response(JSON.stringify({ error: "No assignments found." }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+        status: 404 
+      });
+    }
+
+    // 2. Custom Sorting (S centers then P centers for secondary)
+    let sortedRows = [...rows];
+    if (['FTNA', 'CSEE', 'ACSEE'].includes(code)) {
+      const pCenters: Record<string, any> = {};
+      const sCenters: Record<string, any> = {};
+      const reserves: any[] = [];
+
+      rows.forEach(r => {
+        if (r.center_no.startsWith('P')) pCenters[r.center_no.slice(1)] = r;
+        else if (r.center_no.startsWith('S')) sCenters[r.center_no.slice(1)] = r;
+        else reserves.push(r);
+      });
+
+      const ordered: any[] = [];
+      const allKeys = [...new Set([...Object.keys(pCenters), ...Object.keys(sCenters)])].sort();
+
+      allKeys.forEach(key => {
+        if (sCenters[key]) ordered.push(sCenters[key]);
+        if (pCenters[key]) ordered.push(pCenters[key]);
+      });
+      ordered.push(...reserves);
+      sortedRows = ordered;
+    } else {
+      sortedRows.sort((a, b) => a.center_no.localeCompare(b.center_no));
+    }
+
+    // 3. Fetch Center Names from Master Summary Tables
+    const centersTableMap: Record<string, string> = {
+      SFNA: "primarymastersummary",
+      SSNA: "primarymastersummary",
+      PSLE: "primarymastersummary",
+      FTNA: "secondarymastersummaries",
+      CSEE: "secondarymastersummaries",
+      ACSEE: "secondarymastersummaries",
+      DPEE: "dpeemastersummary",
+      DPNE: "dpnemastersummary",
+    };
     
-    if (fetchError) {
-      console.error("Database fetch error:", fetchError);
-      throw fetchError;
+    const centersTable = centersTableMap[code];
+    const centerNumbers = [...new Set(sortedRows.map(r => r.center_no))];
+    const centerCache: Record<string, string> = {};
+
+    if (centersTable && centerNumbers.length > 0) {
+      // Get mid from supervision
+      const { data: supData } = await supabase.from('supervisions').select('mid').eq('id', supervision_id).single();
+      
+      if (supData?.mid) {
+        const { data: cRes } = await supabase
+          .from(centersTable)
+          .select('center_number, center_name')
+          .eq('mid', supData.mid)
+          .in('center_number', centerNumbers);
+        
+        cRes?.forEach(c => {
+          centerCache[c.center_number] = `${c.center_number} - ${abbreviateSchoolName(c.center_name)}`.toUpperCase();
+        });
+      }
     }
 
-    if (!assignments || assignments.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No supervisor assignments found for the selected criteria." }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
-      );
-    }
-
-    console.log(`Found ${assignments.length} assignments. Starting PDF generation...`);
-
-    const doc = new jsPDF();
+    // 4. Initialize PDF (Landscape A4)
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 50;
 
-    // Header Text
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("THE UNITED REPUBLIC OF TANZANIA", pageWidth / 2, 15, { align: "center" });
-    
-    doc.setFontSize(10);
-    doc.text("PRESIDENT'S OFFICE", pageWidth / 2, 22, { align: "center" });
-    doc.text("REGIONAL ADMINISTRATION AND LOCAL GOVERNMENT", pageWidth / 2, 27, { align: "center" });
-    
-    doc.setFontSize(11);
-    doc.text(`${region.toUpperCase()} REGION`, pageWidth / 2, 35, { align: "center" });
-    
-    doc.setLineWidth(0.5);
-    doc.line(15, 38, pageWidth - 15, 38);
-
-    doc.setFontSize(12);
-    doc.text(`LIST OF SUPERVISORS FOR ${code} ${year}`, pageWidth / 2, 48, { align: "center" });
-
-    // Table Data Preparation
-    const tableData = assignments.map((a, index) => [
-      index + 1,
-      a.district,
-      a.center_no,
-      a.supervisor_name,
-      a.workstation,
-      a.phone
-    ]);
-
-    // Generate Table
-    autoTable(doc, {
-      startY: 55,
-      head: [['S/N', 'District', 'Center', 'Supervisor Name', 'Workstation', 'Phone']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255], fontSize: 9, halign: 'center' },
-      columnStyles: {
-        0: { cellWidth: 10, halign: 'center' },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 20, halign: 'center' },
-        3: { cellWidth: 50 },
-        5: { cellWidth: 30 }
-      },
-      styles: { fontSize: 8, cellPadding: 2 },
-      margin: { top: 55 }
+    // 5. Group by District
+    const districtsMap: Record<string, any[]> = {};
+    sortedRows.forEach(r => {
+      const key = r.district.toUpperCase();
+      if (!districtsMap[key]) districtsMap[key] = [];
+      districtsMap[key].push(r);
     });
 
-    // Footer / Signatures
-    const finalY = (doc as any).lastAutoTable.finalY + 20;
-    const pageHeight = doc.internal.pageSize.getHeight();
+    // 6. Header Function
+    const addHeader = (regionName: string, districtName: string) => {
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('JAMHURI YA MUUNGANO WA TANZANIA', pageWidth / 2, 55, { align: 'center' });
 
-    if (finalY < pageHeight - 40) {
-      doc.setFontSize(10);
-      doc.text("..........................................", 15, finalY);
-      doc.text("REGIONAL EDUCATION OFFICER", 15, finalY + 7);
-      
-      doc.text("..........................................", pageWidth - 75, finalY);
-      doc.text("DATE", pageWidth - 75, finalY + 7);
+      doc.setFontSize(14);
+      doc.text('WIZARA YA ELIMU, SAYANSI NA TEKNOLOJIA', pageWidth / 2, 75, { align: 'center' });
+      doc.text('BARAZA LA MITIHANI LA TANZANIA', pageWidth / 2, 95, { align: 'center' });
+
+      let headingText = "";
+      switch (code) {
+        case "SFNA": headingText = `ORODHA YA WASIMAMIZI WAKUU WA UPIMAJI WA KITAIFA WA DARASA LA NNE ${year}`; break;
+        case "PSLE": headingText = `ORODHA YA WASIMAMIZI WAKUU WA MTIHANI WA KUHITIMU DARASA LA SABA ${year}`; break;
+        case "FTNA": headingText = `ORODHA YA WASIMAMIZI WAKUU WA UPIMAJI WA KITAIFA WA KIDATO CHA PILI ${year}`; break;
+        case "CSEE": headingText = `ORODHA YA WASIMAMIZI WAKUU WA MTIHANI WA KIDATO CHA NNE ${year}`; break;
+        case "ACSEE": headingText = `ORODHA YA WASIMAMIZI WAKUU WA MTIHANI WA KIDATO CHA SITA ${year}`; break;
+        default: headingText = `ORODHA YA WASIMAMIZI WAKUU ${year}`;
+      }
+
+      doc.text(headingText, pageWidth / 2, 123, { align: 'center' });
+      doc.setFontSize(13);
+      doc.text(`MKOA WA ${regionName || 'N/A'}`.toUpperCase(), pageWidth / 2, 143, { align: 'center' });
+
+      let districtText = districtName;
+      if (districtName.endsWith('CC')) districtText = `HALMASHAURI YA JIJI LA ${districtName.slice(0, -2)}`;
+      else if (districtName.endsWith('MC')) districtText = `HALMASHAURI YA MANISPAA YA ${districtName.slice(0, -2)}`;
+      else if (districtName.endsWith('TC')) districtText = `HALMASHAURI YA MJI ${districtName.slice(0, -2)}`;
+      else if (districtName.endsWith('DC')) districtText = `HALMASHAURI YA WILAYA YA ${districtName.slice(0, -2)}`;
+      else districtText = `HALMASHAURI YA WILAYA YA ${districtName}`;
+
+      doc.text(districtText.toUpperCase(), pageWidth / 2, 163, { align: 'center' });
+      doc.setLineWidth(1);
+      doc.line(margin, 170, pageWidth - margin, 170);
+    };
+
+    // 7. Generate Pages
+    let first = true;
+    let globalPageNumber = 1;
+    const districtKeys = Object.keys(districtsMap).sort();
+    
+    // Calculate total pages (approximate for pagination)
+    const rowsPerPage = 20;
+    const totalPages = districtKeys.reduce((total, d) => total + Math.ceil(districtsMap[d].length / rowsPerPage), 0);
+
+    for (const districtName of districtKeys) {
+      const districtRows = districtsMap[districtName];
+      const regionName = districtRows[0].region;
+
+      if (!first) doc.addPage();
+      addHeader(regionName, districtName);
+
+      const tableData = districtRows.map((r, idx) => [
+        (idx + 1).toString(),
+        (centerCache[r.center_no] || r.center_no).toUpperCase(),
+        (r.supervisor_name || "N/A").toUpperCase(),
+        (r.workstation || "N/A").toUpperCase(),
+        (r.phone || "N/A").toUpperCase()
+      ]);
+
+      autoTable(doc, {
+        head: [["SN", "KITUO CHA KUSIMAMIA", "JINA LA MSIMAMIZI", "KITUO CHA KAZI", "SIMU"]],
+        body: tableData,
+        startY: 180,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 3, textTransform: 'uppercase' },
+        headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 11 },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: margin, right: margin },
+        columnStyles: {
+          0: { cellWidth: 40, halign: 'center' },
+          1: { cellWidth: 200 },
+          2: { cellWidth: 200 },
+          3: { cellWidth: 200 },
+          4: { cellWidth: 100 }
+        },
+        didDrawPage: (data) => {
+          // SIRI Watermark
+          doc.setFontSize(16);
+          doc.setTextColor(255, 0, 0);
+          doc.setFont('helvetica', 'bold');
+          doc.text("SIRI", pageWidth / 2, 25, { align: 'center' });
+          doc.text("SIRI", pageWidth / 2, pageHeight - 20, { align: 'center' });
+
+          // Pagination
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`Ukurasa ${globalPageNumber} / ${totalPages}`, pageWidth - margin, pageHeight - 30, { align: 'right' });
+          globalPageNumber++;
+        }
+      });
+
+      first = false;
     }
 
-    // Convert to base64
     const pdfBase64 = doc.output('datauristring').split(',')[1];
-
-    console.log("PDF generation complete.");
-
     return new Response(JSON.stringify({ pdfBase64 }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
