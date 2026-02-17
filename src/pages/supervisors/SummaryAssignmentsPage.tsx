@@ -303,9 +303,7 @@ const SummaryAssignmentsPage = () => {
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 py-1 px-3 rounded-full">
               <Info className="h-3 w-3 mr-2" /> {examInfo.code} {examInfo.year}
             </Badge>
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8 text-slate-500 hover:text-slate-900">
-              <ArrowLeft className="h-4 w-4 mr-1" /> Back
-            </Button>
+             
           </div>
           <h4 className="text-4xl font-black text-slate-900 tracking-tight">Assignments Summary</h4>       
         </div>
