@@ -1,20 +1,33 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Card, CardContent } from "@/components/ui/card";
 import { 
-  ChevronDown, ChevronUp, MapPin, Building, School, Users, 
-  AlertCircle, ArrowLeft, BarChart3, CheckCircle2, XCircle 
+  School, Users, Globe2, ArrowLeft,
+  ShieldCheck, Building2, MapPin, 
+  Search, Info, BarChart3, CheckCircle2, XCircle
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { showError } from "@/utils/toast";
+import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
 
+// --- Constants ---
+const EXCLUDED_REGIONS = [
+  "KASKAZINI PEMBA",
+  "KUSINI PEMBA",
+  "KASKAZINI UNGUJA",
+  "KUSINI UNGUJA",
+  "MJINI MAGHARIBI"
+];
+
+// --- Types ---
 interface SummaryStats {
   required: number;
   assigned: number;
@@ -23,100 +36,62 @@ interface SummaryStats {
   fullyAssigned: boolean;
 }
 
-interface RegionSummary {
+interface RegionGroup {
   name: string;
   centers: SummaryStats;
   supervisors: SummaryStats;
   fullyAssigned: boolean;
+  districts: Record<string, { centers: SummaryStats; supervisors: SummaryStats; fullyAssigned: boolean }>;
 }
 
-interface DistrictSummary {
-  name: string;
-  centers: SummaryStats;
-  supervisors: SummaryStats & { available: number };
-  fullyAssigned: boolean;
-}
+// --- Components ---
 
-function useAnimatedValue(target: number, duration = 1200) {
-  const [value, setValue] = useState(0);
-
-  useEffect(() => {
-    let start = 0;
-    const step = (timestamp: number) => {
-      if (!start) start = timestamp;
-      const progress = timestamp - start;
-      const percentage = Math.min(progress / duration, 1);
-      const eased = 1 - Math.pow(1 - percentage, 3);
-      setValue(Math.floor(eased * target));
-      if (progress < duration) requestAnimationFrame(step);
-      else setValue(target);
-    };
-    requestAnimationFrame(step);
-  }, [target, duration]);
-
-  return value;
-}
-
-const SummaryCard = ({
-  title,
-  value,
-  total,
-  progress,
-  icon: Icon,
-  color,
-  loading,
-}: {
-  title: string;
-  value: number;
-  total?: number;
-  progress: number;
-  icon: any;
-  color: string;
-  loading: boolean;
-}) => {
-  const animatedValue = useAnimatedValue(value);
-  const animatedProgress = useAnimatedValue(progress);
-
+const SummaryCard = ({ title, stats, icon: Icon, colorClass, gradient }: any) => {
+  const progress = stats.progress || 0;
+  
   return (
-    <Card className="overflow-hidden border-none shadow-lg hover:shadow-xl transition-all duration-300">
-      <div className={cn("h-2 w-full", color)} />
-      <CardContent className="p-6">
-        <div className="flex justify-between items-start mb-4">
-          <div className={cn("p-3 rounded-lg bg-opacity-10", color.replace("bg-", "bg-"))}>
-            <Icon className={cn("h-6 w-6", color.replace("bg-", "text-"))} />
+    <Card className="relative overflow-hidden border-none shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
+      <div className={`absolute inset-0 opacity-10 bg-gradient-to-br ${gradient}`} />
+      
+      <CardContent className="p-6 relative z-10">
+        <div className="flex justify-between items-center mb-6">
+          <div className={`p-3 rounded-2xl bg-white shadow-sm ring-1 ring-black/5`}>
+            <Icon className={`h-6 w-6 ${colorClass}`} />
           </div>
-          {loading ? (
-            <Skeleton className="h-6 w-16" />
-          ) : (
-            <Badge variant="outline" className="font-mono">
-              {animatedProgress}%
-            </Badge>
-          )}
+          <Badge className={cn(
+            "bg-white border-current font-bold text-[10px]",
+            stats.fullyAssigned ? "text-emerald-600" : colorClass
+          )}>
+            {stats.fullyAssigned ? "FULLY ASSIGNED" : `${stats.assigned} / ${stats.required}`}
+          </Badge>
         </div>
 
         <div className="space-y-1">
-          {loading ? (
-            <Skeleton className="h-10 w-24" />
-          ) : (
-            <p className="text-3xl font-bold tracking-tight">{animatedValue.toLocaleString()}</p>
-          )}
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{title}</p>
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-4xl font-black tracking-tighter">
+              {progress}%
+            </h3>
+          </div>
         </div>
 
-        <div className="mt-6 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Completed</span>
-            <span className="font-medium">
-              {loading ? <Skeleton className="h-4 w-12 inline-block" /> : value.toLocaleString()}
-            </span>
+        <div className="mt-6 space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] font-bold text-muted-foreground uppercase">Allocation Progress</span>
+            <span className="text-xs font-black">{progress}%</span>
           </div>
-          <Progress value={animatedProgress} className="h-2" indicatorClassName={color.replace("bg-", "")} />
-          {total !== undefined && (
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Total: {total.toLocaleString()}</span>
-              <span>Remaining: {Math.max(0, total - value).toLocaleString()}</span>
-            </div>
-          )}
+          <Progress value={progress} className="h-2 bg-black/5" indicatorClassName={colorClass.replace('text-', 'bg-')} />
+          
+          <div className="flex justify-between pt-2 border-t border-black/5">
+             <div className="flex items-center gap-1.5">
+               <div className="h-2 w-2 rounded-full bg-slate-300" />
+               <span className="text-[10px] font-medium text-muted-foreground">{stats.assigned} Assigned</span>
+             </div>
+             <div className="flex items-center gap-1.5">
+               <div className="h-2 w-2 rounded-full bg-slate-800" />
+               <span className="text-[10px] font-medium text-muted-foreground">{stats.missing} Missing</span>
+             </div>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -126,432 +101,298 @@ const SummaryCard = ({
 const SummaryAssignmentsPage = () => {
   const navigate = useNavigate();
   const { id: supervisionId } = useParams();
-
-  const [regions, setRegions] = useState<RegionSummary[]>([]);
-  const [districtsByRegion, setDistrictsByRegion] = useState<Record<string, DistrictSummary[]>>({});
-  const [overall, setOverall] = useState<{
-    regions: { total: number; assigned: number; progress: number };
-    districts: { total: number; assigned: number; progress: number };
-    centers: { total: number; assigned: number; progress: number };
-    supervisors: { total: number; assigned: number; progress: number };
-  } | null>(null);
-
-  const [examInfo, setExamInfo] = useState<{ code: string; year: number } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [expandedRegion, setExpandedRegion] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [regions, setRegions] = useState<RegionGroup[]>([]);
+  const [examInfo, setExamInfo] = useState({ code: '', year: '' });
+  const [overallStats, setOverallStats] = useState({
+    centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
+    supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false }
+  });
 
   useEffect(() => {
-    if (!supervisionId) {
-      setError("Invalid supervision ID");
-      setLoading(false);
-      return;
-    }
-
-    const loadSummary = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // 1. Get supervision details
-        const { data: supervision, error: supErr } = await supabase
-          .from("supervisions")
-          .select(`
-            mid,
-            mastersummaries ( Examination, Code, Year )
-          `)
-          .eq("id", supervisionId)
-          .single();
-
-        if (supErr) throw supErr;
-        if (!supervision) throw new Error("Supervision session not found");
-
-        const code = supervision.mastersummaries.Code;
-        const year = supervision.mastersummaries.Year;
-        const mid = supervision.mid;
-
-        setExamInfo({ code, year });
-
-        // 2. Define centers table mapping
-        const centersTableMap: Record<string, string> = {
-          "SFNA": "primarymastersummary",
-          "SSNA": "primarymastersummary",
-          "PSLE": "primarymastersummary",
-          "FTNA": "secondarymastersummaries",
-          "CSEE": "secondarymastersummaries",
-          "ACSEE": "secondarymastersummaries",
-          "DPEE": "dpeemastersummary",
-          "DPNE": "dpnemastersummary"
-        };
-
-        const centersTable = centersTableMap[code];
-        if (!centersTable) throw new Error("Unsupported exam code");
-
-        // 3. Execute all data queries in parallel (Replicating backend logic)
-        const [centersRes, availableSupsRes, assignedSupsRes] = await Promise.all([
-          // Get centers grouped by region/district
-          supabase.from(centersTable).select("region, district, center_number").eq("mid", mid).eq("is_latest", 1),
-          // Get available supervisors count by district
-          supabase.from("supervisors").select("region, district").eq("status", "ACTIVE").eq("is_latest", 1),
-          // Get assigned supervisors count by district
-          supabase.from("supervisorassignments").select("region, district, center_no, supervisor_name").eq("supervision_id", supervisionId)
-        ]);
-
-        if (centersRes.error) throw centersRes.error;
-        if (availableSupsRes.error) throw availableSupsRes.error;
-        if (assignedSupsRes.error) throw assignedSupsRes.error;
-
-        // 4. Process Data into District Map
-        const districtMap = new Map<string, DistrictSummary & { region: string }>();
-
-        // Initialize districts from centers table
-        centersRes.data.forEach((c: any) => {
-          const key = `${c.region}-${c.district}`;
-          if (!districtMap.has(key)) {
-            districtMap.set(key, {
-              region: c.region,
-              name: c.district,
-              centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
-              supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false, available: 0 },
-              fullyAssigned: false
-            });
-          }
-          districtMap.get(key)!.centers.required++;
-        });
-
-        // Map available supervisors
-        availableSupsRes.data.forEach((s: any) => {
-          const key = `${s.region}-${s.district}`;
-          if (districtMap.has(key)) {
-            districtMap.get(key)!.supervisors.available++;
-          }
-        });
-
-        // Map assigned supervisors and centers
-        assignedSupsRes.data.forEach((a: any) => {
-          const key = `${a.region}-${a.district}`;
-          if (districtMap.has(key)) {
-            const d = districtMap.get(key)!;
-            d.supervisors.assigned++;
-            // If center_no is not 'RESERVE', it counts as a center assignment
-            if (a.center_no !== 'RESERVE') {
-              d.centers.assigned++;
-            }
-          }
-        });
-
-        // 5. Calculate Progress and Fully Assigned Status for Districts
-        districtMap.forEach((d) => {
-          // Required supervisors = centers + 5 (Reserve logic)
-          d.supervisors.required = d.centers.required + 5;
-          
-          d.centers.missing = Math.max(0, d.centers.required - d.centers.assigned);
-          d.centers.progress = d.centers.required > 0 ? Math.round((d.centers.assigned / d.centers.required) * 100) : 0;
-          d.centers.fullyAssigned = d.centers.assigned >= d.centers.required;
-
-          d.supervisors.missing = Math.max(0, d.supervisors.required - d.supervisors.assigned);
-          d.supervisors.progress = d.supervisors.required > 0 ? Math.round((d.supervisors.assigned / d.supervisors.required) * 100) : 0;
-          d.supervisors.fullyAssigned = d.supervisors.assigned >= d.supervisors.required;
-
-          // District is fully assigned only if BOTH centers and supervisors (including reserve) are met
-          d.fullyAssigned = d.centers.fullyAssigned && d.supervisors.fullyAssigned;
-        });
-
-        // 6. Build Region Map
-        const regionMap = new Map<string, RegionSummary>();
-        const districtsByReg: Record<string, DistrictSummary[]> = {};
-
-        districtMap.forEach((d) => {
-          if (!regionMap.has(d.region)) {
-            regionMap.set(d.region, {
-              name: d.region,
-              centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: true },
-              supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: true },
-              fullyAssigned: true
-            });
-            districtsByReg[d.region] = [];
-          }
-
-          const r = regionMap.get(d.region)!;
-          r.centers.required += d.centers.required;
-          r.centers.assigned += d.centers.assigned;
-          r.centers.missing += d.centers.missing;
-
-          r.supervisors.required += d.supervisors.required;
-          r.supervisors.assigned += d.supervisors.assigned;
-          r.supervisors.missing += d.supervisors.missing;
-
-          if (!d.fullyAssigned) r.fullyAssigned = false;
-          
-          districtsByReg[d.region].push(d);
-        });
-
-        // Calculate Region Progress
-        regionMap.forEach((r) => {
-          r.centers.progress = r.centers.required > 0 ? Math.round((r.centers.assigned / r.centers.required) * 100) : 0;
-          r.supervisors.progress = r.supervisors.required > 0 ? Math.round((r.supervisors.assigned / r.supervisors.required) * 100) : 0;
-          r.centers.fullyAssigned = r.centers.assigned >= r.centers.required;
-          r.supervisors.fullyAssigned = r.supervisors.assigned >= r.supervisors.required;
-        });
-
-        // 7. Calculate Overall Totals
-        const districtValues = Array.from(districtMap.values());
-        const regionValues = Array.from(regionMap.values());
-
-        const fullyAssignedDistricts = districtValues.filter(d => d.fullyAssigned).length;
-        const fullyAssignedRegions = regionValues.filter(r => r.fullyAssigned).length;
-
-        const totalCenters = districtValues.reduce((a, d) => a + d.centers.required, 0);
-        const assignedCenters = districtValues.reduce((a, d) => a + d.centers.assigned, 0);
-
-        const totalSups = districtValues.reduce((a, d) => a + d.supervisors.required, 0);
-        const assignedSups = districtValues.reduce((a, d) => a + d.supervisors.assigned, 0);
-
-        setRegions(regionValues.sort((a, b) => a.name.localeCompare(b.name)));
-        setDistrictsByRegion(districtsByReg);
-        setOverall({
-          regions: { 
-            total: regionValues.length, 
-            assigned: fullyAssignedRegions, 
-            progress: regionValues.length > 0 ? Math.round((fullyAssignedRegions / regionValues.length) * 100) : 0 
-          },
-          districts: { 
-            total: districtValues.length, 
-            assigned: fullyAssignedDistricts, 
-            progress: districtValues.length > 0 ? Math.round((fullyAssignedDistricts / districtValues.length) * 100) : 0 
-          },
-          centers: { 
-            total: totalCenters, 
-            assigned: assignedCenters, 
-            progress: totalCenters > 0 ? Math.round((assignedCenters / totalCenters) * 100) : 0 
-          },
-          supervisors: { 
-            total: totalSups, 
-            assigned: assignedSups, 
-            progress: totalSups > 0 ? Math.round((assignedSups / totalSups) * 100) : 0 
-          },
-        });
-
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message || "Failed to load summary data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadSummary();
+    document.title = "Assignments Summary | NEAS";
+    if (supervisionId) fetchSummaryData();
   }, [supervisionId]);
 
-  return (
-    <div className="container mx-auto py-6 px-4 md:px-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
-            <BarChart3 className="h-7 w-7 text-primary" />
-            Assignments Summary {examInfo ? `— ${examInfo.code} ${examInfo.year}` : ""}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Overview of centers and supervisors allocation (including +5 reserve per district)
-          </p>
+  const fetchSummaryData = async () => {
+    setLoading(true);
+    try {
+      // 1. Get supervision details
+      const { data: supervision, error: supErr } = await supabase
+        .from("supervisions")
+        .select(`mid, mastersummaries ( Examination, Code, Year )`)
+        .eq("id", supervisionId)
+        .single();
+
+      if (supErr) throw supErr;
+      setExamInfo({ 
+        code: supervision.mastersummaries.Code, 
+        year: supervision.mastersummaries.Year.toString() 
+      });
+
+      const centersTableMap: Record<string, string> = {
+        "SFNA": "primarymastersummary", "SSNA": "primarymastersummary", "PSLE": "primarymastersummary",
+        "FTNA": "secondarymastersummaries", "CSEE": "secondarymastersummaries", "ACSEE": "secondarymastersummaries",
+        "DPEE": "dpeemastersummary", "DPNE": "dpnemastersummary"
+      };
+
+      const centersTable = centersTableMap[supervision.mastersummaries.Code];
+      if (!centersTable) throw new Error("Unsupported exam code");
+
+      // 2. Fetch all data in parallel
+      const [centersRes, availableSupsRes, assignedSupsRes] = await Promise.all([
+        supabase.from(centersTable).select("region, district, center_number").eq("mid", supervision.mid).eq("is_latest", 1),
+        supabase.from("supervisors").select("region, district").eq("status", "ACTIVE").eq("is_latest", 1),
+        supabase.from("supervisorassignments").select("region, district, center_no").eq("supervision_id", supervisionId)
+      ]);
+
+      // 3. Filter out excluded regions
+      const filterData = (data: any[]) => data?.filter(item => !EXCLUDED_REGIONS.includes(item.region?.toUpperCase())) || [];
+      
+      const centers = filterData(centersRes.data);
+      const assigned = filterData(assignedSupsRes.data);
+
+      // 4. Process into Region/District Map
+      const regionMap: Record<string, RegionGroup> = {};
+
+      centers.forEach(c => {
+        const rName = c.region || "Other";
+        const dName = c.district || "General";
+        
+        if (!regionMap[rName]) {
+          regionMap[rName] = { 
+            name: rName, 
+            centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: true },
+            supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: true },
+            fullyAssigned: true,
+            districts: {} 
+          };
+        }
+        
+        if (!regionMap[rName].districts[dName]) {
+          regionMap[rName].districts[dName] = { 
+            centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
+            supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
+            fullyAssigned: false
+          };
+        }
+
+        regionMap[rName].centers.required++;
+        regionMap[rName].districts[dName].centers.required++;
+      });
+
+      // Map assigned
+      assigned.forEach(a => {
+        const rName = a.region || "Other";
+        const dName = a.district || "General";
+        if (regionMap[rName] && regionMap[rName].districts[dName]) {
+          regionMap[rName].supervisors.assigned++;
+          regionMap[rName].districts[dName].supervisors.assigned++;
+          if (a.center_no !== 'RESERVE') {
+            regionMap[rName].centers.assigned++;
+            regionMap[rName].districts[dName].centers.assigned++;
+          }
+        }
+      });
+
+      // 5. Final Calculations
+      let totalCentersReq = 0, totalCentersAss = 0;
+      let totalSupsReq = 0, totalSupsAss = 0;
+
+      Object.values(regionMap).forEach(r => {
+        // Supervisors required = centers + (districts * 5)
+        const districtCount = Object.keys(r.districts).length;
+        r.supervisors.required = r.centers.required + (districtCount * 5);
+        
+        r.centers.missing = Math.max(0, r.centers.required - r.centers.assigned);
+        r.centers.progress = r.centers.required > 0 ? Math.round((r.centers.assigned / r.centers.required) * 100) : 0;
+        
+        r.supervisors.missing = Math.max(0, r.supervisors.required - r.supervisors.assigned);
+        r.supervisors.progress = r.supervisors.required > 0 ? Math.round((r.supervisors.assigned / r.supervisors.required) * 100) : 0;
+
+        totalCentersReq += r.centers.required;
+        totalCentersAss += r.centers.assigned;
+        totalSupsReq += r.supervisors.required;
+        totalSupsAss += r.supervisors.assigned;
+
+        Object.values(r.districts).forEach(d => {
+          d.supervisors.required = d.centers.required + 5;
+          d.centers.missing = Math.max(0, d.centers.required - d.centers.assigned);
+          d.centers.progress = d.centers.required > 0 ? Math.round((d.centers.assigned / d.centers.required) * 100) : 0;
+          d.supervisors.missing = Math.max(0, d.supervisors.required - d.supervisors.assigned);
+          d.supervisors.progress = d.supervisors.required > 0 ? Math.round((d.supervisors.assigned / d.supervisors.required) * 100) : 0;
+          
+          d.fullyAssigned = d.centers.assigned >= d.centers.required && d.supervisors.assigned >= d.supervisors.required;
+          if (!d.fullyAssigned) r.fullyAssigned = false;
+        });
+      });
+
+      setOverallStats({
+        centers: { 
+          required: totalCentersReq, assigned: totalCentersAss, 
+          missing: totalCentersReq - totalCentersAss, 
+          progress: totalCentersReq > 0 ? Math.round((totalCentersAss / totalCentersReq) * 100) : 0,
+          fullyAssigned: totalCentersAss >= totalCentersReq
+        },
+        supervisors: { 
+          required: totalSupsReq, assigned: totalSupsAss, 
+          missing: totalSupsReq - totalSupsAss, 
+          progress: totalSupsReq > 0 ? Math.round((totalSupsAss / totalSupsReq) * 100) : 0,
+          fullyAssigned: totalSupsAss >= totalSupsReq
+        }
+      });
+
+      setRegions(Object.values(regionMap).sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (err) {
+      showError("Failed to load summary data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredRegions = regions.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  if (loading) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center gap-6 bg-slate-50">
+        <Spinner size="lg" />
+        <div className="text-center space-y-2">
+           <h2 className="text-xl font-bold text-slate-800">Syncing Summary...</h2>           
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 space-y-10 max-w-7xl mx-auto pb-32">
+      {/* Header Section */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 py-1 px-3 rounded-full">
+              <Info className="h-3 w-3 mr-2" /> {examInfo.code} {examInfo.year}
+            </Badge>
+            <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8 text-slate-500 hover:text-slate-900">
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+          </div>
+          <h4 className="text-4xl font-black text-slate-900 tracking-tight">Assignments Summary</h4>       
+        </div>
+        
+        <div className="relative w-full lg:w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Search regions..." 
+            className="pl-10 h-12 bg-white border-slate-200 shadow-sm rounded-xl focus:ring-2 focus:ring-blue-500/20"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {/* Grid Summary */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <SummaryCard 
+          title="Centers Allocation" 
+          stats={overallStats.centers} 
+          icon={School} 
+          colorClass="text-red-600" 
+          gradient="from-red-400 to-orange-500"
+        />
+        <SummaryCard 
+          title="Supervisors Allocation" 
+          stats={overallStats.supervisors} 
+          icon={Users} 
+          colorClass="text-emerald-600" 
+          gradient="from-emerald-400 to-teal-500"
+        />
+      </div>
 
-      {loading ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="p-6">
-              <Skeleton className="h-8 w-16 mb-4" />
-              <Skeleton className="h-10 w-32 mb-2" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-2 w-full mt-6" />
-            </Card>
-          ))}
+      {/* Regional Section */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between border-b pb-4 border-slate-200">
+          <div className="flex items-center gap-3">
+            <div className="bg-slate-900 p-2 rounded-lg text-white">
+              <Globe2 className="h-5 w-5" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900">Regional Breakdown</h2>
+          </div>
+          <Badge className="bg-slate-100 text-slate-600 border-none px-4 py-1">{filteredRegions.length} Regions tracked</Badge>
         </div>
-      ) : overall ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-10">
-          <SummaryCard
-            title="Regions (Fully Assigned)"
-            value={overall.regions.assigned}
-            total={overall.regions.total}
-            progress={overall.regions.progress}
-            icon={MapPin}
-            color="bg-amber-500"
-            loading={loading}
-          />
-          <SummaryCard
-            title="Districts (Fully Assigned)"
-            value={overall.districts.assigned}
-            total={overall.districts.total}
-            progress={overall.districts.progress}
-            icon={Building}
-            color="bg-blue-500"
-            loading={loading}
-          />
-          <SummaryCard
-            title="Centers Assigned"
-            value={overall.centers.assigned}
-            total={overall.centers.total}
-            progress={overall.centers.progress}
-            icon={School}
-            color="bg-red-500"
-            loading={loading}
-          />
-          <SummaryCard
-            title="Supervisors Assigned"
-            value={overall.supervisors.assigned}
-            total={overall.supervisors.total}
-            progress={overall.supervisors.progress}
-            icon={Users}
-            color="bg-green-500"
-            loading={loading}
-          />
-        </div>
-      ) : null}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Region & District Breakdown</CardTitle>
-          <CardDescription>Detailed allocation status per region and district</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="border rounded-lg p-4">
-                  <Skeleton className="h-8 w-48 mb-4" />
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <Skeleton className="h-28 w-full" />
-                    <Skeleton className="h-28 w-full" />
+        <Accordion type="single" collapsible className="w-full space-y-4">
+          {filteredRegions.map((region) => (
+            <AccordionItem key={region.name} value={region.name} className="border-none bg-white rounded-2xl shadow-sm overflow-hidden group">
+              <AccordionTrigger className="hover:no-underline px-6 py-5 group-data-[state=open]:bg-slate-50 transition-colors">
+                <div className="flex flex-col md:flex-row md:items-center justify-between w-full text-left gap-4 pr-4">
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "h-10 w-10 rounded-full flex items-center justify-center font-bold",
+                      region.fullyAssigned ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
+                    )}>
+                       {region.fullyAssigned ? <CheckCircle2 className="h-5 w-5" /> : region.name.charAt(0)}
+                    </div>
+                    <div>
+                      <span className="font-extrabold text-lg text-slate-800">{region.name}</span>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> {Object.keys(region.districts).length} Districts
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-8">
+                    <div className="text-center">
+                      <p className="text-[10px] text-slate-400 font-bold">CENTERS</p>
+                      <p className={cn("font-black", region.centers.fullyAssigned ? "text-emerald-600" : "text-red-600")}>
+                        {region.centers.assigned}/{region.centers.required}
+                      </p>
+                    </div>
+                    <div className="w-px h-8 bg-slate-200 self-center hidden md:block" />
+                    <div className="text-center">
+                      <p className="text-[10px] text-slate-400 font-bold">SUPERVISORS</p>
+                      <p className={cn("font-black", region.supervisors.fullyAssigned ? "text-emerald-600" : "text-blue-600")}>
+                        {region.supervisors.assigned}/{region.supervisors.required}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : regions.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              No assignment data found for this session.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {regions.map((region) => (
-                <div key={region.name} className="border rounded-lg overflow-hidden">
-                  <button
-                    className="w-full px-5 py-4 text-left flex items-center justify-between bg-muted/50 hover:bg-muted transition-colors"
-                    onClick={() => setExpandedRegion(expandedRegion === region.name ? null : region.name)}
-                  >
-                    <div className="flex items-center gap-3">
-                      {expandedRegion === region.name ? (
-                        <ChevronUp className="h-5 w-5 text-primary" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-primary" />
-                      )}
-                      <span className="font-bold">{region.name}</span>
-                      {region.fullyAssigned && (
-                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
-                          <CheckCircle2 className="h-3 w-3 mr-1" /> Fully Assigned
-                        </Badge>
-                      )}
-                    </div>
-                    <Badge variant="secondary">
-                      {districtsByRegion[region.name]?.length || 0} districts
-                    </Badge>
-                  </button>
-
-                  {expandedRegion === region.name && (
-                    <div className="p-5 pt-3 space-y-6 bg-muted/30">
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                          <div className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                            <School className="h-4 w-4 text-red-600" /> Centers Summary
-                          </div>
-                          <div className="border rounded-xl p-4 bg-white shadow-sm">
-                            <div className="flex justify-between text-sm mb-3">
-                              <span className="font-medium">Total Required:</span>
-                              <span className="font-bold">{region.centers.required}</span>
-                            </div>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span className="font-medium">Assigned:</span>
-                              <span className="font-bold text-red-600">{region.centers.assigned}</span>
-                            </div>
-                            <Progress value={region.centers.progress} className="h-2 mb-2" indicatorClassName="bg-red-500" />
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                            <Users className="h-4 w-4 text-green-600" /> Supervisors Summary
-                          </div>
-                          <div className="border rounded-xl p-4 bg-white shadow-sm">
-                            <div className="flex justify-between text-sm mb-3">
-                              <span className="font-medium">Total Required (+5):</span>
-                              <span className="font-bold">{region.supervisors.required}</span>
-                            </div>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span className="font-medium">Assigned:</span>
-                              <span className="font-bold text-green-600">{region.supervisors.assigned}</span>
-                            </div>
-                            <Progress value={region.supervisors.progress} className="h-2 mb-2" indicatorClassName="bg-green-500" />
-                          </div>
-                        </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-6 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                  {Object.entries(region.districts).map(([dName, dStats]) => (
+                    <div key={dName} className={cn(
+                      "p-4 rounded-xl border transition-all cursor-default",
+                      dStats.fullyAssigned ? "border-emerald-100 bg-emerald-50/30" : "border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-md"
+                    )}>
+                      <div className="flex justify-between items-center mb-3 border-b pb-2">
+                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-tight truncate">{dName}</h4>
+                        {dStats.fullyAssigned && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
                       </div>
-
                       <div className="space-y-3">
-                        <div className="text-xs font-black uppercase tracking-widest text-slate-400 px-1">District Details</div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {districtsByRegion[region.name].map((dist) => (
-                            <div key={dist.name} className={cn(
-                              "p-4 rounded-xl border bg-white shadow-sm transition-all",
-                              dist.fullyAssigned ? "border-green-200 bg-green-50/30" : "border-slate-100"
-                            )}>
-                              <div className="flex justify-between items-start mb-3">
-                                <h5 className="text-sm font-bold uppercase tracking-tight truncate pr-2">{dist.name}</h5>
-                                {dist.fullyAssigned ? (
-                                  <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                                ) : (
-                                  <XCircle className="h-4 w-4 text-slate-300 shrink-0" />
-                                )}
-                              </div>
-                              
-                              <div className="space-y-3">
-                                <div>
-                                  <div className="flex justify-between text-[10px] font-bold uppercase text-slate-400 mb-1">
-                                    <span>Centers</span>
-                                    <span>{dist.centers.assigned}/{dist.centers.required}</span>
-                                  </div>
-                                  <Progress value={dist.centers.progress} className="h-1" indicatorClassName="bg-red-500" />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10px] font-bold uppercase text-slate-400 mb-1">
-                                    <span>Supervisors</span>
-                                    <span>{dist.supervisors.assigned}/{dist.supervisors.required}</span>
-                                  </div>
-                                  <Progress value={dist.supervisors.progress} className="h-1" indicatorClassName="bg-green-500" />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                        <div>
+                          <div className="flex justify-between items-center text-[10px] font-bold mb-1">
+                            <span className="text-red-700 uppercase">Centers</span>
+                            <span className="font-black">{dStats.centers.assigned}/{dStats.centers.required}</span>
+                          </div>
+                          <Progress value={dStats.centers.progress} className="h-1" indicatorClassName="bg-red-500" />
+                        </div>
+                        <div>
+                          <div className="flex justify-between items-center text-[10px] font-bold mb-1">
+                            <span className="text-blue-700 uppercase">Supervisors</span>
+                            <span className="font-black">{dStats.supervisors.assigned}/{dStats.supervisors.required}</span>
+                          </div>
+                          <Progress value={dStats.supervisors.progress} className="h-1" indicatorClassName="bg-blue-500" />
                         </div>
                       </div>
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </div>
     </div>
   );
 };
