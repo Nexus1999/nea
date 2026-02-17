@@ -63,7 +63,7 @@ const App = () => (
               <Route path="supervisors" element={<SupervisionsPage />} />
               <Route path="supervisors/supervisors-management" element={<SupervisorsManagementPage />} />
               <Route path="supervisors/supervisors-assignments/:id" element={<SupervisorAssignmentsPage />} />
-               <Route path="supervisors/supervisors-list/:id" element={<SupervisorAssignmentsPage />} />
+              <Route path="supervisors/supervisors-lists/:id" element={<SupervisorsListsPage />} />
              
               {/* Miscellaneous Routes */}
               <Route path="miscellaneous/jobs" element={<Teachers />} />
