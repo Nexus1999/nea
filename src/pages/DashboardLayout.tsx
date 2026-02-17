@@ -36,7 +36,7 @@ const navItems = [
   { path: '/dashboard/budgets', label: 'Budgets', icon: DollarSign, key: 'Budgets' },
   { path: '/dashboard/mastersummaries', label: 'Master Summaries', icon: Database, key:'Master Summaries'},
   { path: '/dashboard/stationeries', label: 'Stationeries', icon: PenLine, key: 'Stationeries' },
-  { path: '/dashboard/supervisors', label: 'Supervisors', icon: UserCog, key: 'Supervisors' },
+  { path: '/dashboard/supervisors', label: 'Supervisions', icon: UserCog, key: 'Supervisions' },
   { 
     path: '/dashboard/institutions', 
     label: 'Institutions', 
@@ -96,7 +96,7 @@ const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType;
   'budgets': { label: 'Budgets', icon: DollarSign },
   'mastersummaries': { label: 'Master Summaries', icon: Database },
   'stationeries': { label: 'Stationeries', icon: PenLine },
-  'supervisors': { label: 'Supervisors', icon: UserCog },
+  'supervisors': { label: 'Supervisions', icon: UserCog },
   'institutions': { label: 'Institutions', icon: Building },
   'miscellaneous': { label: 'Miscellaneous', icon: Tags },
   'security': { label: 'Security', icon: Shield },
@@ -105,7 +105,7 @@ const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType;
   'profile': { label: 'Profile', icon: User },
 
   // Supervisor Specifics
-  'supervisors-management': { label: 'Management', icon: Users },
+  'supervisors-management': { label: 'Supervisors', icon: Users },
   'supervisors-assignments': { label: 'Assignments', icon: UserCheck },
   
   // Institution Specifics
@@ -119,7 +119,7 @@ const breadcrumbRoutes: Record<string, { label: string; icon: React.ElementType;
   'teachers-management': { label: 'Teachers Management', icon: Users },
   'assignments': { label: 'Assignments', icon: FileText, path: '/dashboard/miscellaneous/jobs' },
 
-  // Common Action Placeholders (Easily editable)
+  // Common Action Placeholders
   'add': { label: 'Add New', icon: PlusCircle },
   'new': { label: 'Create', icon: PlusCircle },
   'edit': { label: 'Edit Record', icon: PenLine },
