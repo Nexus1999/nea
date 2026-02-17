@@ -14,8 +14,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
 import {
-  Download, RefreshCw, MapPin, Globe, Search, X, ChevronDown,
-  FileText, Loader2, CheckCircle, Ban, ArrowLeft, Printer
+  Download,
+  RefreshCw,
+  MapPin,
+  Globe,
+  ChevronDown,
+  FileText,
+  Loader2,
+  CheckCircle,
+  Ban,
+  ArrowLeft,
+  Printer,
+  X
 } from "lucide-react";
 
 interface Supervision {
@@ -47,11 +57,29 @@ const SupervisorsListsPage = () => {
   const [fileName, setFileName] = useState('');
 
   const [loading, setLoading] = useState(true);
+
   const [isRegionPopoverOpen, setIsRegionPopoverOpen] = useState(false);
   const [isDistrictPopoverOpen, setIsDistrictPopoverOpen] = useState(false);
 
   const code = supervision?.mastersummaries?.Code || '';
   const year = supervision?.mastersummaries?.Year?.toString() || '';
+
+  const mainContentHeightClass = "h-[calc(100vh-160px)]";
+
+  const regionPopoverHeight = useMemo(() => Math.min(regions.length * 40 + 60, 256), [regions]);
+  const districtPopoverHeight = useMemo(() => Math.min(districts.length * 40 + 60, 256), [districts]);
+
+  const searchableRegions = useMemo(() =>
+    regions.filter(r => r.toLowerCase().includes(regionSearch.toLowerCase())),
+    [regions, regionSearch]
+  );
+
+  const searchableDistricts = useMemo(() =>
+    districts.filter(d => d.toLowerCase().includes(districtSearch.toLowerCase())),
+    [districts, districtSearch]
+  );
+
+  const isAllDistrictsSelected = districts.length > 0 && districts.every(d => selectedDistricts.includes(d));
 
   useEffect(() => {
     if (supervisionId) fetchSupervisionDetails();
@@ -73,58 +101,67 @@ const SupervisorsListsPage = () => {
       if (error) throw error;
       setSupervision(data as any);
 
-      // Fetch unique regions from assignments
-      const { data: assignmentRegions, error: regError } = await supabase
+      const { data: regData, error: regErr } = await supabase
         .from('supervisorassignments')
         .select('region')
         .eq('supervision_id', supervisionId);
-      
-      if (regError) throw regError;
-      const uniqueRegions = [...new Set(assignmentRegions?.map(a => a.region).filter(Boolean))].sort();
+
+      if (regErr) throw regErr;
+
+      const uniqueRegions = [...new Set(regData?.map(a => a.region).filter(Boolean))].sort();
       setRegions(uniqueRegions);
 
     } catch (err: any) {
-      showError("Failed to load supervision details.");
+      showError("Failed to load supervision session.");
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchDistrictsForRegion = async (regionName: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('supervisorassignments')
-        .select('district')
-        .eq('supervision_id', supervisionId)
-        .eq('region', regionName);
-      
-      if (error) throw error;
-      const uniqueDistricts = [...new Set(data?.map(a => a.district).filter(Boolean))].sort();
-      setDistricts(uniqueDistricts);
-    } catch (err) {
-      showError("Failed to load districts.");
+  useEffect(() => {
+    if (!selectedRegion || !supervisionId) {
+      setDistricts([]);
+      return;
     }
-  };
 
-  const handleRegionSelect = (regionName: string) => {
-    setSelectedRegion(regionName);
+    const loadDistricts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('supervisorassignments')
+          .select('district')
+          .eq('supervision_id', supervisionId)
+          .eq('region', selectedRegion);
+
+        if (error) throw error;
+
+        const unique = [...new Set(data?.map(d => d.district).filter(Boolean))].sort();
+        setDistricts(unique);
+      } catch (err) {
+        showError("Failed to load districts for this region.");
+      }
+    };
+
+    loadDistricts();
+  }, [selectedRegion, supervisionId]);
+
+  const handleRegionSelect = (region: string) => {
+    setSelectedRegion(region);
     setSelectedDistricts([]);
-    fetchDistrictsForRegion(regionName);
     setIsRegionPopoverOpen(false);
     clearPreview();
   };
 
-  const toggleDistrictSelection = (districtName: string) => {
+  const toggleDistrictSelection = (district: string) => {
     setSelectedDistricts(prev =>
-      prev.includes(districtName)
-        ? prev.filter(n => n !== districtName)
-        : [...prev, districtName]
+      prev.includes(district)
+        ? prev.filter(d => d !== district)
+        : [...prev, district]
     );
     clearPreview();
   };
 
   const handleSelectAllDistricts = () => {
-    if (selectedDistricts.length === districts.length) {
+    if (isAllDistrictsSelected) {
       setSelectedDistricts([]);
     } else {
       setSelectedDistricts([...districts]);
@@ -141,7 +178,10 @@ const SupervisorsListsPage = () => {
   };
 
   const handleGenerateList = async () => {
-    if (!selectedRegion) return;
+    if (!supervision || !selectedRegion) {
+      showError("Please select a region.");
+      return;
+    }
 
     setIsGenerating(true);
     clearPreview();
@@ -155,142 +195,327 @@ const SupervisorsListsPage = () => {
         districts: selectedDistricts.length > 0 ? selectedDistricts : null,
       };
 
-      const { data, error } = await supabase.functions.invoke(
-        'generate-supervisors-list-pdf',
-        { body: payload }
-      );
+      const { data, error } = await supabase.functions.invoke('generate-supervisors-list-pdf', {
+        body: payload
+      });
 
       if (error) throw error;
 
-      if (!data?.pdfBase64) throw new Error("No PDF content returned");
+      if (data?.pdfBase64) {
+        const byteCharacters = atob(data.pdfBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
 
-      const binary = atob(data.pdfBase64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-      const blob = new Blob([bytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-
-      setPreviewUrl(url);
-      setFileName(`Wasimamizi_${code}_${year}_${selectedRegion.replace(/\s+/g, '_')}.pdf`);
-      showSuccess("Supervisors list generated!");
+        setPreviewUrl(url);
+        setFileName(`Wasimamizi_${code}_${year}_${selectedRegion.replace(/\s+/g, '_')}.pdf`);
+        showSuccess("Supervisors list generated successfully!");
+      } else {
+        throw new Error("No PDF data received from server.");
+      }
     } catch (err: any) {
-      showError(err.message || "Failed to generate list.");
+      console.error("PDF generation failed:", err);
+      showError(err.message || "Failed to generate the supervisors list.");
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const searchableRegions = regions.filter(r => r.toLowerCase().includes(regionSearch.toLowerCase()));
-  const searchableDistricts = districts.filter(d => d.toLowerCase().includes(districtSearch.toLowerCase()));
+  const downloadDocument = () => {
+    if (!previewUrl) return;
+    const link = document.createElement('a');
+    link.href = previewUrl;
+    link.setAttribute('download', fileName || `Wasimamizi_${new Date().toISOString().slice(0,10)}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const handleClearFilters = () => {
+    setSelectedRegion('');
+    setSelectedDistricts([]);
+    setRegionSearch('');
+    setDistrictSearch('');
+    clearPreview();
+  };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!supervision) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto mt-8">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-gray-800">Supervisors Lists</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-gray-500">
+            Could not load supervision details.
+          </p>
+          <div className="text-center mt-4">
+            <Button variant="outline" onClick={() => navigate('/dashboard/supervisors')}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Supervisors
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <div className="container mx-auto py-6 px-4 h-full">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900 flex items-center gap-2">
-          <Printer className="h-6 w-6 text-indigo-600" /> Orodha ya Wasimamizi
+    <div className="container mx-auto py-3 px-4 h-full">
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <Printer className="h-6 w-6 text-primary" /> Orodha ya Wasimamizi
         </h1>
-        <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/supervisors')} className="rounded-xl font-bold">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/supervisors')}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Supervisors
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
-        <Card className="shadow-xl border-none rounded-2xl overflow-hidden flex flex-col">
-          <CardHeader className="bg-slate-900 text-white p-6">
-            <CardTitle className="text-lg font-black uppercase tracking-widest">Filters</CardTitle>
-            <CardDescription className="text-slate-400 font-bold uppercase text-[10px]">
-              Session: {code}-{year}
+      <div className={cn("flex gap-4", mainContentHeightClass)}>
+        <Card className="w-full lg:w-1/3 flex flex-col flex-shrink-0 shadow-lg">
+          <CardHeader className="border-b p-3">
+            <CardTitle className="text-xl font-bold text-gray-800 flex items-center justify-between">
+              List Filters
+              <Button variant="ghost" size="sm" onClick={handleClearFilters} title="Clear Filters">
+                <RefreshCw className="h-4 w-4 text-gray-800" />
+              </Button>
+            </CardTitle>
+            <CardDescription className="text-sm font-semibold text-gray-700">
+              Session: <span className="text-gray-800">{code}-{year}</span>
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="p-6 space-y-6 flex-1 overflow-y-auto">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Region</Label>
+          <CardContent className="flex-1 p-4 space-y-3 overflow-y-auto">
+            <div className="space-y-1">
+              <Label className="flex items-center gap-1 font-semibold text-gray-700 text-sm">
+                <Globe className="h-4 w-4 text-primary" /> Select Region
+              </Label>
               <Popover open={isRegionPopoverOpen} onOpenChange={setIsRegionPopoverOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-between h-12 rounded-xl border-2">
-                    {selectedRegion || "Select Region"}
-                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between text-left font-normal h-9"
+                    disabled={isGenerating}
+                  >
+                    {selectedRegion || "Select region..."}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0 rounded-xl shadow-2xl border-none">
-                  <div className="p-2 border-b"><Input placeholder="Search..." value={regionSearch} onChange={e => setRegionSearch(e.target.value)} className="h-9 rounded-lg" /></div>
-                  <ScrollArea className="h-64">
+                <PopoverContent className="w-[300px] p-0">
+                  <Input
+                    placeholder="Search regions..."
+                    className="h-9"
+                    value={regionSearch}
+                    onChange={(e) => setRegionSearch(e.target.value)}
+                  />
+                  <ScrollArea style={{ height: `${regionPopoverHeight}px` }} className="mt-2">
                     <div className="p-1">
-                      {searchableRegions.map(r => (
-                        <Button key={r} variant="ghost" className="w-full justify-start h-10 rounded-lg font-bold" onClick={() => handleRegionSelect(r)}>{r}</Button>
-                      ))}
+                      {searchableRegions.length === 0 ? (
+                        <p className="text-center text-sm text-gray-500 py-2">No regions found.</p>
+                      ) : (
+                        searchableRegions.map((region) => (
+                          <Button
+                            key={region}
+                            variant="ghost"
+                            className={cn(
+                              "w-full justify-start h-9",
+                              selectedRegion === region && "bg-gray-100 text-primary hover:bg-gray-200"
+                            )}
+                            onClick={() => handleRegionSelect(region)}
+                          >
+                            {region}
+                          </Button>
+                        ))
+                      )}
                     </div>
                   </ScrollArea>
                 </PopoverContent>
               </Popover>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Districts</Label>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-1 font-semibold text-gray-700 text-sm">
+                <MapPin className="h-4 w-4 text-primary" /> Select Districts
+              </Label>
               <Popover open={isDistrictPopoverOpen} onOpenChange={setIsDistrictPopoverOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-between h-12 rounded-xl border-2" disabled={!selectedRegion}>
-                    {selectedDistricts.length > 0 ? `${selectedDistricts.length} Selected` : "All Districts"}
-                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between text-left font-normal h-9"
+                    disabled={!selectedRegion || isGenerating}
+                  >
+                    {selectedDistricts.length > 0
+                      ? `${selectedDistricts.length} district(s) selected`
+                      : "Select districts..."}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0 rounded-xl shadow-2xl border-none">
-                  <div className="p-2 border-b"><Input placeholder="Search..." value={districtSearch} onChange={e => setDistrictSearch(e.target.value)} className="h-9 rounded-lg" /></div>
-                  <ScrollArea className="h-64">
-                    <div className="p-2 space-y-1">
-                      <div className="flex items-center space-x-2 p-2 hover:bg-slate-50 rounded-lg cursor-pointer" onClick={handleSelectAllDistricts}>
-                        <Checkbox checked={selectedDistricts.length === districts.length && districts.length > 0} />
-                        <span className="font-bold text-sm">Select All</span>
-                      </div>
-                      <Separator className="my-1" />
-                      {searchableDistricts.map(d => (
-                        <div key={d} className="flex items-center space-x-2 p-2 hover:bg-slate-50 rounded-lg cursor-pointer" onClick={() => toggleDistrictSelection(d)}>
-                          <Checkbox checked={selectedDistricts.includes(d)} />
-                          <span className="text-sm font-medium">{d}</span>
-                        </div>
-                      ))}
+                <PopoverContent className="w-[300px] p-0">
+                  <Input
+                    placeholder="Search districts..."
+                    className="h-9"
+                    value={districtSearch}
+                    onChange={(e) => setDistrictSearch(e.target.value)}
+                  />
+                  <ScrollArea style={{ height: `${districtPopoverHeight}px` }} className="mt-2">
+                    <div className="p-1">
+                      {districts.length === 0 ? (
+                        <p className="text-center text-sm text-gray-500 py-2">
+                          No districts available
+                        </p>
+                      ) : (
+                        <>
+                          <div
+                            className="flex items-center space-x-2 p-2 cursor-pointer hover:bg-gray-100 rounded-md h-9"
+                            onClick={handleSelectAllDistricts}
+                          >
+                            <Checkbox checked={isAllDistrictsSelected} id="select-all-districts" />
+                            <Label htmlFor="select-all-districts" className="font-semibold cursor-pointer">
+                              Select All ({districts.length})
+                            </Label>
+                          </div>
+                          <Separator className="my-1" />
+
+                          {searchableDistricts.map((district) => {
+                            const isSelected = selectedDistricts.includes(district);
+                            return (
+                              <div
+                                key={district}
+                                className="flex items-center space-x-2 p-2 cursor-pointer hover:bg-gray-100 rounded-md h-9"
+                                onClick={() => toggleDistrictSelection(district)}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  id={`dist-${district}`}
+                                  onCheckedChange={() => toggleDistrictSelection(district)}
+                                />
+                                <Label htmlFor={`dist-${district}`} className="cursor-pointer font-normal">
+                                  {district}
+                                </Label>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
                     </div>
                   </ScrollArea>
                 </PopoverContent>
               </Popover>
             </div>
 
-            <Button onClick={handleGenerateList} disabled={isGenerating || !selectedRegion} className="w-full h-14 bg-slate-900 hover:bg-black text-white font-black uppercase tracking-widest rounded-2xl shadow-lg transition-all active:scale-95">
-              {isGenerating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Printer className="mr-2 h-5 w-5" />}
-              Generate List
-            </Button>
+            <div className="pt-4 flex flex-col gap-3">
+              {isGenerating && (
+                <div className="w-full">
+                  <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary animate-pulse"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <p className="text-xs text-primary mt-1 text-center">
+                    Generating list...
+                  </p>
+                </div>
+              )}
+
+              <Button
+                onClick={handleGenerateList}
+                disabled={isGenerating || !selectedRegion}
+                className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold"
+                size="lg"
+              >
+                {isGenerating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Printer className="mr-2 h-4 w-4" />
+                )}
+                {isGenerating ? 'Generating...' : 'Generate Supervisors List'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 shadow-xl border-none rounded-2xl overflow-hidden flex flex-col bg-slate-50">
-          <CardHeader className="bg-white border-b p-6 flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-black uppercase tracking-tight text-slate-900 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-indigo-600" /> Preview
+        <Card className="w-full lg:w-2/3 flex flex-col shadow-lg">
+          <CardHeader className="border-b p-3 flex-row items-center justify-between">
+            <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" /> Document Preview
             </CardTitle>
             {previewUrl && (
-              <Button variant="outline" size="sm" onClick={() => { const link = document.createElement('a'); link.href = previewUrl; link.download = fileName; link.click(); }} className="rounded-xl font-bold border-2">
-                <Download className="h-4 w-4 mr-2" /> Download
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="flex-1 p-0 relative">
-            {previewUrl ? (
-              <iframe src={previewUrl} className="w-full h-full border-none" title="PDF Preview" />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-12 text-center">
-                <div className="w-20 h-20 bg-white rounded-3xl shadow-sm flex items-center justify-center mb-4">
-                  <FileText className="h-10 w-10 opacity-20" />
-                </div>
-                <p className="font-bold uppercase text-xs tracking-widest">Select filters and click generate to preview the list</p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={downloadDocument}>
+                  <Download className="h-4 w-4 mr-2" /> Download
+                </Button>
+                <Button variant="destructive" size="sm" onClick={clearPreview}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             )}
+          </CardHeader>
+
+          <CardContent className="flex-1 p-3 flex items-center justify-center bg-gray-50">
+            <div className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+              {previewUrl ? (
+                <iframe
+                  src={previewUrl}
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  title="Supervisors List Preview"
+                  className="border-none"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                  <FileText className="h-12 w-12 text-gray-300 mb-4" />
+                  <p className="text-lg font-semibold text-gray-600 mb-2">Preview Area</p>
+                  <p className="text-sm text-gray-500">
+                    Select a region then click 'Generate Supervisors List'
+                  </p>
+                </div>
+              )}
+            </div>
           </CardContent>
+
+          <div className="p-3 border-t bg-gray-100 flex justify-between items-center text-sm">
+            <div className="flex items-center gap-2">
+              {selectedRegion ? (
+                <>
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  <span className="text-primary font-medium">
+                    Region: {selectedRegion}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Ban className="h-4 w-4 text-red-500" />
+                  <span className="text-red-500">No Region Selected</span>
+                </>
+              )}
+            </div>
+
+            {selectedDistricts.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedDistricts([])}
+                className="text-red-500 hover:bg-red-50"
+              >
+                Clear Districts ({selectedDistricts.length})
+              </Button>
+            )}
+          </div>
         </Card>
       </div>
     </div>
