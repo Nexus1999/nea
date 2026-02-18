@@ -17,6 +17,7 @@ import {
   Settings, Users, LayoutDashboard, Globe, MapPin, BookOpen, GraduationCap, Accessibility,
   UserCheck, PlusCircle, Eye, User
 } from "lucide-react";
+import { WheelchairPickup } from "@mui/icons-material";
 
 // ── Icon map (add new entries here anytime) ────────────────────────────────
 const iconMap: Record<string, React.ReactNode> = {
@@ -48,6 +49,7 @@ const iconMap: Record<string, React.ReactNode> = {
   examinations: <BookOpen className="h-4 w-4" />,
   subjects: <GraduationCap className="h-4 w-4" />,
   profile: <User className="h-4 w-4" />,
+  'special-needs':<WheelchairPickup className="h-4 w-4"/>
 };
 
 const labelMap: Record<string, string> = {
@@ -55,6 +57,7 @@ const labelMap: Record<string, string> = {
   timetables: "Timetables",
   budgets: "Budgets",
   mastersummaries: "Master Summaries",
+  'special-needs':"Special Needs",
   stationeries: "Stationeries",
   supervisors: "Supervisions",                           
   'supervisors-management': "Supervisors Management",

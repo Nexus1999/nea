@@ -197,14 +197,9 @@ const SpecialNeedsPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto py-4 px-4">
+    <div className="">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">
-          Special Needs – {masterSummary.Code} {masterSummary.Year}
-        </h1>
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
+        
       </div>
 
       <Card className="shadow-lg rounded-xl overflow-hidden bg-white">

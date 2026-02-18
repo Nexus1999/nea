@@ -1,251 +1,342 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, Eye, Search, ArrowLeft } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowUpDown, Eye, Search, X } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { cn } from "@/lib/utils";
-
-// Components
 import Spinner from "@/components/Spinner";
 import PaginationControls from "@/components/ui/pagination-controls";
 import SecondarySchoolDetailsDrawer from "@/components/mastersummaries/SecondarySchoolDetailsDrawer";
-
-// Types
 import { MasterSummary, MasterSummaryDetail, SecondaryMasterSummary } from "@/types/mastersummaries";
 import abbreviateSchoolName from "@/utils/abbreviateSchoolName";
 
 type DetailSortKey = keyof MasterSummaryDetail | 'center_name' | 'center_number' | 'region' | 'district';
 
 const MasterSummaryDetailsPage: React.FC = () => {
-const { id } = useParams<{ id: string }>();
-const masterSummaryId = id;  const navigate = useNavigate();
-  
+  const { id } = useParams<{ id: string }>();
+
   const [masterSummary, setMasterSummary] = useState<MasterSummary | null>(null);
-  const [details, setDetails] = useState<MasterSummaryDetail[]>([]);
-  
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
-  
+  const [allDetails, setAllDetails] = useState<MasterSummaryDetail[]>([]); // ← all fetched rows
+  const [search, setSearch] = useState('');
+
+  const [loading, setLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
   const [subjectsMap, setSubjectsMap] = useState<Map<string, string>>(new Map());
 
   const [isSecondaryDrawerOpen, setIsSecondaryDrawerOpen] = useState(false);
   const [viewingSecondarySchool, setViewingSecondarySchool] = useState<SecondaryMasterSummary | null>(null);
 
-  const [inputValue, setInputValue] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [orderBy, setOrderBy] = useState<DetailSortKey>('center_name');
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Debounce search
+  const isSecondary = masterSummary && ["FTNA", "CSEE", "ACSEE"].includes(masterSummary.Code);
+
+  // Fetch all data once (client-side filtering from now on)
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setSearchQuery(inputValue);
-      setCurrentPage(1);
-    }, 400);
-    return () => clearTimeout(handler);
-  }, [inputValue]);
+     document.title = "Summary Details | NEAS";
+    if (!id) return;
 
-  const fetchMasterSummaryAndDetails = useCallback(async (isFirstLoad = false) => {
-    if (!masterSummaryId) return;
-    
-    if (isFirstLoad) setIsInitialLoading(true);
-    else setIsUpdating(true);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Load master summary
+        const { data: summary, error: sumErr } = await supabase
+          .from('mastersummaries')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (sumErr) throw sumErr;
+        if (summary) setMasterSummary(summary);
 
-    try {
-      if (!masterSummary) {
-        const { data: summaryData } = await supabase.from('mastersummaries').select('*').eq('id', masterSummaryId).single();
-        if (summaryData) setMasterSummary(summaryData as MasterSummary);
+        const code = summary?.Code || "";
+        const table = ["FTNA", "CSEE", "ACSEE"].includes(code) ? 'secondarymastersummaries' : 'primarymastersummary';
+
+        // Load subjects for secondary
+        if (["FTNA", "CSEE", "ACSEE"].includes(code)) {
+          const { data: subs } = await supabase
+            .from('subjects')
+            .select('subject_code, subject_name')
+            .eq('exam_code', code);
+          const map = new Map(subs?.map(s => [s.subject_code, s.subject_name]) || []);
+          setSubjectsMap(map);
+        }
+
+        // Fetch ALL matching rows (no pagination here)
+        const { data, error } = await supabase
+          .from(table)
+          .select('*')
+          .eq('mid', id)
+          .eq('is_latest', true);
+
+        if (error) throw error;
+
+        setAllDetails(data || []);
+        setTotalItems(data?.length || 0);
+      } catch (err: any) {
+        showError(err.message || "Failed to load records");
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const currentMaster = masterSummary || (await supabase.from('mastersummaries').select('*').eq('id', masterSummaryId).single()).data;
-      const code = currentMaster?.Code || "";
-      const isSec = ["FTNA", "CSEE", "ACSEE"].includes(code);
-      const tableName = isSec ? 'secondarymastersummaries' : 'primarymastersummary';
-      const searchCols = isSec ? ['region', 'district', 'center_name', 'center_number'] : ['region', 'district', 'center_name', 'center_number', 'subjects', 'medium'];
+    fetchData();
+  }, [id]);
 
-      if (isSec && subjectsMap.size === 0) {
-        const { data: subs } = await supabase.from('subjects').select('subject_code, subject_name').eq('exam_code', code);
-        const map = new Map();
-        subs?.forEach(s => map.set(s.subject_code, s.subject_name));
-        setSubjectsMap(map);
-      }
+  // Client-side filtering + sorting + pagination
+  const filteredAndSortedData = useMemo(() => {
+    let result = [...allDetails];
 
-      const from = (currentPage - 1) * itemsPerPage;
-      const to = from + itemsPerPage - 1;
-
-      let query = supabase.from(tableName).select("*", { count: "exact" })
-        .eq('mid', masterSummaryId)
-        .eq('is_latest', true)
-        .order(orderBy as string, { ascending: order === 'asc' });
-
-      if (searchQuery) {
-        query = query.or(searchCols.map(col => `${col}.ilike.%${searchQuery}%`).join(','));
-      }
-
-      const { data, count, error } = await query.range(from, to);
-      if (error) throw error;
-
-      setDetails((data as MasterSummaryDetail[]) || []);
-      setTotalItems(count || 0);
-    } catch (e: any) {
-      showError(e.message);
-    } finally {
-      setIsInitialLoading(false);
-      setIsUpdating(false);
+    // Filter
+    if (search.trim()) {
+      const term = search.toLowerCase().trim();
+      result = result.filter((item) =>
+        item.region?.toLowerCase().includes(term) ||
+        item.district?.toLowerCase().includes(term) ||
+        item.center_name?.toLowerCase().includes(term) ||
+        item.center_number?.toLowerCase().includes(term)
+      );
     }
-  }, [masterSummaryId, currentPage, itemsPerPage, orderBy, order, searchQuery, masterSummary, subjectsMap.size]);
 
-  useEffect(() => {
-    fetchMasterSummaryAndDetails(true);
-  }, [masterSummaryId]);
+    // Sort
+    result.sort((a, b) => {
+      let aVal = a[orderBy as keyof typeof a] ?? '';
+      let bVal = b[orderBy as keyof typeof b] ?? '';
 
-  useEffect(() => {
-    if (!isInitialLoading) {
-        fetchMasterSummaryAndDetails(false);
-    }
-  }, [currentPage, orderBy, order, searchQuery]);
+      // Special handling for numeric center_number if needed
+      if (orderBy === 'center_number') {
+        aVal = String(aVal).padStart(10, '0');
+        bVal = String(bVal).padStart(10, '0');
+      }
 
-  const handleSort = (columnId: DetailSortKey) => {
-    const isAsc = orderBy === columnId && order === 'asc';
+      if (aVal < bVal) return order === 'asc' ? -1 : 1;
+      if (aVal > bVal) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [allDetails, search, orderBy, order]);
+
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredAndSortedData.slice(start, start + itemsPerPage);
+  }, [filteredAndSortedData, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredAndSortedData.length / itemsPerPage);
+
+  const handleSort = (column: DetailSortKey) => {
+    const isAsc = orderBy === column && order === 'asc';
     setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(columnId);
+    setOrderBy(column);
     setCurrentPage(1);
   };
 
-  const isPrimary = masterSummary && ["SFNA", "SSNA", "PSLE"].includes(masterSummary.Code);
-  const isSecondary = masterSummary && ["FTNA", "CSEE", "ACSEE"].includes(masterSummary.Code);
+  const clearSearch = () => {
+    setSearch('');
+    setCurrentPage(1);
+  };
 
-  if (isInitialLoading) {
+  if (loading) {
     return (
-        <div className="flex h-[400px] items-center justify-center">
-            <Spinner label="Loading records..." size="lg" />
-        </div>
+      <div className="flex h-[400px] items-center justify-center">
+        <Spinner label="Loading records..." size="lg" />
+      </div>
     );
   }
 
   return (
-    <div className="p-4 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between">
-        <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/mastersummaries')}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
-        </Button>
-      </div>
+    <div className="space-y-4 p-4">
+      <Card className="w-full relative min-h-[600px] border-none shadow-sm">
 
-      <Card className="w-full relative border shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
-          <CardTitle className="text-xl font-bold">
-           Registration records for {masterSummary?.Code} - {masterSummary?.Year} 
-          </CardTitle>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Input
-                placeholder="Search centers, regions..."
-                value={inputValue}
-                onChange={e => setInputValue(e.target.value)}
-                className="w-64 pl-10 h-9 text-sm"
-              />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-            </div>
-            <div className="text-xs font-medium text-muted-foreground bg-gray-100 px-3 py-1.5 rounded-md border">
-              Total: {totalItems.toLocaleString()}
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0 pb-6 border-b mb-4">
+          <div>
+            <CardTitle className="text-2xl font-black uppercase tracking-tight text-slate-900">
+              Registration Records – {masterSummary?.Code} {masterSummary?.Year}
+            </CardTitle>
+            <div className="flex items-center gap-4 mt-1">
+              <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase">
+                TOTAL RECORDS
+              </p>
+              <Badge variant="secondary" className="text-xs font-medium px-2.5 py-0.5">
+                {filteredAndSortedData.length.toLocaleString()}
+              </Badge>
             </div>
           </div>
         </CardHeader>
 
         <CardContent>
-          <div className={cn("border rounded-md overflow-hidden transition-opacity duration-200", isUpdating ? "opacity-50" : "opacity-100")}>
+          {/* Search – exact match to JobAssignmentsPage */}
+          <div className="mb-6">
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder="Search center, region, district, number..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9 h-10 text-sm border-slate-200 focus:ring-slate-100"
+              />
+              {search && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-slate-400 hover:text-slate-700"
+                  onClick={clearSearch}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
             <Table>
-              <TableHeader className="bg-gray-50">
-                <TableRow>
-                  <TableHead className="w-[60px]">SN</TableHead>
-                  
-                  <TableHead onClick={() => handleSort('center_number')} className="cursor-pointer whitespace-nowrap">
-                    Center No. <ArrowUpDown className={cn("ml-2 h-3 w-3 inline", orderBy === 'center_number' ? "text-blue-600" : "text-gray-400")} />
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent border-b border-slate-200">
+                  <TableHead className="w-[60px] text-[10px] font-black uppercase text-slate-500">SN</TableHead>
+
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">
+                    <button
+                      onClick={() => handleSort('center_number')}
+                      className="flex items-center gap-1 hover:opacity-80"
+                    >
+                      Center No.
+                      <ArrowUpDown className="h-3 w-3" />
+                    </button>
                   </TableHead>
 
-                  <TableHead onClick={() => handleSort('center_name')} className="cursor-pointer whitespace-nowrap">
-                    Center Name <ArrowUpDown className={cn("ml-2 h-3 w-3 inline", orderBy === 'center_name' ? "text-blue-600" : "text-gray-400")} />
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">
+                    <button
+                      onClick={() => handleSort('center_name')}
+                      className="flex items-center gap-1 hover:opacity-80"
+                    >
+                      Center Name
+                      <ArrowUpDown className="h-3 w-3" />
+                    </button>
                   </TableHead>
 
-                  <TableHead onClick={() => handleSort('region')} className="cursor-pointer whitespace-nowrap">
-                    Region <ArrowUpDown className={cn("ml-2 h-3 w-3 inline", orderBy === 'region' ? "text-blue-600" : "text-gray-400")} />
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">
+                    <button
+                      onClick={() => handleSort('region')}
+                      className="flex items-center gap-1 hover:opacity-80"
+                    >
+                      Region
+                      <ArrowUpDown className="h-3 w-3" />
+                    </button>
                   </TableHead>
 
-                  <TableHead onClick={() => handleSort('district')} className="cursor-pointer whitespace-nowrap">
-                    District <ArrowUpDown className={cn("ml-2 h-3 w-3 inline", orderBy === 'district' ? "text-blue-600" : "text-gray-400")} />
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">
+                    <button
+                      onClick={() => handleSort('district')}
+                      className="flex items-center gap-1 hover:opacity-80"
+                    >
+                      District
+                      <ArrowUpDown className="h-3 w-3" />
+                    </button>
                   </TableHead>
 
-                  {isPrimary && (
+                  {masterSummary && ["SFNA", "SSNA", "PSLE"].includes(masterSummary.Code) && (
                     <>
-                      <TableHead>Subjects</TableHead>
-                      <TableHead>Medium</TableHead>
-                      <TableHead onClick={() => handleSort('registered' as any)} className="cursor-pointer text-right">
-                        Reg. <ArrowUpDown className="ml-1 h-3 w-3 inline" />
+                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Subjects</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Medium</TableHead>
+                      <TableHead className="text-right text-[10px] font-black uppercase text-slate-500">
+                        <button
+                          onClick={() => handleSort('registered' as any)}
+                          className="flex items-center gap-1 justify-end hover:opacity-80 w-full"
+                        >
+                          Registered
+                          <ArrowUpDown className="h-3 w-3" />
+                        </button>
                       </TableHead>
                     </>
                   )}
 
-                  {isSecondary && <TableHead className="text-right">Actions</TableHead>}
+                  {isSecondary && (
+                    <TableHead className="text-right text-[10px] font-black uppercase text-slate-500 px-6">
+                      Actions
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
+
               <TableBody>
-                {details.length === 0 ? (
+                {paginatedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isPrimary ? 8 : 6} className="text-center py-12 text-muted-foreground">
-                      No registration records found.
+                    <TableCell
+                      colSpan={isSecondary ? 6 : 8}
+                      className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest"
+                    >
+                      {search.trim()
+                        ? "No matching registration records found."
+                        : "No registration records found."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  details.map((detail: any, index) => (
-                    <TableRow key={detail.id || index} className="hover:bg-gray-50/50">
-                      <TableCell className="text-muted-foreground font-medium">
+                  paginatedData.map((detail: any, index: number) => (
+                    <TableRow
+                      key={detail.id || index}
+                      className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors"
+                    >
+                      <TableCell className="text-slate-400 text-xs font-mono">
                         {((currentPage - 1) * itemsPerPage) + index + 1}
                       </TableCell>
-                      <TableCell className="font-mono text-xs font-bold text-blue-600">
+
+                      <TableCell className="font-mono text-sm font-bold text-blue-600">
                         {detail.center_number}
                       </TableCell>
-                      <TableCell className="font-semibold text-gray-900">
+
+                      <TableCell className="text-sm text-slate-800 font-medium">
                         {abbreviateSchoolName(detail.center_name)}
                       </TableCell>
-                      <TableCell className="text-sm">{detail.region}</TableCell>
-                      <TableCell className="text-sm">{detail.district}</TableCell>
-                      
-                      {isPrimary && (
+
+                      <TableCell className="text-sm text-slate-600 font-medium">{detail.region}</TableCell>
+                      <TableCell className="text-sm text-slate-600 font-medium">{detail.district}</TableCell>
+
+                      {masterSummary && ["SFNA", "SSNA", "PSLE"].includes(masterSummary.Code) && (
                         <>
-                          <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">
-                            {detail.subjects || '---'}
+                          <TableCell className="text-sm text-slate-500 max-w-[180px] truncate">
+                            {detail.subjects || '—'}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="bg-gray-50 text-gray-600 font-medium">
-                              {detail.medium}
+                            <Badge variant="outline" className="text-xs font-medium">
+                              {detail.medium || '—'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-bold">{detail.registered}</TableCell>
+                          <TableCell className="text-right text-sm font-medium text-slate-700">
+                            {detail.registered?.toLocaleString() || '0'}
+                          </TableCell>
                         </>
                       )}
 
                       {isSecondary && (
-                        <TableCell className="text-right">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => { 
-                              setViewingSecondarySchool(detail); 
-                              setIsSecondaryDrawerOpen(true); 
+                        <TableCell className="text-right px-6">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-slate-900 transition-all"
+                            onClick={() => {
+                              setViewingSecondarySchool(detail);
+                              setIsSecondaryDrawerOpen(true);
                             }}
-                            className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           >
-                            <Eye size={16} />
+                            <Eye className="h-3.5 w-3.5" />
                           </Button>
                         </TableCell>
                       )}
@@ -256,17 +347,12 @@ const masterSummaryId = id;  const navigate = useNavigate();
             </Table>
           </div>
 
-          {totalItems > 0 && (
-            <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-              <p className="text-sm text-muted-foreground">
-                Showing <span className="font-medium text-foreground">{Math.min(totalItems, (currentPage - 1) * itemsPerPage + 1)}</span> to{" "}
-                <span className="font-medium text-foreground">{Math.min(totalItems, currentPage * itemsPerPage)}</span> of{" "}
-                <span className="font-medium text-foreground">{totalItems}</span> results
-              </p>
-              <PaginationControls 
-                currentPage={currentPage} 
-                totalPages={Math.ceil(totalItems / itemsPerPage)} 
-                onPageChange={setCurrentPage} 
+          {filteredAndSortedData.length > 0 && (
+            <div className="mt-6 flex justify-center">
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
               />
             </div>
           )}

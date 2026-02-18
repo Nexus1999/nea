@@ -3,7 +3,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Trash2, ArrowUpDown, Eye, Accessibility, GitBranch, LayoutDashboard } from "lucide-react";
+import { 
+  PlusCircle, 
+  Trash2, 
+  ArrowUpDown, 
+  Eye, 
+  Accessibility, 
+  GitBranch, 
+  LayoutDashboard, 
+  AlertTriangle,
+  RefreshCw
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -13,9 +23,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { showStyledSwal } from '@/utils/alerts';
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import PaginationControls from "@/components/ui/pagination-controls";
@@ -35,6 +54,19 @@ const MasterSummariesPage = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+
+  // Delete confirmation dialog state
+  const [deleteConfig, setDeleteConfig] = useState<{
+    open: boolean;
+    id: number | null;
+    code: string;
+    year: number;
+  }>({
+    open: false,
+    id: null,
+    code: '',
+    year: 0,
+  });
 
   useEffect(() => {
     document.title = "Master Summaries | NEAS";
@@ -60,33 +92,38 @@ const MasterSummariesPage = () => {
   const handleAddMasterSummary = () => setIsFormOpen(true);
 
   const handleViewMasterSummaryOverview = (id: number | string) =>
-  navigate(`/dashboard/mastersummaries/overview/${id}`);
+    navigate(`/dashboard/mastersummaries/overview/${id}`);
 
-const handleViewMasterSummaryDetails = (id: number | string) =>
-  navigate(`/dashboard/mastersummaries/details/${id}`);
+  const handleViewMasterSummaryDetails = (id: number | string) =>
+    navigate(`/dashboard/mastersummaries/details/${id}`);
 
-const handleManageSpecialNeeds = (id: number | string) =>
-  navigate(`/dashboard/mastersummaries/special-needs/${id}`);
+  const handleManageSpecialNeeds = (id: number | string) =>
+    navigate(`/dashboard/mastersummaries/special-needs/${id}`);
 
-const handleManageVersions = (id: number | string) =>
-  navigate(`/dashboard/mastersummaries/version/${id}`);
+  const handleManageVersions = (id: number | string) =>
+    navigate(`/dashboard/mastersummaries/version/${id}`);
 
-  const handleDeleteMasterSummary = async (id: number, examinationName: string, year: number) => {
-    const result = await showStyledSwal({
-      title: 'Are you sure?',
-      html: `You are about to delete the master summary for <b>${examinationName} (${year})</b>.<br>This action cannot be undone and will also delete associated detailed data.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, delete it!',
-      cancelButtonText: 'No, cancel!',
-      reverseButtons: true,
+  const requestDelete = (id: number, code: string, year: number) => {
+    setDeleteConfig({
+      open: true,
+      id,
+      code,
+      year,
     });
+  };
 
-    if (!result.isConfirmed) return;
+  const confirmDelete = async () => {
+    if (!deleteConfig.id) return;
+
+    const id = deleteConfig.id;
+    const code = deleteConfig.code;
+    const year = deleteConfig.year;
 
     setLoading(true);
+    setDeleteConfig(prev => ({ ...prev, open: false }));
+
     try {
-      // Get code to decide which child table to clean
+      // Get code (already have it, but keeping fetch for safety/consistency)
       const { data: summary, error: fetchError } = await supabase
         .from('mastersummaries')
         .select('Code')
@@ -97,8 +134,6 @@ const handleManageVersions = (id: number | string) =>
         throw new Error(fetchError?.message || "Could not fetch summary code");
       }
 
-      const code = summary.Code;
-
       // Clean child tables
       if (["SFNA", "SSNA", "PSLE"].includes(code)) {
         const { error } = await supabase
@@ -106,8 +141,7 @@ const handleManageVersions = (id: number | string) =>
           .delete()
           .eq('mid', id);
         if (error) throw error;
-      } 
-      else if (["FTNA", "CSEE", "ACSEE"].includes(code)) {
+      } else if (["FTNA", "CSEE", "ACSEE"].includes(code)) {
         const { error } = await supabase
           .from('secondarymastersummaries')
           .delete()
@@ -115,7 +149,7 @@ const handleManageVersions = (id: number | string) =>
         if (error) throw error;
       }
 
-      // Finally delete master record
+      // Delete master record
       const { error: masterError } = await supabase
         .from('mastersummaries')
         .delete()
@@ -123,7 +157,7 @@ const handleManageVersions = (id: number | string) =>
 
       if (masterError) throw masterError;
 
-      showSuccess(`Master summary for ${examinationName} (${year}) deleted successfully.`);
+      showSuccess(`Master summary for ${code} (${year}) deleted successfully.`);
       fetchMasterSummaries();
     } catch (err: any) {
       showError(err.message || "Deletion failed");
@@ -300,7 +334,7 @@ const handleManageVersions = (id: number | string) =>
                           size="icon"
                           className="h-8 w-8 text-destructive hover:text-red-700 hover:bg-red-50"
                           title="Delete Summary"
-                          onClick={() => handleDeleteMasterSummary(summary.id, summary.Examination, summary.Year)}
+                          onClick={() => requestDelete(summary.id, summary.Code, summary.Year)}
                           disabled={loading}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -328,6 +362,52 @@ const handleManageVersions = (id: number | string) =>
         onOpenChange={setIsFormOpen}
         onSuccess={fetchMasterSummaries}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={deleteConfig.open}
+        onOpenChange={(open) => setDeleteConfig(prev => ({ ...prev, open }))}
+      >
+        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6">
+          <AlertDialogHeader>
+            <div className="flex flex-col items-center text-center mb-2">
+              <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+                <AlertTriangle className="h-7 w-7" />
+              </div>
+              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
+                Are you sure?
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base text-slate-700 text-center font-medium leading-relaxed mt-3">
+              Are you sure you want to delete the master summary for{" "}
+              <span className="font-bold text-red-700">
+                {deleteConfig.code}-{deleteConfig.year}
+              </span>
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="flex flex-row items-center gap-3 mt-8">
+            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-xs tracking-wider rounded-xl">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={loading}
+              className="flex-[1.5] h-11 font-black uppercase text-xs tracking-wider rounded-xl bg-red-600 hover:bg-red-700 text-white"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Deleting...
+                </span>
+              ) : (
+                "Yes, Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
