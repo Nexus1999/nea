@@ -24,8 +24,8 @@ import abbreviateSchoolName from "@/utils/abbreviateSchoolName";
 type DetailSortKey = keyof MasterSummaryDetail | 'center_name' | 'center_number' | 'region' | 'district';
 
 const MasterSummaryDetailsPage: React.FC = () => {
-  const { masterSummaryId } = useParams<{ masterSummaryId: string }>();
-  const navigate = useNavigate();
+const { id } = useParams<{ id: string }>();
+const masterSummaryId = id;  const navigate = useNavigate();
   
   const [masterSummary, setMasterSummary] = useState<MasterSummary | null>(null);
   const [details, setDetails] = useState<MasterSummaryDetail[]>([]);

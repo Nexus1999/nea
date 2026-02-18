@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/select";
 
 const VersionManagementPage: React.FC = () => {
-  const { masterSummaryId } = useParams<{ masterSummaryId: string }>();
+  const { id } = useParams<{ id: string }>();
+  const masterSummaryId = id;
   const navigate = useNavigate();
 
   const [masterSummary, setMasterSummary] = useState<MasterSummary | null>(null);

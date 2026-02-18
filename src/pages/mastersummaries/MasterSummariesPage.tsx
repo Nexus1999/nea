@@ -59,17 +59,17 @@ const MasterSummariesPage = () => {
 
   const handleAddMasterSummary = () => setIsFormOpen(true);
 
-  const handleViewMasterSummaryOverview  = (id: number | string) => 
-    navigate(`/dashboard/mastersummaries/${id}/overview`);
+  const handleViewMasterSummaryOverview = (id: number | string) =>
+  navigate(`/dashboard/mastersummaries/overview/${id}`);
 
-  const handleViewMasterSummaryDetails = (id: number | string) => 
-    navigate(`/dashboard/mastersummaries/${id}/details`);
+const handleViewMasterSummaryDetails = (id: number | string) =>
+  navigate(`/dashboard/mastersummaries/details/${id}`);
 
-  const handleManageSpecialNeeds = (id: number | string) => 
-    navigate(`/dashboard/mastersummaries/${id}/special-needs`);
+const handleManageSpecialNeeds = (id: number | string) =>
+  navigate(`/dashboard/mastersummaries/special-needs/${id}`);
 
-  const handleManageVersions = (id: number | string) => 
-    navigate(`/dashboard/mastersummaries/${id}/version`);
+const handleManageVersions = (id: number | string) =>
+  navigate(`/dashboard/mastersummaries/version/${id}`);
 
   const handleDeleteMasterSummary = async (id: number, examinationName: string, year: number) => {
     const result = await showStyledSwal({

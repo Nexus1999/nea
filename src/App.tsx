@@ -25,6 +25,7 @@ import SummaryAssignmentsPage from "./pages/supervisors/SummaryAssignmentsPage";
 import MasterSummariesPage from "./pages/mastersummaries/MasterSummariesPage";
 import MasterSummaryDetailsPage from "./pages/mastersummaries/MasterSummaryDetailsPage";
 import VersionManagementPage from "./pages/mastersummaries/VersionManagementPage";
+import SpecialNeedsPage from "./pages/mastersummaries/SpecialNeedsPage";
 import SpecialNeedDetailsPage from "./pages/mastersummaries/SpecialNeedDetailsPage";
 import MasterSummaryOverviewPage from "./pages/mastersummaries/MasterSummaryOverviewPage";
 
@@ -68,9 +69,10 @@ const App = () => (
                  {/* Master Summaries Routes */}
               <Route path="mastersummaries" element={<MasterSummariesPage />} />
               <Route path="mastersummaries/details/:id" element={<MasterSummaryDetailsPage />} />
-              <Route path="mastersummaries/overview" element={<MasterSummaryOverviewPage />} />
-              <Route path="mastersummaries/version" element={<VersionManagementPage />} />
-              <Route path="mastersummaries/special-needs" element={<SpecialNeedDetailsPage />} />
+              <Route path="mastersummaries/overview/:id" element={<MasterSummaryOverviewPage />} />
+              <Route path="mastersummaries/version/:id" element={<VersionManagementPage />} />
+              <Route path="mastersummaries/special-needs/:id" element={<SpecialNeedsPage />} />
+              <Route path="mastersummaries/special-needs/:id/:specialNeedType/details" element={<SpecialNeedDetailsPage />} />
 
 
                {/* Supervisors Routes */}
