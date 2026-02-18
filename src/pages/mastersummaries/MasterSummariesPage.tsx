@@ -52,86 +52,85 @@ const MasterSummariesPage = () => {
     if (error) {
       showError(error.message);
     } else {
-      setMasterSummaries(data);
+      setMasterSummaries(data ?? []);
     }
     setLoading(false);
   };
 
-  const handleAddMasterSummary = () => {
-    setIsFormOpen(true);
-  };
+  const handleAddMasterSummary = () => setIsFormOpen(true);
 
-  const handleViewMasterSummaryDetails = (summaryId: number | string) => {
-    navigate(`/dashboard/mastersummaries/${summaryId}/details`);
-  };
+  const handleViewMasterSummaryOverview  = (id: number | string) => 
+    navigate(`/dashboard/mastersummaries/${id}/overview`);
 
-  const handleViewMasterSummaryOverview = (summaryId: number | string) => {
-    navigate(`/dashboard/mastersummaries/${summaryId}/overview`);
-  };
+  const handleViewMasterSummaryDetails = (id: number | string) => 
+    navigate(`/dashboard/mastersummaries/${id}/details`);
 
-  const handleManageSpecialNeeds = (summaryId: number | string) => {
-    navigate(`/dashboard/mastersummaries/${summaryId}/special-needs`);
-  };
+  const handleManageSpecialNeeds = (id: number | string) => 
+    navigate(`/dashboard/mastersummaries/${id}/special-needs`);
 
-  const handleManageVersions = (summaryId: number | string) => {
-    navigate(`/dashboard/mastersummaries/${summaryId}/version`);
-  };
+  const handleManageVersions = (id: number | string) => 
+    navigate(`/dashboard/mastersummaries/${id}/version`);
 
-  const handleDeleteMasterSummary = async (summaryId: number, examinationName: string, year: number) => {
-    showStyledSwal({
+  const handleDeleteMasterSummary = async (id: number, examinationName: string, year: number) => {
+    const result = await showStyledSwal({
       title: 'Are you sure?',
-      html: `You are about to delete the master summary for <b>${examinationName} (${year})</b>. This action cannot be undone and will also delete associated detailed data.`,
+      html: `You are about to delete the master summary for <b>${examinationName} (${year})</b>.<br>This action cannot be undone and will also delete associated detailed data.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, delete it!',
       cancelButtonText: 'No, cancel!',
       reverseButtons: true,
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        setLoading(true);
-        try {
-          const { data: summaryData, error: fetchError } = await supabase
-            .from('mastersummaries')
-            .select('Code')
-            .eq('id', summaryId)
-            .single();
-
-          if (fetchError) {
-            throw new Error(fetchError.message || "Failed to fetch master summary code for deletion.");
-          }
-
-          const code = summaryData.Code;
-
-          if (["SFNA", "SSNA", "PSLE"].includes(code)) {
-            const { error: primaryDeleteError } = await supabase
-              .from('primarymastersummary')
-              .delete()
-              .eq('mid', summaryId);
-            if (primaryDeleteError) throw primaryDeleteError;
-          } else if (["FTNA", "CSEE", "ACSEE"].includes(code)) {
-            const { error: secondaryDeleteError } = await supabase
-              .from('secondarymastersummaries')
-              .delete()
-              .eq('mid', summaryId);
-            if (secondaryDeleteError) throw secondaryDeleteError;
-          }
-
-          const { error: masterDeleteError } = await supabase
-            .from('mastersummaries')
-            .delete()
-            .eq('id', summaryId);
-
-          if (masterDeleteError) throw masterDeleteError;
-
-          showSuccess(`Master summary for ${examinationName} (${year}) and its associated data deleted successfully.`);
-          fetchMasterSummaries();
-        } catch (error: any) {
-          showError(error.message || "An unexpected error occurred during deletion.");
-        } finally {
-          setLoading(false);
-        }
-      }
     });
+
+    if (!result.isConfirmed) return;
+
+    setLoading(true);
+    try {
+      // Get code to decide which child table to clean
+      const { data: summary, error: fetchError } = await supabase
+        .from('mastersummaries')
+        .select('Code')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !summary) {
+        throw new Error(fetchError?.message || "Could not fetch summary code");
+      }
+
+      const code = summary.Code;
+
+      // Clean child tables
+      if (["SFNA", "SSNA", "PSLE"].includes(code)) {
+        const { error } = await supabase
+          .from('primarymastersummary')
+          .delete()
+          .eq('mid', id);
+        if (error) throw error;
+      } 
+      else if (["FTNA", "CSEE", "ACSEE"].includes(code)) {
+        const { error } = await supabase
+          .from('secondarymastersummaries')
+          .delete()
+          .eq('mid', id);
+        if (error) throw error;
+      }
+
+      // Finally delete master record
+      const { error: masterError } = await supabase
+        .from('mastersummaries')
+        .delete()
+        .eq('id', id);
+
+      if (masterError) throw masterError;
+
+      showSuccess(`Master summary for ${examinationName} (${year}) deleted successfully.`);
+      fetchMasterSummaries();
+    } catch (err: any) {
+      showError(err.message || "Deletion failed");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSort = (columnId: keyof MasterSummary) => {
@@ -142,40 +141,41 @@ const MasterSummariesPage = () => {
   };
 
   const filteredAndSortedSummaries = useMemo(() => {
-    let currentSummaries = [...masterSummaries];
+    let list = [...masterSummaries];
 
-    if (search) {
-      currentSummaries = currentSummaries.filter(summary =>
-        summary.Examination.toLowerCase().includes(search.toLowerCase()) ||
-        summary.Code.toLowerCase().includes(search.toLowerCase()) ||
-        summary.Year.toString().includes(search.toLowerCase())
+    if (search.trim()) {
+      const term = search.toLowerCase();
+      list = list.filter(s =>
+        s.Examination.toLowerCase().includes(term) ||
+        s.Code.toLowerCase().includes(term) ||
+        String(s.Year).includes(term)
       );
     }
 
-    currentSummaries.sort((a, b) => {
-      const aValue = a[orderBy];
-      const bValue = b[orderBy];
+    list.sort((a, b) => {
+      const aVal = a[orderBy];
+      const bVal = b[orderBy];
 
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return order === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return order === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
       }
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return order === 'asc' ? aValue - bValue : bValue - aValue;
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return order === 'asc' ? aVal - bVal : bVal - aVal;
       }
       return 0;
     });
 
-    return currentSummaries;
+    return list;
   }, [masterSummaries, search, orderBy, order]);
 
   const totalPages = Math.ceil(filteredAndSortedSummaries.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentSummaries = filteredAndSortedSummaries.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = filteredAndSortedSummaries.slice(indexOfFirstItem, indexOfLastItem);
 
-  const handlePageChange = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
-  };
+  const handlePageChange = (page: number) => setCurrentPage(page);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -184,10 +184,11 @@ const MasterSummariesPage = () => {
   return (
     <Card className="relative min-h-[600px]">
       {loading && (
-        <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-[50] rounded-lg">
+        <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
           <Spinner label="Loading master summaries..." size="lg" />
         </div>
       )}
+
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-2xl font-bold">Master Summaries</CardTitle>
         <Button size="sm" className="h-8 gap-1" onClick={handleAddMasterSummary} disabled={loading}>
@@ -195,8 +196,9 @@ const MasterSummariesPage = () => {
           <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Add Master Summary</span>
         </Button>
       </CardHeader>
+
       <CardContent>
-        <div className="mb-4 flex justify-between items-center flex-wrap gap-2">
+        <div className="mb-4">
           <Input
             type="text"
             placeholder="Search summaries..."
@@ -212,31 +214,19 @@ const MasterSummariesPage = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort('Examination')}
-                    className="px-0 hover:bg-transparent"
-                  >
+                  <Button variant="ghost" onClick={() => handleSort('Examination')} className="px-0 hover:bg-transparent">
                     Examination
                     <ArrowUpDown className={cn("ml-2 h-4 w-4", orderBy === 'Examination' ? 'opacity-100' : 'opacity-50')} />
                   </Button>
                 </TableHead>
                 <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort('Code')}
-                    className="px-0 hover:bg-transparent"
-                  >
+                  <Button variant="ghost" onClick={() => handleSort('Code')} className="px-0 hover:bg-transparent">
                     Code
                     <ArrowUpDown className={cn("ml-2 h-4 w-4", orderBy === 'Code' ? 'opacity-100' : 'opacity-50')} />
                   </Button>
                 </TableHead>
                 <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort('Year')}
-                    className="px-0 hover:bg-transparent"
-                  >
+                  <Button variant="ghost" onClick={() => handleSort('Year')} className="px-0 hover:bg-transparent">
                     Year
                     <ArrowUpDown className={cn("ml-2 h-4 w-4", orderBy === 'Year' ? 'opacity-100' : 'opacity-50')} />
                   </Button>
@@ -246,63 +236,72 @@ const MasterSummariesPage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentSummaries.length === 0 ? (
+              {currentItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     No master summaries found.
                   </TableCell>
                 </TableRow>
               ) : (
-                currentSummaries.map((summary) => (
+                currentItems.map(summary => (
                   <TableRow key={summary.id}>
                     <TableCell className="font-medium">{summary.Examination}</TableCell>
                     <TableCell>{summary.Code}</TableCell>
                     <TableCell>{summary.Year}</TableCell>
                     <TableCell>{format(new Date(summary.created_at), 'PPP')}</TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-1">
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="View Overview"
                           onClick={() => handleViewMasterSummaryOverview(summary.id)}
                           disabled={loading}
-                          title="View Overview"
                         >
                           <LayoutDashboard className="h-4 w-4" />
                         </Button>
+
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                          title="View Details"
                           onClick={() => handleViewMasterSummaryDetails(summary.id)}
                           disabled={loading}
-                          title="View Details"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                          title="Manage Special Needs"
                           onClick={() => handleManageSpecialNeeds(summary.id)}
                           disabled={loading}
-                          title="Manage Special Needs"
                         >
                           <Accessibility className="h-4 w-4" />
                         </Button>
+
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          title="Manage Versions"
                           onClick={() => handleManageVersions(summary.id)}
                           disabled={loading}
-                          title="Manage Versions"
                         >
                           <GitBranch className="h-4 w-4" />
                         </Button>
+
                         <Button
-                          variant="destructive"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-red-700 hover:bg-red-50"
+                          title="Delete Summary"
                           onClick={() => handleDeleteMasterSummary(summary.id, summary.Examination, summary.Year)}
                           disabled={loading}
-                          title="Delete Summary"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -314,6 +313,7 @@ const MasterSummariesPage = () => {
             </TableBody>
           </Table>
         </div>
+
         {!loading && totalPages > 1 && (
           <PaginationControls
             currentPage={currentPage}
@@ -322,7 +322,8 @@ const MasterSummariesPage = () => {
           />
         )}
       </CardContent>
-      <AddMasterSummaryForm 
+
+      <AddMasterSummaryForm
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         onSuccess={fetchMasterSummaries}

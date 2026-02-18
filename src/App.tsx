@@ -24,10 +24,9 @@ import SupervisorsListsPage from "./pages/supervisors/SupervisorsListsPage";
 import SummaryAssignmentsPage from "./pages/supervisors/SummaryAssignmentsPage";
 import MasterSummariesPage from "./pages/mastersummaries/MasterSummariesPage";
 import MasterSummaryDetailsPage from "./pages/mastersummaries/MasterSummaryDetailsPage";
-import MasterSummaryOverviewPage from "./pages/mastersummaries/MasterSummaryOverviewPage";
-import SpecialNeedsPage from "./pages/mastersummaries/SpecialNeedsPage";
-import SpecialNeedDetailsPage from "./pages/mastersummaries/SpecialNeedDetailsPage";
 import VersionManagementPage from "./pages/mastersummaries/VersionManagementPage";
+import SpecialNeedDetailsPage from "./pages/mastersummaries/SpecialNeedDetailsPage";
+import MasterSummaryOverviewPage from "./pages/mastersummaries/MasterSummaryOverviewPage";
 
 const queryClient = new QueryClient();
 
@@ -66,15 +65,15 @@ const App = () => (
               <Route index element={<Overview />} />
               <Route path="timetables" element={<Timetables />} />
               
-              {/* Master Summaries Routes */}
+                 {/* Master Summaries Routes */}
               <Route path="mastersummaries" element={<MasterSummariesPage />} />
-              <Route path="mastersummaries/:masterSummaryId/details" element={<MasterSummaryDetailsPage />} />
-              <Route path="mastersummaries/:masterSummaryId/overview" element={<MasterSummaryOverviewPage />} />
-              <Route path="mastersummaries/:masterSummaryId/special-needs" element={<SpecialNeedsPage />} />
-              <Route path="mastersummaries/:masterSummaryId/special-needs/:specialNeedType/details" element={<SpecialNeedDetailsPage />} />
-              <Route path="mastersummaries/:masterSummaryId/version" element={<VersionManagementPage />} />
+              <Route path="mastersummaries/details/:id" element={<MasterSummaryDetailsPage />} />
+              <Route path="mastersummaries/overview" element={<MasterSummaryOverviewPage />} />
+              <Route path="mastersummaries/version" element={<VersionManagementPage />} />
+              <Route path="mastersummaries/special-needs" element={<SpecialNeedDetailsPage />} />
 
-              {/* Supervisors Routes */}
+
+               {/* Supervisors Routes */}
               <Route path="supervisors" element={<SupervisionsPage />} />
               <Route path="supervisors/supervisors-management" element={<SupervisorsManagementPage />} />
               <Route path="supervisors/supervisors-assignments/:id" element={<SupervisorAssignmentsPage />} />
