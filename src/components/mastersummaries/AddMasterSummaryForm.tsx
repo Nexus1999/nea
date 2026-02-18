@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Loader2, UploadCloud, TriangleAlert, Download } from "lucide-react";
-import * as XLSX from 'xlsx'; // Import xlsx library
+import * as XLSX from 'xlsx';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +35,6 @@ import {
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
 
-// Define a type for the examination options fetched from Supabase
 interface ExaminationOption {
   exam_id: number;
   examination: string;
@@ -53,7 +52,7 @@ const addMasterSummaryFormSchema = z.object({
     (val) => Number(val),
     z.number().int().min(1900, { message: "Year must be a valid year." }).max(2100, { message: "Year must be a valid year." })
   ),
-  file: z.any() // This will hold the FileList object temporarily
+  file: z.any()
     .refine((file) => file?.length > 0, "File is required.")
     .refine((file) => file?.[0]?.size <= 10 * 1024 * 1024, `File size should be less than 10MB.`)
     .refine(
@@ -76,7 +75,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
   const [examinationsLoading, setExaminationsLoading] = useState(true);
   const [missingHeadersError, setMissingHeadersError] = useState<string | null>(null);
   const [expectedHeadersForTemplate, setExpectedHeadersForTemplate] = useState<string[]>([]);
-  const [parsedFileData, setParsedFileData] = useState<string | null>(null); // State to hold parsed JSON data
+  const [parsedFileData, setParsedFileData] = useState<string | null>(null);
 
   const form = useForm<AddMasterSummaryFormValues>({
     resolver: zodResolver(addMasterSummaryFormSchema),
@@ -88,7 +87,8 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
     },
   });
 
-  // Fetch examinations when the dialog opens
+  const watchedExamination = useWatch({ control: form.control, name: 'examination' });
+
   useEffect(() => {
     if (open) {
       const fetchExaminations = async () => {
@@ -96,7 +96,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         const { data, error } = await supabase
           .from('examinations')
           .select('exam_id, examination, code, level, status')
-          .eq('status', 'active') // Only fetch active examinations
+          .eq('status', 'active')
           .order('examination', { ascending: true });
 
         if (error) {
@@ -109,58 +109,53 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
       };
       fetchExaminations();
       
-      // Reset form for a new entry
       form.reset({
         examination: "",
         code: undefined,
         year: new Date().getFullYear(),
         file: undefined,
       });
-      setMissingHeadersError(null); // Clear previous errors
+      setMissingHeadersError(null);
       setExpectedHeadersForTemplate([]);
-      setParsedFileData(null); // Clear parsed data
+      setParsedFileData(null);
     }
   }, [open, form]);
 
-  // Effect to update 'code' when 'examination' changes
   useEffect(() => {
-    const selectedExaminationName = form.watch('examination');
-    if (selectedExaminationName) {
+    if (watchedExamination) {
       const selectedExam = examinations.find(
-        (exam) => exam.examination === selectedExaminationName
+        (exam) => exam.examination === watchedExamination
       );
       if (selectedExam) {
-        if (addMasterSummaryFormSchema.shape.code.options.includes(selectedExam.code as any)) {
+        const validCodes = ["SFNA", "SSNA", "PSLE", "FTNA", "CSEE", "ACSEE"];
+        if (validCodes.includes(selectedExam.code)) {
           form.setValue('code', selectedExam.code as AddMasterSummaryFormValues['code'], { shouldValidate: true });
+          form.clearErrors('code');
         } else {
           form.setError('code', { type: 'manual', message: `Invalid code '${selectedExam.code}' for master summary.` });
-          form.setValue('code', undefined);
+          form.setValue('code', undefined as any);
         }
       }
     } else {
-      form.setValue('code', undefined);
+      form.setValue('code', undefined as any);
     }
-  }, [form.watch('examination'), examinations, form]);
+  }, [watchedExamination, examinations, form]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    form.setValue('file', files); // Set the FileList to the form field for validation
-
     if (!files || files.length === 0) {
       setParsedFileData(null);
       return;
     }
 
     const file = files[0];
+    form.setValue('file', files, { shouldValidate: true });
 
-    // Perform client-side file validation
     if (file.size > 10 * 1024 * 1024) {
-      form.setError('file', { type: 'manual', message: 'File size should be less than 10MB.' });
       setParsedFileData(null);
       return;
     }
     if (!['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'].includes(file.type)) {
-      form.setError('file', { type: 'manual', message: 'Only .xlsx and .csv files are allowed.' });
       setParsedFileData(null);
       return;
     }
@@ -173,16 +168,17 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
       const reader = new FileReader();
       reader.onload = (e) => {
         const data = e.target?.result;
-        let workbook;
         let jsonData: any[] = [];
 
         if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-          workbook = XLSX.read(data, { type: 'array' });
+          const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
         } else if (file.type === 'text/csv') {
           const csvText = new TextDecoder().decode(data as ArrayBuffer);
-          jsonData = XLSX.utils.sheet_to_json(XLSX.read(csvText, { type: 'string' }).Sheets['Sheet1'], { defval: '' });
+          const workbook = XLSX.read(csvText, { type: 'string' });
+          const sheetName = workbook.SheetNames[0];
+          jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
         }
 
         if (jsonData.length === 0) {
@@ -192,7 +188,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         }
 
         setParsedFileData(JSON.stringify(jsonData));
-        form.clearErrors('file'); // Clear any file-related errors if parsing is successful
+        form.clearErrors('file');
       };
       reader.readAsArrayBuffer(file);
     } catch (error: any) {
@@ -219,7 +215,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
       formData.append('examination', values.examination);
       formData.append('code', values.code);
       formData.append('year', values.year.toString());
-      formData.append('data', parsedFileData); // Send the parsed JSON data as a string
+      formData.append('data', parsedFileData);
       
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-mastersummary`, {
         method: 'POST',
@@ -235,15 +231,14 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         } else {
           showError(result.error || 'Failed to process master summary data.');
         }
-        return; // Stop further processing
+        return;
       }
 
-      showSuccess(result.message || "Master summary and detailed data processed successfully!");
-      
+      showSuccess(result.message || "Master summary processed successfully!");
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      showError(error.message || "An unexpected error occurred during master summary creation.");
+      showError(error.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -251,25 +246,21 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
 
   const handleDownloadTemplate = () => {
     if (expectedHeadersForTemplate.length === 0) {
-      showError("No template headers available. Please select an examination first.");
+      showError("No template headers available.");
       return;
     }
 
     const csvContent = expectedHeadersForTemplate.join(',') + '\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    if (link.download !== undefined) { // Feature detection for download attribute
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `${form.getValues('code') || 'master_summary'}_template.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showSuccess("Template downloaded successfully!");
-    } else {
-      showError("Your browser does not support downloading files directly. Please copy the headers manually.");
-    }
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${form.getValues('code') || 'master_summary'}_template.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showSuccess("Template downloaded successfully!");
   };
 
   return (
@@ -316,17 +307,13 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
                     >
                       <FormControl>
                         <SelectTrigger>
-                          {field.value ? (
-                            <SelectValue placeholder="Select an examination" />
-                          ) : (
-                            <span className="text-muted-foreground">Select an examination</span>
-                          )}
+                          <SelectValue placeholder="Select an examination" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {examinationsLoading ? (
                           <div className="flex items-center justify-center p-4">
-                            <Loader2 className="h-5 w-5 animate-spin text-neas-green" />
+                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
                           </div>
                         ) : examinations.length === 0 ? (
                           <div className="p-4 text-center text-gray-500">No active examinations found.</div>
@@ -354,7 +341,6 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
                         placeholder="Auto-filled"
                         {...field}
                         readOnly
-                        disabled={true}
                         className="bg-gray-100 cursor-not-allowed"
                       />
                     </FormControl>
@@ -378,7 +364,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
               <FormField
                 control={form.control}
                 name="file"
-                render={({ field: { value, ...fieldProps } }) => (
+                render={({ field: { value, onChange, ...fieldProps } }) => (
                   <FormItem>
                     <FormLabel>Upload Data File (.xlsx, .csv)</FormLabel>
                     <FormControl>
@@ -386,9 +372,9 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
                         {...fieldProps}
                         type="file"
                         accept=".xlsx,.csv"
-                        onChange={handleFileChange} // Use the new handler
+                        onChange={handleFileChange}
                         disabled={loading}
-                        className="file:text-neas-green file:font-semibold file:hover:bg-gray-100"
+                        className="file:text-primary file:font-semibold file:hover:bg-gray-100"
                       />
                     </FormControl>
                     <FormMessage />

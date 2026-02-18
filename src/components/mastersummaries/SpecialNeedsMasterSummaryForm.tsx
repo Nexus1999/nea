@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, UploadCloud, TriangleAlert, Download } from "lucide-react"; // Added TriangleAlert and Download icons
+import { Loader2, UploadCloud, TriangleAlert, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,13 +32,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { showSuccess, showError } from "@/utils/toast";
-import { SpecialNeedType } from "@/types/mastersummaries";
 
 const specialNeedsMasterSummaryFormSchema = z.object({
-  mid: z.number(), // Existing Master Summary ID
-  examination: z.string(), // Auto-filled
-  code: z.string(), // Auto-filled
-  year: z.number(), // Auto-filled
+  mid: z.number(),
+  examination: z.string(),
+  code: z.string(),
+  year: z.number(),
   special_need: z.enum(["HI", "BR", "LV", "PI"], {
     required_error: "Special need type is required.",
   }),
@@ -74,8 +73,8 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
     resolver: zodResolver(specialNeedsMasterSummaryFormSchema),
     defaultValues: {
       mid: masterSummaryData?.id,
-      examination: masterSummaryData?.examination,
-      code: masterSummaryData?.code,
+      examination: masterSummaryData?.examination || "",
+      code: masterSummaryData?.code || "",
       year: masterSummaryData?.year,
       special_need: undefined,
       file: undefined,
@@ -83,42 +82,32 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
   });
 
   useEffect(() => {
-    if (masterSummaryData) {
+    if (open && masterSummaryData) {
       form.reset({
         mid: masterSummaryData.id,
         examination: masterSummaryData.examination,
         code: masterSummaryData.code,
         year: masterSummaryData.year,
-        special_need: undefined, // Keep special_need and file undefined for new selection
-        file: undefined,
-      });
-    } else {
-      form.reset({
-        mid: undefined,
-        examination: "",
-        code: "",
-        year: undefined,
         special_need: undefined,
         file: undefined,
       });
+      setMissingHeadersError(null);
+      setExpectedHeadersForTemplate([]);
     }
-    setMissingHeadersError(null); // Clear previous errors
-    setExpectedHeadersForTemplate([]);
-  }, [masterSummaryData, form, open]); // Added 'open' to dependencies to reset on modal open
+  }, [open, masterSummaryData, form]);
 
   const onSubmit = async (values: SpecialNeedsMasterSummaryFormValues) => {
     setLoading(true);
-    setMissingHeadersError(null); // Clear previous errors
+    setMissingHeadersError(null);
     setExpectedHeadersForTemplate([]);
 
     try {
       const formData = new FormData();
       formData.append('mid', values.mid.toString());
       formData.append('special_need', values.special_need);
-      formData.append('code', values.code); // Pass the examination code to the edge function
+      formData.append('code', values.code);
       
       const fileToUpload = values.file?.[0];
-
       if (fileToUpload) {
         formData.append('file', fileToUpload);
       } else {
@@ -137,17 +126,16 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
           setMissingHeadersError(result.error);
           setExpectedHeadersForTemplate(result.expectedHeaders);
         } else {
-          showError(result.error || 'Failed to process special needs master summary file.');
+          showError(result.error || 'Failed to process special needs file.');
         }
-        return; // Stop further processing
+        return;
       }
 
-      showSuccess(result.message || "Special needs master summary data processed successfully!");
-      
+      showSuccess(result.message || "Special needs data processed successfully!");
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      showError(error.message || "An unexpected error occurred during special needs master summary creation.");
+      showError(error.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -155,25 +143,21 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
 
   const handleDownloadTemplate = () => {
     if (expectedHeadersForTemplate.length === 0) {
-      showError("No template headers available. Please select an examination and special need type first.");
+      showError("No template headers available.");
       return;
     }
 
     const csvContent = expectedHeadersForTemplate.join(',') + '\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    if (link.download !== undefined) { // Feature detection for download attribute
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `${masterSummaryData?.code || 'special_needs'}_${form.getValues('special_need') || 'template'}_template.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showSuccess("Template downloaded successfully!");
-    } else {
-      showError("Your browser does not support downloading files directly. Please copy the headers manually.");
-    }
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${masterSummaryData?.code || 'special_needs'}_${form.getValues('special_need') || 'template'}_template.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showSuccess("Template downloaded successfully!");
   };
 
   return (
@@ -214,7 +198,7 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
                   <FormItem>
                     <FormLabel>Examination Name</FormLabel>
                     <FormControl>
-                      <Input {...field} readOnly disabled className="bg-gray-100 cursor-not-allowed" />
+                      <Input {...field} readOnly className="bg-gray-100 cursor-not-allowed" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -227,7 +211,7 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
                   <FormItem>
                     <FormLabel>Examination Code</FormLabel>
                     <FormControl>
-                      <Input {...field} readOnly disabled className="bg-gray-100 cursor-not-allowed" />
+                      <Input {...field} readOnly className="bg-gray-100 cursor-not-allowed" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -240,7 +224,7 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
                   <FormItem>
                     <FormLabel>Year</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} readOnly disabled className="bg-gray-100 cursor-not-allowed" />
+                      <Input type="number" {...field} readOnly className="bg-gray-100 cursor-not-allowed" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -281,10 +265,10 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
                         type="file"
                         accept=".xlsx,.csv"
                         onChange={(event) => {
-                          onChange(event.target.files && event.target.files);
+                          onChange(event.target.files);
                         }}
                         disabled={loading}
-                        className="file:text-neas-green file:font-semibold file:hover:bg-gray-100"
+                        className="file:text-primary file:font-semibold file:hover:bg-gray-100"
                       />
                     </FormControl>
                     <FormMessage />
