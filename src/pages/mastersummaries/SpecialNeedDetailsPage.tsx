@@ -194,17 +194,10 @@ const SpecialNeedDetailsPage: React.FC = () => {
   }
 
   return (
-    <div className="p-4 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
+    <div className=" ">
       <div className="flex items-center justify-between">
-        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
-        <h1 className="text-2xl font-bold text-gray-900">
-          {specialNeedFullNames[specialNeedType] || specialNeedType} Details
-          <span className="ml-3 text-lg font-normal text-muted-foreground">
-            {masterSummary?.Code} — {masterSummary?.Year}
-          </span>
-        </h1>
+         
+       
       </div>
 
       <Card className="border shadow-sm relative min-h-[500px]">
@@ -212,7 +205,7 @@ const SpecialNeedDetailsPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <CardTitle className="text-xl font-bold flex items-center gap-2">
               <Accessibility className="h-5 w-5 text-blue-600" />
-              {specialNeedFullNames[specialNeedType] || specialNeedType}
+              {specialNeedFullNames[specialNeedType] || specialNeedType}  {masterSummary?.Code} — {masterSummary?.Year}
             </CardTitle>
 
             <div className="flex items-center gap-3 flex-wrap">
