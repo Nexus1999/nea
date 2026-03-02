@@ -47,7 +47,9 @@ const iconMap: Record<string, React.ReactNode> = {
   examinations: <BookOpen className="h-4 w-4" />,
   subjects: <GraduationCap className="h-4 w-4" />,
   profile: <User className="h-4 w-4" />,
-  'special-needs': <Accessibility className="h-4 w-4" />
+  'special-needs': <Accessibility className="h-4 w-4" />,
+  details: <FileText className="h-4 w-4" />,
+  version: <FileText className="h-4 w-4" />
 };
 
 const labelMap: Record<string, string> = {
@@ -80,11 +82,20 @@ const labelMap: Record<string, string> = {
   examinations: "Examinations",
   subjects: "Subjects",
   profile: "Profile",
-  details: "Details"
+  details: "Details",
+  version: "Version"
 };
 
 // Special need codes to skip in breadcrumbs
 const specialNeedCodes = ['BR', 'HI', 'LV', 'PI'];
+
+const isSkippable = (value: string) => {
+  return (
+    /^\d+$/.test(value) || 
+    value.match(/^[0-9a-fA-F-]{36}$/) || 
+    specialNeedCodes.includes(value)
+  );
+};
 
 const DynamicBreadcrumbs = () => {
   const location = useLocation();
@@ -112,15 +123,15 @@ const DynamicBreadcrumbs = () => {
         {pathnames.slice(1).map((value, index) => {
           const actualIndex = index + 1;
           
-          // Skip numeric/UUID IDs
-          if (/^\d+$/.test(value) || value.match(/^[0-9a-fA-F-]{36}$/)) {
+          // Skip numeric/UUID IDs or special need codes
+          if (isSkippable(value)) {
             return null;
           }
 
-          // Skip special need codes (BR, HI, etc.)
-          if (specialNeedCodes.includes(value)) {
-            return null;
-          }
+          // Check if this is the last VISIBLE segment
+          // It's the last if all subsequent segments are skippable
+          const remainingSegments = pathnames.slice(actualIndex + 1);
+          const isLastVisible = remainingSegments.every(seg => isSkippable(seg));
 
           let to = `/${pathnames.slice(0, actualIndex + 1).join('/')}`;
           
@@ -132,7 +143,6 @@ const DynamicBreadcrumbs = () => {
             }
           }
 
-          const isLast = actualIndex === pathnames.length - 1;
           const displayName = labelMap[value] || 
             value.charAt(0).toUpperCase() + value.slice(1).replace(/-/g, ' ');
 
@@ -144,7 +154,7 @@ const DynamicBreadcrumbs = () => {
                 <ChevronRight className="h-4 w-4 text-gray-400" />
               </BreadcrumbSeparator>
               <BreadcrumbItem>
-                {isLast ? (
+                {isLastVisible ? (
                   <BreadcrumbPage className="font-medium text-gray-900 flex items-center gap-1.5">
                     {icon}
                     {displayName}
