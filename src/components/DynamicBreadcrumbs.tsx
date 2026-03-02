@@ -9,7 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, History } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags, Shield, FileText,
@@ -49,7 +49,7 @@ const iconMap: Record<string, React.ReactNode> = {
   profile: <User className="h-4 w-4" />,
   'special-needs': <Accessibility className="h-4 w-4" />,
   details: <FileText className="h-4 w-4" />,
-  version: <FileText className="h-4 w-4" />
+  version: <History className="h-4 w-4" />
 };
 
 const labelMap: Record<string, string> = {
