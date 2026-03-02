@@ -336,16 +336,7 @@ const VersionManagementPage: React.FC = () => {
 
   return (
     <div className="container mx-auto py-4 px-4">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">
-          Version History for {masterSummary.Examination} ({masterSummary.Code}) - {masterSummary.Year}
-        </h1>
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Master Summaries
-        </Button>
-      </div>
-
-      <Card className="shadow-lg rounded-xl overflow-hidden bg-white">
+            <Card className="shadow-lg rounded-xl overflow-hidden bg-white">
         <CardHeader className="border-b pb-4 flex-row items-center justify-between">
           <div>
             <CardTitle className="text-2xl font-bold text-gray-800 flex items-center gap-2">
