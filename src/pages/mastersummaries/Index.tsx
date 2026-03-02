@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+// Mock data for demonstration
 const mockSummaries = [
   { id: "51", name: "2024 Primary Examination Summary", status: "Completed", date: "2024-03-15" },
   { id: "52", name: "2024 Secondary Mock Summary", status: "Draft", date: "2024-03-10" },
@@ -28,12 +29,12 @@ const MasterSummaries = () => {
   const navigate = useNavigate();
 
   const handleViewDetails = (id: string) => {
+    // Updated to point to the details page as requested
     navigate(`/dashboard/mastersummaries/details/${id}`);
   };
 
   const handleDifferenceReport = (id: string) => {
-    // Assuming difference report is the 'version' or 'overview' page
-    // If it's a specific report, we might need a new route or logic here
+    // Difference report points to the version comparison page
     navigate(`/dashboard/mastersummaries/version/${id}`);
   };
 
@@ -86,10 +87,6 @@ const MasterSummaries = () => {
                         <DropdownMenuItem onClick={() => navigate(`/dashboard/mastersummaries/overview/${summary.id}`)}>
                           <Eye className="mr-2 h-4 w-4" />
                           Overview
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => navigate(`/dashboard/mastersummaries/special-needs/${summary.id}`)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Special Needs
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
