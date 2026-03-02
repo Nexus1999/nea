@@ -342,7 +342,7 @@ const VersionManagementPage: React.FC = () => {
         <CardHeader className="border-b pb-4 flex-row items-center justify-between">
           <div>
             <CardTitle className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <GitBranch className="h-6 w-6 text-neas-green" /> All Versions
+              <GitBranch className="h-6 w-6 text-neas-green" /> Master Summary Version Management
             </CardTitle>
             <CardDescription className="text-gray-600">
               Manage historical and current versions of this master summary.
