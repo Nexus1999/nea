@@ -1,26 +1,12 @@
-import Swal from 'sweetalert2';
+import Swal, { SweetAlertOptions } from 'sweetalert2';
 
-export const showStyledSwal = ({
-  title,
-  html,
-  icon,
-  showCancelButton,
-  confirmButtonText,
-  cancelButtonText,
-  reverseButtons,
-}: any) => {
+export const showStyledSwal = (options: SweetAlertOptions) => {
   return Swal.fire({
-    title,
-    html,
-    icon,
-    showCancelButton,
-    confirmButtonText,
-    cancelButtonText,
-    reverseButtons,
+    ...options,
     customClass: {
-      confirmButton: 'bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md',
-      cancelButton: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 py-2 rounded-md ml-2'
+      confirmButton: 'bg-primary text-primary-foreground px-4 py-2 rounded-md',
+      cancelButton: 'bg-destructive text-destructive-foreground px-4 py-2 rounded-md',
     },
-    buttonsStyling: false
+    buttonsStyling: false,
   });
 };
