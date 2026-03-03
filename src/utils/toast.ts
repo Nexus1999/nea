@@ -1,17 +1,15 @@
-import { toast } from "sonner";
+import { toast } from "react-hot-toast";
 
 export const showSuccess = (message: string) => {
-  toast.success(message);
+  toast.success(message, {
+    duration: 3000,
+    position: "top-right",
+  });
 };
 
 export const showError = (message: string) => {
-  toast.error(message);
-};
-
-export const showLoading = (message: string) => {
-  return toast.loading(message);
-};
-
-export const dismissToast = (toastId: string) => {
-  toast.dismiss(toastId);
+  toast.error(message, {
+    duration: 4000,
+    position: "top-right",
+  });
 };
