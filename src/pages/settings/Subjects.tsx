@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  PlusCircle, Edit, Trash2, ArrowUpDown, Eye, Calculator 
+  PlusCircle, Edit, Trash2, ArrowUpDown, Eye, Calculator, AlertTriangle 
 } from "lucide-react";
 import {
   Table,
@@ -15,15 +15,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import SubjectForm, { SubjectFormValues } from "@/components/settings/SubjectForm";
 import SubjectDetailsDrawer from "@/components/settings/SubjectDetailsDrawer";
 import SubjectMultiplierModal from "@/components/settings/SubjectMultiplierModal";
-import { showStyledSwal } from '@/utils/alerts';
 import { cn } from "@/lib/utils";
 import PaginationControls from "@/components/ui/pagination-controls";
-import Spinner from "@/components/Spinner";           // ← assuming you have this component
+import Spinner from "@/components/Spinner";
 
 interface Subject {
   id: number;
@@ -44,10 +53,14 @@ const Subjects = () => {
   const [editingSubject, setEditingSubject] = useState<SubjectFormValues | undefined>(undefined);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [viewingSubject, setViewingSubject] = useState<Subject | undefined>(undefined);
-  const [isViewingDetailsLoading, setIsViewingDetailsLoading] = useState(false);
 
   const [isMultiplierModalOpen, setIsMultiplierModalOpen] = useState(false);
   const [subjectToEditMultipliers, setSubjectToEditMultipliers] = useState<Subject | undefined>(undefined);
+
+  // Delete confirmation
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [subjectToDelete, setSubjectToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [search, setSearch] = useState('');
   const [orderBy, setOrderBy] = useState<keyof Subject>('subject_name');
@@ -63,23 +76,33 @@ const Subjects = () => {
 
   const fetchSubjects = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('subjects')
-      .select('*, examinations(examination)')
-      .order('subject_name', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('subjects')
+        .select('*, examinations(examination)')
+        .order('subject_name', { ascending: true });
 
-    if (error) {
-      showError(error.message);
-    } else {
-      const formatted = data?.map((sub: any) => ({
+      if (error) {
+        showError("Failed to load subjects: " + error.message);
+        setSubjects([]);
+        return;
+      }
+
+      const formatted = (data || []).map((sub: any) => ({
         ...sub,
         examination_name: sub.examinations?.examination || 'N/A',
-        normal_booklet_multiplier: parseFloat(String(sub.normal_booklet_multiplier)),
-        graph_booklet_multiplier: parseFloat(String(sub.graph_booklet_multiplier)),
-      })) ?? [];
+        normal_booklet_multiplier: parseFloat(String(sub.normal_booklet_multiplier || 0)),
+        graph_booklet_multiplier: parseFloat(String(sub.graph_booklet_multiplier || 0)),
+      }));
+
       setSubjects(formatted);
+    } catch (err) {
+      console.error("Unexpected fetch error:", err);
+      showError("Something went wrong while loading subjects.");
+      setSubjects([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleAddSubject = () => {
@@ -109,26 +132,41 @@ const Subjects = () => {
     setIsDrawerOpen(true);
   };
 
-  const handleDeleteSubject = async (subjectId: number, subjectName: string) => {
-    showStyledSwal({
-      title: 'Are you sure?',
-      html: `Delete subject <b>${subjectName}</b>?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#d32f2f',
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        setLoading(true);
-        const { error } = await supabase.from('subjects').delete().eq('id', subjectId);
-        if (error) showError(error.message);
-        else {
-          showSuccess(`Subject ${subjectName} deleted`);
-          fetchSubjects();
-        }
-        setLoading(false);
-      }
-    });
+  const handleDeleteClick = (id: number, name: string) => {
+    setSubjectToDelete({ id, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!subjectToDelete) return;
+
+    setDeleteLoading(true);
+
+    try {
+      // Delete the record
+      const { error: deleteError } = await supabase
+        .from('subjects')
+        .delete()
+        .eq('id', subjectToDelete.id);
+
+      if (deleteError) throw deleteError;
+
+      showSuccess(`Subject "${subjectToDelete.name}" deleted successfully`);
+
+      // Close dialog first for better UX
+      setDeleteDialogOpen(false);
+      setSubjectToDelete(null);
+
+      // Then refresh the list
+      await fetchSubjects();
+
+    } catch (err: any) {
+      showError(err.message || "Could not delete subject. Please try again.");
+      console.error("Delete operation failed:", err);
+      // Dialog stays open on error so user can retry
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleSort = (columnId: keyof Subject) => {
@@ -197,7 +235,7 @@ const Subjects = () => {
 
           <Button 
             size="sm" 
-            className="bg-black hover:bg-gray-800 text-white gap-1"
+            className="bg-black hover:bg-black/90 text-white gap-1"
             onClick={handleAddSubject}
             disabled={loading}
           >
@@ -225,23 +263,14 @@ const Subjects = () => {
               <TableHeader className="bg-gray-50">
                 <TableRow>
                   <TableHead className="w-[50px]">SN</TableHead>
-                  <TableHead 
-                    onClick={() => handleSort('subject_code')} 
-                    className="cursor-pointer"
-                  >
+                  <TableHead onClick={() => handleSort('subject_code')} className="cursor-pointer">
                     Code <ArrowUpDown className="ml-2 h-3 w-3 inline" />
                   </TableHead>
-                  <TableHead 
-                    onClick={() => handleSort('subject_name')} 
-                    className="cursor-pointer"
-                  >
+                  <TableHead onClick={() => handleSort('subject_name')} className="cursor-pointer">
                     Name <ArrowUpDown className="ml-2 h-3 w-3 inline" />
                   </TableHead>
                   <TableHead>Exam Code</TableHead>
-                  <TableHead 
-                    onClick={() => handleSort('status')} 
-                    className="cursor-pointer"
-                  >
+                  <TableHead onClick={() => handleSort('status')} className="cursor-pointer">
                     Status <ArrowUpDown className="ml-2 h-3 w-3 inline" />
                   </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -312,10 +341,10 @@ const Subjects = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-destructive hover:bg-red-50"
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                             title="Delete Subject"
-                            onClick={() => handleDeleteSubject(subject.id, subject.subject_name)}
-                            disabled={loading}
+                            onClick={() => handleDeleteClick(subject.id, subject.subject_name)}
+                            disabled={loading || deleteLoading}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -350,7 +379,7 @@ const Subjects = () => {
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}
         subject={viewingSubject}
-        loading={isViewingDetailsLoading}
+        loading={false}
       />
       <SubjectMultiplierModal
         open={isMultiplierModalOpen}
@@ -358,6 +387,53 @@ const Subjects = () => {
         subject={subjectToEditMultipliers}
         onSuccess={fetchSubjects}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+        if (!deleteLoading) setDeleteDialogOpen(open);
+      }}>
+        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6">
+          <AlertDialogHeader>
+            <div className="flex flex-col items-center text-center mb-2">
+              <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+                <AlertTriangle className="h-7 w-7" />
+              </div>
+              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
+                Confirm Deletion
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
+              You are about to permanently delete
+              <br />
+              <strong>{subjectToDelete?.name || "this subject"}</strong>.
+              <br />
+             </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
+            <AlertDialogCancel 
+              disabled={deleteLoading}
+              className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={deleteLoading}
+              className="flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest text-white bg-red-600 hover:bg-red-700 rounded-xl"
+            >
+              {deleteLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Subject"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
