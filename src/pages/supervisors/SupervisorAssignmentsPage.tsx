@@ -103,7 +103,9 @@ const SupervisorAssignmentsPage = () => {
       const centersTableMap: Record<string, string> = {
         'SFNA': 'primarymastersummary', 'SSNA': 'primarymastersummary', 'PSLE': 'primarymastersummary',
         'FTNA': 'secondarymastersummaries', 'CSEE': 'secondarymastersummaries', 'ACSEE': 'secondarymastersummaries',
-        'DPEE': 'dpeemastersummary', 'DPNE': 'dpnemastersummary'
+        'DPEE': 'ualimumastersummary','DSEE': 'ualimumastersummary','DSPEE': 'ualimumastersummary',
+        'DPPE': 'ualimumastersummary','GATCE': 'ualimumastersummary','GATSCCE': 'ualimumastersummary',
+         'DPNE': 'dpnemastersummary'
       };
       
       const centersTable = centersTableMap[supervision.mastersummaries.Code?.toUpperCase() || ''];

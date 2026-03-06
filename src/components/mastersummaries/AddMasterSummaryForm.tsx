@@ -45,7 +45,7 @@ interface ExaminationOption {
 
 const addMasterSummaryFormSchema = z.object({
   examination: z.string().min(2, { message: "Examination name is required." }),
-  code: z.enum(["SFNA", "SSNA", "PSLE", "FTNA", "CSEE", "ACSEE"], {
+  code: z.enum(["SFNA", "SSNA", "PSLE", "FTNA", "CSEE", "ACSEE", "DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"], {
     required_error: "Examination code is required.",
   }),
   year: z.preprocess(
@@ -108,7 +108,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         setExaminationsLoading(false);
       };
       fetchExaminations();
-      
+
       form.reset({
         examination: "",
         code: undefined,
@@ -127,7 +127,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         (exam) => exam.examination === watchedExamination
       );
       if (selectedExam) {
-        const validCodes = ["SFNA", "SSNA", "PSLE", "FTNA", "CSEE", "ACSEE"];
+        const validCodes = ["SFNA", "SSNA", "PSLE", "FTNA", "CSEE", "ACSEE", "DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
         if (validCodes.includes(selectedExam.code)) {
           form.setValue('code', selectedExam.code as AddMasterSummaryFormValues['code'], { shouldValidate: true });
           form.clearErrors('code');
@@ -216,7 +216,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
       formData.append('code', values.code);
       formData.append('year', values.year.toString());
       formData.append('data', parsedFileData);
-      
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-mastersummary`, {
         method: 'POST',
         body: formData,

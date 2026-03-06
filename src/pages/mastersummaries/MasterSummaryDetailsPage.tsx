@@ -26,30 +26,37 @@ import abbreviateSchoolName from "@/utils/abbreviateSchoolName";
 
 type DetailSortKey = keyof MasterSummaryDetail | 'center_name' | 'center_number' | 'region' | 'district';
 
+const SECONDARY_CODES = ["FTNA", "CSEE", "ACSEE"];
+const UALIMU_CODES = ["DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
+const PRIMARY_CODES = ["SFNA", "SSNA", "PSLE"];
+
 const MasterSummaryDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
   const [masterSummary, setMasterSummary] = useState<MasterSummary | null>(null);
-  const [allDetails, setAllDetails] = useState<MasterSummaryDetail[]>([]); // ← all fetched rows
+  const [allDetails, setAllDetails] = useState<MasterSummaryDetail[]>([]);
   const [search, setSearch] = useState('');
 
   const [loading, setLoading] = useState(true);
-  const [totalItems, setTotalItems] = useState(0);
   const [subjectsMap, setSubjectsMap] = useState<Map<string, string>>(new Map());
 
-  const [isSecondaryDrawerOpen, setIsSecondaryDrawerOpen] = useState(false);
-  const [viewingSecondarySchool, setViewingSecondarySchool] = useState<SecondaryMasterSummary | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [viewingSchool, setViewingSchool] = useState<SecondaryMasterSummary | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [orderBy, setOrderBy] = useState<DetailSortKey>('center_name');
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
 
-  const isSecondary = masterSummary && ["FTNA", "CSEE", "ACSEE"].includes(masterSummary.Code);
+  const isSecondary = masterSummary && SECONDARY_CODES.includes(masterSummary.Code);
+  const isUalimu = masterSummary && UALIMU_CODES.includes(masterSummary.Code);
+  const isPrimary = masterSummary && PRIMARY_CODES.includes(masterSummary.Code);
 
-  // Fetch all data once (client-side filtering from now on)
+  // Shows the eye/drawer — true for both secondary and ualimu
+  const hasDetailDrawer = isSecondary || isUalimu;
+
   useEffect(() => {
-     document.title = "Summary Details | NEAS";
+    document.title = "Summary Details | NEAS";
     if (!id) return;
 
     const fetchData = async () => {
@@ -65,10 +72,19 @@ const MasterSummaryDetailsPage: React.FC = () => {
         if (summary) setMasterSummary(summary);
 
         const code = summary?.Code || "";
-        const table = ["FTNA", "CSEE", "ACSEE"].includes(code) ? 'secondarymastersummaries' : 'primarymastersummary';
 
-        // Load subjects for secondary
-        if (["FTNA", "CSEE", "ACSEE"].includes(code)) {
+        // Determine which detail table to query
+        let table: string;
+        if (SECONDARY_CODES.includes(code)) {
+          table = 'secondarymastersummaries';
+        } else if (UALIMU_CODES.includes(code)) {
+          table = 'ualimumastersummary';
+        } else {
+          table = 'primarymastersummary';
+        }
+
+        // Load subjects map for secondary or ualimu
+        if (SECONDARY_CODES.includes(code) || UALIMU_CODES.includes(code)) {
           const { data: subs } = await supabase
             .from('subjects')
             .select('subject_code, subject_name')
@@ -77,7 +93,7 @@ const MasterSummaryDetailsPage: React.FC = () => {
           setSubjectsMap(map);
         }
 
-        // Fetch ALL matching rows (no pagination here)
+        // Fetch all matching rows (client-side pagination)
         const { data, error } = await supabase
           .from(table)
           .select('*')
@@ -87,7 +103,6 @@ const MasterSummaryDetailsPage: React.FC = () => {
         if (error) throw error;
 
         setAllDetails(data || []);
-        setTotalItems(data?.length || 0);
       } catch (err: any) {
         showError(err.message || "Failed to load records");
       } finally {
@@ -102,7 +117,6 @@ const MasterSummaryDetailsPage: React.FC = () => {
   const filteredAndSortedData = useMemo(() => {
     let result = [...allDetails];
 
-    // Filter
     if (search.trim()) {
       const term = search.toLowerCase().trim();
       result = result.filter((item) =>
@@ -113,12 +127,10 @@ const MasterSummaryDetailsPage: React.FC = () => {
       );
     }
 
-    // Sort
     result.sort((a, b) => {
       let aVal = a[orderBy as keyof typeof a] ?? '';
       let bVal = b[orderBy as keyof typeof b] ?? '';
 
-      // Special handling for numeric center_number if needed
       if (orderBy === 'center_number') {
         aVal = String(aVal).padStart(10, '0');
         bVal = String(bVal).padStart(10, '0');
@@ -151,6 +163,9 @@ const MasterSummaryDetailsPage: React.FC = () => {
     setCurrentPage(1);
   };
 
+  // Column count for the empty-state colspan
+  const colSpan = isPrimary ? 8 : hasDetailDrawer ? 6 : 5;
+
   if (loading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
@@ -180,7 +195,6 @@ const MasterSummaryDetailsPage: React.FC = () => {
         </CardHeader>
 
         <CardContent>
-          {/* Search – exact match to JobAssignmentsPage */}
           <div className="mb-6">
             <div className="relative w-full max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
@@ -213,46 +227,30 @@ const MasterSummaryDetailsPage: React.FC = () => {
                   <TableHead className="w-[60px] text-[10px] font-black uppercase text-slate-500">SN</TableHead>
 
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">
-                    <button
-                      onClick={() => handleSort('center_number')}
-                      className="flex items-center gap-1 hover:opacity-80"
-                    >
-                      Center No.
-                      <ArrowUpDown className="h-3 w-3" />
+                    <button onClick={() => handleSort('center_number')} className="flex items-center gap-1 hover:opacity-80">
+                      Center No. <ArrowUpDown className="h-3 w-3" />
                     </button>
                   </TableHead>
 
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">
-                    <button
-                      onClick={() => handleSort('center_name')}
-                      className="flex items-center gap-1 hover:opacity-80"
-                    >
-                      Center Name
-                      <ArrowUpDown className="h-3 w-3" />
+                    <button onClick={() => handleSort('center_name')} className="flex items-center gap-1 hover:opacity-80">
+                      Center Name <ArrowUpDown className="h-3 w-3" />
                     </button>
                   </TableHead>
 
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">
-                    <button
-                      onClick={() => handleSort('region')}
-                      className="flex items-center gap-1 hover:opacity-80"
-                    >
-                      Region
-                      <ArrowUpDown className="h-3 w-3" />
+                    <button onClick={() => handleSort('region')} className="flex items-center gap-1 hover:opacity-80">
+                      Region <ArrowUpDown className="h-3 w-3" />
                     </button>
                   </TableHead>
 
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">
-                    <button
-                      onClick={() => handleSort('district')}
-                      className="flex items-center gap-1 hover:opacity-80"
-                    >
-                      District
-                      <ArrowUpDown className="h-3 w-3" />
+                    <button onClick={() => handleSort('district')} className="flex items-center gap-1 hover:opacity-80">
+                      District <ArrowUpDown className="h-3 w-3" />
                     </button>
                   </TableHead>
 
-                  {masterSummary && ["SFNA", "SSNA", "PSLE"].includes(masterSummary.Code) && (
+                  {isPrimary && (
                     <>
                       <TableHead className="text-[10px] font-black uppercase text-slate-500">Subjects</TableHead>
                       <TableHead className="text-[10px] font-black uppercase text-slate-500">Medium</TableHead>
@@ -261,14 +259,13 @@ const MasterSummaryDetailsPage: React.FC = () => {
                           onClick={() => handleSort('registered' as any)}
                           className="flex items-center gap-1 justify-end hover:opacity-80 w-full"
                         >
-                          Registered
-                          <ArrowUpDown className="h-3 w-3" />
+                          Registered <ArrowUpDown className="h-3 w-3" />
                         </button>
                       </TableHead>
                     </>
                   )}
 
-                  {isSecondary && (
+                  {hasDetailDrawer && (
                     <TableHead className="text-right text-[10px] font-black uppercase text-slate-500 px-6">
                       Actions
                     </TableHead>
@@ -280,7 +277,7 @@ const MasterSummaryDetailsPage: React.FC = () => {
                 {paginatedData.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={isSecondary ? 6 : 8}
+                      colSpan={colSpan}
                       className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest"
                     >
                       {search.trim()
@@ -309,7 +306,7 @@ const MasterSummaryDetailsPage: React.FC = () => {
                       <TableCell className="text-sm text-slate-600 font-medium">{detail.region}</TableCell>
                       <TableCell className="text-sm text-slate-600 font-medium">{detail.district}</TableCell>
 
-                      {masterSummary && ["SFNA", "SSNA", "PSLE"].includes(masterSummary.Code) && (
+                      {isPrimary && (
                         <>
                           <TableCell className="text-sm text-slate-500 max-w-[180px] truncate">
                             {detail.subjects || '—'}
@@ -325,15 +322,15 @@ const MasterSummaryDetailsPage: React.FC = () => {
                         </>
                       )}
 
-                      {isSecondary && (
+                      {hasDetailDrawer && (
                         <TableCell className="text-right px-6">
                           <Button
                             variant="outline"
                             size="sm"
                             className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-slate-900 transition-all"
                             onClick={() => {
-                              setViewingSecondarySchool(detail);
-                              setIsSecondaryDrawerOpen(true);
+                              setViewingSchool(detail);
+                              setIsDrawerOpen(true);
                             }}
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -359,11 +356,11 @@ const MasterSummaryDetailsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {isSecondary && viewingSecondarySchool && (
+      {hasDetailDrawer && viewingSchool && (
         <SecondarySchoolDetailsDrawer
-          open={isSecondaryDrawerOpen}
-          onOpenChange={setIsSecondaryDrawerOpen}
-          schoolDetails={viewingSecondarySchool}
+          open={isDrawerOpen}
+          onOpenChange={setIsDrawerOpen}
+          schoolDetails={viewingSchool}
           examinationCode={masterSummary?.Code || ""}
           subjectsMap={subjectsMap}
         />

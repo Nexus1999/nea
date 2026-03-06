@@ -29,6 +29,7 @@ import SpecialNeedsPage from "./pages/mastersummaries/SpecialNeedsPage";
 import SpecialNeedDetailsPage from "./pages/mastersummaries/SpecialNeedDetailsPage";
 import MasterSummaryOverviewPage from "./pages/mastersummaries/MasterSummaryOverviewPage";
 import Subjects from "./pages/settings/Subjects";
+import Examinations from "./pages/settings/Examinations";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +92,7 @@ const App = () => (
 
                {/* Settings Routes */}
               <Route path="settings/subjects" element={<Subjects />} />
+              <Route path="settings/examinations" element={<Examinations />} />
 
               {/* Add more routes as needed */}
               <Route path="*" element={<div className="p-4">Page under construction</div>} />
