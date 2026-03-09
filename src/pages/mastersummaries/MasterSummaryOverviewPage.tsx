@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -49,6 +49,7 @@ const MasterSummaryOverviewPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const SECONDARY_CODES = ["FTNA", "CSEE", "ACSEE"];
+  const UALIMU_CODES = ["DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
 
   // Guard for missing ID
   if (!id) {
@@ -78,7 +79,6 @@ const MasterSummaryOverviewPage = () => {
   const fetchMasterSummaryData = async () => {
     setLoading(true);
     try {
-      // Fetch main master summary
       const { data: msData, error: msError } = await supabase
         .from('mastersummaries')
         .select('*')
@@ -93,9 +93,16 @@ const MasterSummaryOverviewPage = () => {
 
       setMasterSummary(msData);
 
-      // Fetch latest details
-      const isSecondary = SECONDARY_CODES.includes(msData.Code);
-      const tableName = isSecondary ? 'secondarymastersummaries' : 'primarymastersummary';
+      let tableName: string;
+      const code = msData.Code;
+
+      if (SECONDARY_CODES.includes(code)) {
+        tableName = 'secondarymastersummaries';
+      } else if (UALIMU_CODES.includes(code)) {
+        tableName = 'ualimumastersummary';
+      } else {
+        tableName = 'primarymastersummary';
+      }
 
       const { data: detailsData, error: detailsError } = await supabase
         .from(tableName)
@@ -117,7 +124,9 @@ const MasterSummaryOverviewPage = () => {
   const totals = useMemo(() => {
     if (!masterSummary || !summaryDetails.length) return [];
 
-    const isSecondary = SECONDARY_CODES.includes(masterSummary.Code);
+    const code = masterSummary.Code;
+    const isSecondary = SECONDARY_CODES.includes(code);
+    const isUalimu = UALIMU_CODES.includes(code);
     const breakdown: Record<string, any> = {};
 
     summaryDetails.forEach(detail => {
@@ -125,17 +134,33 @@ const MasterSummaryOverviewPage = () => {
       const districtName = detail.district || "Unknown";
       let registered = 0;
       let streams = 0;
-      const isPrivate = detail.center_number?.startsWith('P');
 
-      if (isSecondary) {
-        const subjectCode = (masterSummary.Code === "ACSEE") ? "111" : "011";
+      if (isUalimu) {
+        const subjectValues = Object.entries(detail)
+          .filter(([key]) => 
+            !['id','mid','region','district','center_name','center_number','is_latest','version','created_at','special_need']
+              .includes(key) &&
+            typeof detail[key] === 'number'
+          )
+          .map(([, val]) => Number(val) || 0);
+
+        registered = subjectValues.length > 0 ? Math.max(...subjectValues) : 0;
+        streams = Math.ceil(registered / 40);
+      } 
+      else if (isSecondary) {
+        const subjectCode = (code === "ACSEE") ? "111" : "011";
+        const isPrivate = detail.center_number?.startsWith('P');
         registered = isPrivate 
-          ? Math.max(...Object.keys(detail)
-              .filter(k => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k))
-              .map(k => Number(detail[k]) || 0), 0)
+          ? Math.max(
+              ...Object.keys(detail)
+                .filter(k => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k))
+                .map(k => Number(detail[k]) || 0),
+              0
+            )
           : (Number(detail[subjectCode]) || 0);
         streams = Math.ceil(registered / 40);
-      } else {
+      } 
+      else {
         registered = detail.registered || 0;
         const base = Math.floor(registered / 25);
         streams = (registered % 25) >= 5 ? base + 1 : Math.max(base, registered > 0 ? 1 : 0);
@@ -169,6 +194,7 @@ const MasterSummaryOverviewPage = () => {
       district.totalStreams += streams;
 
       if (isSecondary) {
+        const isPrivate = detail.center_number?.startsWith('P');
         if (isPrivate) {
           district.pCount++;
           district.pRegistered += registered;
@@ -192,9 +218,9 @@ const MasterSummaryOverviewPage = () => {
       districts: totals.reduce((sum: number, r: any) => sum + Object.keys(r.districts).length, 0),
       centers: summaryDetails.length,
       sCenters: totals.reduce((sum: number, r: any) => 
-        sum + Object.values(r.districts).reduce((x: number, d: any) => x + d.sCount, 0), 0),
+        sum + Object.values(r.districts).reduce((x: number, d: any) => x + (d.sCount || 0), 0), 0),
       pCenters: totals.reduce((sum: number, r: any) => 
-        sum + Object.values(r.districts).reduce((x: number, d: any) => x + d.pCount, 0), 0),
+        sum + Object.values(r.districts).reduce((x: number, d: any) => x + (d.pCount || 0), 0), 0),
       registered: totals.reduce((sum: number, r: any) => sum + r.totalRegistered, 0),
       streams: totals.reduce((sum: number, r: any) => sum + r.totalStreams, 0),
     };
@@ -208,7 +234,12 @@ const MasterSummaryOverviewPage = () => {
     );
   }
 
-  const isSecondary = SECONDARY_CODES.includes(masterSummary?.Code);
+  if (!masterSummary) return null;
+
+  const code = masterSummary.Code;
+  const isSecondary = SECONDARY_CODES.includes(code);
+  const isUalimu = UALIMU_CODES.includes(code);
+  const showSplit = isSecondary; // only secondary shows S/P split
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-8 space-y-10 max-w-[1700px] mx-auto pb-32">
@@ -216,7 +247,7 @@ const MasterSummaryOverviewPage = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
         <div className="space-y-1">
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Master Summary Overview for {masterSummary?.Code}-{masterSummary?.Year}
+            Master Summary Overview for {code}-{masterSummary?.Year}
           </h1>
         </div>
         
@@ -235,63 +266,120 @@ const MasterSummaryOverviewPage = () => {
 
       {/* TOP KPI DASHBOARD */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-        {/* Regions & Districts */}
-        <div className="lg:col-span-3 grid grid-rows-2 gap-4">
-          <Card className="border-none shadow-sm bg-indigo-600 text-white rounded-[1.5rem] overflow-hidden relative group">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <p className="text-indigo-100 text-[10px] font-black uppercase tracking-widest mb-1">Total Regions</p>
-                <h3 className="text-3xl font-black"><CountUp value={stats.regions} /></h3>
-              </div>
-              <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md group-hover:scale-110 transition-transform">
-                <Landmark size={24} />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-slate-900 text-white rounded-[1.5rem] overflow-hidden relative group">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Districts</p>
-                <h3 className="text-3xl font-black"><CountUp value={stats.districts} /></h3>
-              </div>
-              <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md group-hover:scale-110 transition-transform">
-                <MapPinned size={24} />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* CENTERS CARD */}
-        <Card className="lg:col-span-5 border-none bg-white shadow-xl shadow-blue-900/5 rounded-[2rem] overflow-hidden ring-1 ring-slate-200/50">
+        {/* Regions & Districts — secondary only */}
+        {showSplit && (
+          <div className="lg:col-span-3 grid grid-rows-2 gap-4">
+            <Card className="border-none shadow-sm bg-indigo-600 text-white rounded-[1.5rem] overflow-hidden relative group">
+              <CardContent className="p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-indigo-100 text-[10px] font-black uppercase tracking-widest mb-1">Total Regions</p>
+                  <h3 className="text-3xl font-black"><CountUp value={stats.regions} /></h3>
+                </div>
+                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md group-hover:scale-110 transition-transform">
+                  <Landmark size={24} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-none shadow-sm bg-slate-900 text-white rounded-[1.5rem] overflow-hidden relative group">
+              <CardContent className="p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Districts</p>
+                  <h3 className="text-3xl font-black"><CountUp value={stats.districts} /></h3>
+                </div>
+                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md group-hover:scale-110 transition-transform">
+                  <MapPinned size={24} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* CENTERS CARD — col-span-5 for secondary, col-span-8 for primary/ualimu */}
+        <Card className={`${showSplit ? 'lg:col-span-5' : 'lg:col-span-8'} border-none bg-white shadow-xl shadow-blue-900/5 rounded-[2rem] overflow-hidden ring-1 ring-slate-200/50`}>
           <CardContent className="p-0 flex flex-col sm:flex-row h-full">
-            <div className={`${isSecondary ? 'sm:w-1/2' : 'w-full'} p-8 flex flex-col justify-between bg-gradient-to-br from-blue-600 to-blue-700 text-white relative overflow-hidden transition-all duration-500`}>
-              <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12"><School size={120} /></div>
-              <div>
-                <Badge className="bg-white/20 hover:bg-white/20 border-none text-white mb-4">Examination Centers</Badge>
-                <h2 className="text-6xl font-black tracking-tighter"><CountUp value={stats.centers} /></h2>
-              </div>
-              <div className="text-[10px] font-medium text-blue-200"></div>
-            </div>
-
-            {isSecondary && (
-              <div className="sm:w-1/2 p-8 flex flex-col justify-center gap-6 bg-white">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
-                    <GraduationCap size={24} />
-                  </div>
+            {showSplit ? (
+              // ── Secondary: original split layout ──
+              <>
+                <div className="p-8 flex flex-col justify-between bg-gradient-to-br from-blue-600 to-blue-700 text-white relative overflow-hidden transition-all duration-500 w-full sm:w-1/2">
+                  <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12"><School size={120} /></div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">School (S)</p>
-                    <p className="text-3xl font-black text-slate-900"><CountUp value={stats.sCenters}/></p>
+                    <Badge className="bg-white/20 hover:bg-white/20 border-none text-white mb-4">Examination Centers</Badge>
+                    <h2 className="text-6xl font-black tracking-tighter"><CountUp value={stats.centers} /></h2>
                   </div>
                 </div>
-                <div className="h-px bg-slate-100 w-full" />
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600">
-                    <Building2 size={24} />
+                <div className="sm:w-1/2 p-8 flex flex-col justify-center gap-6 bg-white">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
+                      <GraduationCap size={24} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">School (S)</p>
+                      <p className="text-3xl font-black text-slate-900"><CountUp value={stats.sCenters}/></p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Private (P)</p>
-                    <p className="text-3xl font-black text-slate-900"><CountUp value={stats.pCenters}/></p>
+                  <div className="h-px bg-slate-100 w-full" />
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600">
+                      <Building2 size={24} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Private (P)</p>
+                      <p className="text-3xl font-black text-slate-900"><CountUp value={stats.pCenters}/></p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // ── Primary / Ualimu: wider immersive card with regions & districts inside ──
+              <div className="w-full relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-600 text-white">
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                  <div className="absolute -top-10 -right-10 h-64 w-64 rounded-full bg-white/5" />
+                  <div className="absolute bottom-0 -left-10 h-72 w-72 rounded-full bg-white/5" />
+                  <div className="absolute top-1/2 right-1/4 -translate-y-1/2 h-80 w-80 rounded-full bg-white/[0.03]" />
+                  <School className="absolute right-12 bottom-6 opacity-[0.07]" size={180} />
+                </div>
+
+                <div className="relative z-10 p-10 flex flex-col sm:flex-row items-center justify-between gap-10 h-full min-h-[160px]">
+                  {/* Centers: big number + label */}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-1.5 w-8 rounded-full bg-blue-300/70" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-200">
+                        Examination Centers
+                      </span>
+                    </div>
+                    <h2 className="text-8xl font-black tracking-tighter leading-none">
+                      <CountUp value={stats.centers} />
+                    </h2>
+                    <p className="text-blue-200/70 text-sm font-semibold mt-2">
+                      centers registered nationwide
+                    </p>
+                  </div>
+
+                  {/* Vertical divider */}
+                  <div className="hidden sm:block h-24 w-px bg-white/20 self-center shrink-0" />
+
+                  {/* Regions & Districts */}
+                  <div className="flex sm:flex-col gap-6 sm:gap-5 shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="h-11 w-11 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
+                        <Landmark size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-blue-200 mb-0.5">Total Regions</p>
+                        <p className="text-2xl font-black leading-none"><CountUp value={stats.regions} /></p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="h-11 w-11 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
+                        <MapPinned size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-blue-200 mb-0.5">Total Districts</p>
+                        <p className="text-2xl font-black leading-none"><CountUp value={stats.districts} /></p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -379,7 +467,7 @@ const MasterSummaryOverviewPage = () => {
                         </div>
                         
                         <div className="space-y-6">
-                          {isSecondary ? (
+                          {showSplit ? (
                             <div className="grid grid-cols-2 gap-4">
                               <MiniPill label="School (S)" value={dStats.sCount} total={dStats.sRegistered} color="blue" />
                               <MiniPill label="Private (P)" value={dStats.pCount} total={dStats.pRegistered} color="orange" />

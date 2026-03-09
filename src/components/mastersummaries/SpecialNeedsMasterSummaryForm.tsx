@@ -162,7 +162,7 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Upload Special Needs Master Summary</DialogTitle>
           <DialogDescription>
@@ -171,6 +171,13 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+
+            {/* Hidden fields — stored in form state, not rendered */}
+            <input type="hidden" {...form.register("mid", { valueAsNumber: true })} />
+            <input type="hidden" {...form.register("examination")} />
+            <input type="hidden" {...form.register("code")} />
+            <input type="hidden" {...form.register("year", { valueAsNumber: true })} />
+
             {missingHeadersError && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-md text-sm">
                 <p className="font-semibold mb-2 flex items-center"><TriangleAlert className="h-4 w-4 mr-2" /> {missingHeadersError}</p>
@@ -190,92 +197,52 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
                 )}
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="examination"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Examination Name</FormLabel>
+
+            <FormField
+              control={form.control}
+              name="special_need"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Special Need Type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
                     <FormControl>
-                      <Input {...field} readOnly className="bg-gray-100 cursor-not-allowed" />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a special need type" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Examination Code</FormLabel>
-                    <FormControl>
-                      <Input {...field} readOnly className="bg-gray-100 cursor-not-allowed" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="year"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Year</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} readOnly className="bg-gray-100 cursor-not-allowed" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="special_need"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Special Need Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a special need type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="HI">HI - Hearing Impairment</SelectItem>
-                        <SelectItem value="BR">BR - Braille</SelectItem>
-                        <SelectItem value="LV">LV - Low Vision</SelectItem>
-                        <SelectItem value="PI">PI - Physical Impairment</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="file"
-                render={({ field: { value, onChange, ...fieldProps } }) => (
-                  <FormItem>
-                    <FormLabel>Upload Data File (.xlsx, .csv)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...fieldProps}
-                        type="file"
-                        accept=".xlsx,.csv"
-                        onChange={(event) => {
-                          onChange(event.target.files);
-                        }}
-                        disabled={loading}
-                        className="file:text-primary file:font-semibold file:hover:bg-gray-100"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                    <SelectContent>
+                      <SelectItem value="HI">HI - Hearing Impairment</SelectItem>
+                      <SelectItem value="BR">BR - Braille</SelectItem>
+                      <SelectItem value="LV">LV - Low Vision</SelectItem>
+                      <SelectItem value="PI">PI - Physical Impairment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="file"
+              render={({ field: { value, onChange, ...fieldProps } }) => (
+                <FormItem>
+                  <FormLabel>Upload Data File (.xlsx, .csv)</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...fieldProps}
+                      type="file"
+                      accept=".xlsx,.csv"
+                      onChange={(event) => onChange(event.target.files)}
+                      disabled={loading}
+                      className="file:text-primary file:font-semibold file:hover:bg-gray-100"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <DialogFooter>
               <Button type="submit" disabled={loading || !masterSummaryData}>
                 {loading ? (

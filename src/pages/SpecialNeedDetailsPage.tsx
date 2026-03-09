@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, Eye, Search, Accessibility } from "lucide-react";
@@ -18,10 +18,30 @@ import PaginationControls from "@/components/ui/pagination-controls";
 import SecondarySchoolDetailsDrawer from "@/components/mastersummaries/SecondarySchoolDetailsDrawer";
 
 // Types
-import { MasterSummary, PrimaryMasterSummarySpecialNeeds, SecondaryMasterSummarySpecialNeeds, SpecialNeedType } from "@/types/mastersummaries";
+import { MasterSummary, SpecialNeedType } from "@/types/mastersummaries";
 
-type SpecialNeedsDetail = PrimaryMasterSummarySpecialNeeds | SecondaryMasterSummarySpecialNeeds;
-type DetailSortKey = 'center_name' | 'center_number' | 'region' | 'district';
+// We use the same type for secondary & ualimu since they have the same wide-column structure
+type WideSpecialNeedsDetail = {
+  id: number;
+  mid: number;
+  special_need: SpecialNeedType;
+  region: string | null;
+  district: string | null;
+  center_number: string;
+  center_name: string;
+  is_latest: boolean;
+  version: number;
+  created_at: string;
+  [subjectCode: string]: number | string | boolean | null; // dynamic subject columns
+};
+
+const specialNeedFullNames: Record<string, string> = {
+  HI: 'Hearing Impairment',
+  BR: 'Braille',
+  LV: 'Low Vision',
+  PI: 'Physical Impairment',
+  // add more as needed
+};
 
 function abbreviateSchoolName(name: string): string {
   if (!name) return "";
@@ -32,53 +52,45 @@ function abbreviateSchoolName(name: string): string {
     .trim();
 }
 
-const specialNeedFullNames: Record<string, string> = {
-  HI: 'Hearing Impairment',
-  BR: 'Braille',
-  LV: 'Low Vision',
-  PI: 'Physical Impairment',
-};
-
 const SpecialNeedDetailsPage: React.FC = () => {
   const { id, specialNeedType } = useParams<{ id: string; specialNeedType: SpecialNeedType }>();
   const navigate = useNavigate();
 
   const [masterSummary, setMasterSummary] = useState<MasterSummary | null>(null);
-  const [details, setDetails] = useState<SpecialNeedsDetail[]>([]);
+  const [details, setDetails] = useState<WideSpecialNeedsDetail[]>([]);
   const [subjectsMap, setSubjectsMap] = useState<Map<string, string>>(new Map());
 
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
 
-  const [isSecondaryDrawerOpen, setIsSecondaryDrawerOpen] = useState(false);
-  const [viewingSecondarySchool, setViewingSecondarySchool] = useState<any>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [viewingSchool, setViewingSchool] = useState<WideSpecialNeedsDetail | null>(null);
 
-  const [inputValue, setInputValue] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [orderBy, setOrderBy] = useState<DetailSortKey>('center_name');
-  const [order, setOrder] = useState<'asc' | 'desc'>('asc');
+  const [orderBy, setOrderBy] = useState<'center_name' | 'center_number' | 'region' | 'district'>('center_name');
+  const [orderDirection, setOrderDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Debounce search
+  // Debounce search input
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setSearchQuery(inputValue.trim());
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
       setCurrentPage(1);
-    }, 400);
-    return () => clearTimeout(handler);
-  }, [inputValue]);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
-  const fetchData = useCallback(async (isFirstLoad = false) => {
-    if (isFirstLoad) setIsInitialLoading(true);
+  const fetchData = useCallback(async (initial = false) => {
+    if (initial) setIsInitialLoading(true);
     else setIsUpdating(true);
 
     try {
-      let currentSummary = masterSummary;
-      
-      // Fetch master summary if not already loaded
-      if (!currentSummary) {
+      // Load master summary if missing
+      let summary = masterSummary;
+      if (!summary) {
         const { data, error } = await supabase
           .from('mastersummaries')
           .select('*')
@@ -86,18 +98,26 @@ const SpecialNeedDetailsPage: React.FC = () => {
           .single();
 
         if (error || !data) throw new Error(error?.message || "Master summary not found");
-        currentSummary = data as MasterSummary;
-        setMasterSummary(currentSummary);
+        summary = data as MasterSummary;
+        setMasterSummary(summary);
       }
 
-      const code = currentSummary?.Code || "";
-      const isPrimary = ["SFNA", "SSNA", "PSLE"].includes(code);
-      const tableName = isPrimary
-        ? 'primarymastersummary_specialneeds'
-        : 'secondarymastersummaries_specialneeds';
+      const code = summary.Code;
 
-      // Load subjects map for secondary (only once)
-      if (!isPrimary && subjectsMap.size === 0) {
+      // Determine table name
+      let tableName: string;
+      if (["SFNA", "SSNA", "PSLE"].includes(code)) {
+        tableName = 'primarymastersummary_specialneeds';
+      } else if (["FTNA", "CSEE", "ACSEE", "DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"].includes(code)) {
+        tableName = ["DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"].includes(code)
+          ? 'ualimumastersummary_specialneeds'
+          : 'secondarymastersummaries_specialneeds';
+      } else {
+        throw new Error(`Unsupported examination code: ${code}`);
+      }
+
+      // Load subjects map (for secondary & ualimu) — only once
+      if (!["SFNA", "SSNA", "PSLE"].includes(code) && subjectsMap.size === 0) {
         const { data: subjects } = await supabase
           .from('subjects')
           .select('subject_code, subject_name')
@@ -108,7 +128,7 @@ const SpecialNeedDetailsPage: React.FC = () => {
         setSubjectsMap(map);
       }
 
-      // Main data query with pagination + sorting + search
+      // Pagination & sorting
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
@@ -117,7 +137,7 @@ const SpecialNeedDetailsPage: React.FC = () => {
         .select("*", { count: "exact" })
         .eq('mid', id)
         .eq('special_need', specialNeedType)
-        .order(orderBy, { ascending: order === 'asc' });
+        .order(orderBy, { ascending: orderDirection === 'asc' });
 
       if (searchQuery) {
         query = query.or(
@@ -131,25 +151,19 @@ const SpecialNeedDetailsPage: React.FC = () => {
 
       if (error) throw error;
 
-      setDetails((data as SpecialNeedsDetail[]) || []);
+      setDetails((data as WideSpecialNeedsDetail[]) || []);
       setTotalItems(count ?? 0);
     } catch (err: any) {
-      showError(err.message || "Failed to load special needs details");
+      showError(err.message || "Failed to load details");
       console.error(err);
     } finally {
       setIsInitialLoading(false);
       setIsUpdating(false);
     }
   }, [
-    id,
-    specialNeedType,
-    currentPage,
-    itemsPerPage,
-    orderBy,
-    order,
-    searchQuery,
-    masterSummary,
-    subjectsMap.size
+    id, specialNeedType, currentPage, itemsPerPage,
+    orderBy, orderDirection, searchQuery,
+    masterSummary, subjectsMap.size
   ]);
 
   useEffect(() => {
@@ -158,17 +172,21 @@ const SpecialNeedDetailsPage: React.FC = () => {
 
   useEffect(() => {
     if (!isInitialLoading) fetchData(false);
-  }, [currentPage, orderBy, order, searchQuery]);
+  }, [currentPage, orderBy, orderDirection, searchQuery]);
 
-  const handleSort = (column: DetailSortKey) => {
-    const isAsc = orderBy === column && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(column);
+  const handleSort = (column: 'center_name' | 'center_number' | 'region' | 'district') => {
+    if (orderBy === column) {
+      setOrderDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setOrderBy(column);
+      setOrderDirection('asc');
+    }
     setCurrentPage(1);
   };
 
-  const isPrimary = masterSummary && ["SFNA", "SSNA", "PSLE"].includes(masterSummary.Code);
-  const isSecondary = masterSummary && ["FTNA", "CSEE", "ACSEE"].includes(masterSummary.Code);
+  const code = masterSummary?.Code || "";
+  const isPrimary = ["SFNA", "SSNA", "PSLE"].includes(code);
+  const isWideFormat = ["FTNA", "CSEE", "ACSEE", "DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"].includes(code);
 
   if (isInitialLoading) {
     return (
@@ -178,13 +196,21 @@ const SpecialNeedDetailsPage: React.FC = () => {
     );
   }
 
+  if (!masterSummary) {
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-lg text-muted-foreground">Master summary not found</p>
+      </Card>
+    );
+  }
+
   return (
     <div className="p-2 md:p-4 space-y-6 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">
           {specialNeedFullNames[specialNeedType] || specialNeedType} Details
           <span className="ml-3 text-lg font-normal text-muted-foreground">
-            {masterSummary?.Code} — {masterSummary?.Year}
+            {masterSummary.Code} — {masterSummary.Year}
           </span>
         </h1>
       </div>
@@ -201,8 +227,8 @@ const SpecialNeedDetailsPage: React.FC = () => {
               <div className="relative">
                 <Input
                   placeholder="Search center, region, district..."
-                  value={inputValue}
-                  onChange={e => setInputValue(e.target.value)}
+                  value={searchInput}
+                  onChange={e => setSearchInput(e.target.value)}
                   className="w-64 pl-9 h-9"
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -257,7 +283,7 @@ const SpecialNeedDetailsPage: React.FC = () => {
                     </>
                   )}
 
-                  {isSecondary && <TableHead className="w-20 text-right">View</TableHead>}
+                  {isWideFormat && <TableHead className="w-20 text-right">View</TableHead>}
                 </TableRow>
               </TableHeader>
 
@@ -270,7 +296,7 @@ const SpecialNeedDetailsPage: React.FC = () => {
                   </TableRow>
                 ) : (
                   details.map((detail, idx) => (
-                    <TableRow key={detail.id || idx} className="hover:bg-gray-50/70 transition-colors">
+                    <TableRow key={detail.id} className="hover:bg-gray-50/70 transition-colors">
                       <TableCell className="text-muted-foreground font-medium">
                         {((currentPage - 1) * itemsPerPage) + idx + 1}
                       </TableCell>
@@ -280,8 +306,8 @@ const SpecialNeedDetailsPage: React.FC = () => {
                       <TableCell className="font-medium">
                         {abbreviateSchoolName(detail.center_name)}
                       </TableCell>
-                      <TableCell className="text-sm">{detail.region}</TableCell>
-                      <TableCell className="text-sm">{detail.district}</TableCell>
+                      <TableCell className="text-sm">{detail.region || '—'}</TableCell>
+                      <TableCell className="text-sm">{detail.district || '—'}</TableCell>
 
                       {isPrimary && (
                         <>
@@ -299,15 +325,15 @@ const SpecialNeedDetailsPage: React.FC = () => {
                         </>
                       )}
 
-                      {isSecondary && (
+                      {isWideFormat && (
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             onClick={() => {
-                              setViewingSecondarySchool(detail);
-                              setIsSecondaryDrawerOpen(true);
+                              setViewingSchool(detail);
+                              setIsDrawerOpen(true);
                             }}
                           >
                             <Eye className="h-4 w-4" />
@@ -326,7 +352,7 @@ const SpecialNeedDetailsPage: React.FC = () => {
               <div>
                 Showing <span className="font-medium text-foreground">
                   {Math.min(totalItems, (currentPage - 1) * itemsPerPage + 1)}
-                </span>–<span className="font-medium text-foreground">
+                </span> – <span className="font-medium text-foreground">
                   {Math.min(totalItems, currentPage * itemsPerPage)}
                 </span> of <span className="font-medium text-foreground">{totalItems}</span>
               </div>
@@ -341,12 +367,12 @@ const SpecialNeedDetailsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {isSecondary && viewingSecondarySchool && (
+      {isWideFormat && viewingSchool && (
         <SecondarySchoolDetailsDrawer
-          open={isSecondaryDrawerOpen}
-          onOpenChange={setIsSecondaryDrawerOpen}
-          schoolDetails={viewingSecondarySchool}
-          examinationCode={masterSummary?.Code || ""}
+          open={isDrawerOpen}
+          onOpenChange={setIsDrawerOpen}
+          schoolDetails={viewingSchool}
+          examinationCode={masterSummary.Code}
           subjectsMap={subjectsMap}
         />
       )}

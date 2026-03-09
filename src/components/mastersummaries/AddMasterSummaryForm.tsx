@@ -108,7 +108,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         setExaminationsLoading(false);
       };
       fetchExaminations();
-
+      
       form.reset({
         examination: "",
         code: undefined,
@@ -216,7 +216,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
       formData.append('code', values.code);
       formData.append('year', values.year.toString());
       formData.append('data', parsedFileData);
-
+      
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-mastersummary`, {
         method: 'POST',
         body: formData,

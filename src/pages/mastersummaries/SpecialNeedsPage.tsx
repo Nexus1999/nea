@@ -26,7 +26,6 @@ const SpecialNeedsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  // Guard for missing ID
   if (!id) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-8">
@@ -71,8 +70,10 @@ const SpecialNeedsPage: React.FC = () => {
         tableName = 'primarymastersummary_specialneeds';
       } else if (["FTNA", "CSEE", "ACSEE"].includes(code)) {
         tableName = 'secondarymastersummaries_specialneeds';
+      } else if (["DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"].includes(code)) {
+        tableName = 'ualimumastersummary_specialneeds';
       } else {
-        throw new Error(`Unsupported examination code: ${code}`);
+        throw new Error(`Unsupported examination code for special needs: ${code}`);
       }
 
       // 2. Fetch special needs data
@@ -85,7 +86,7 @@ const SpecialNeedsPage: React.FC = () => {
         throw new Error(detailsError.message || "Failed to fetch special needs records");
       }
 
-      // 3. Aggregate: count unique schools per special_need
+      // 3. Aggregate: count unique schools (centers) per special_need
       const aggregationMap = new Map<SpecialNeedType, Set<string>>();
 
       rawDetails.forEach((detail: { special_need: SpecialNeedType; center_name: string }) => {
@@ -146,9 +147,18 @@ const SpecialNeedsPage: React.FC = () => {
     try {
       if (!masterSummary) throw new Error("Master summary not loaded");
 
-      const tableName = ["SFNA", "SSNA", "PSLE"].includes(masterSummary.Code)
-        ? 'primarymastersummary_specialneeds'
-        : 'secondarymastersummaries_specialneeds';
+      let tableName: string;
+      const code = masterSummary.Code;
+
+      if (["SFNA", "SSNA", "PSLE"].includes(code)) {
+        tableName = 'primarymastersummary_specialneeds';
+      } else if (["FTNA", "CSEE", "ACSEE"].includes(code)) {
+        tableName = 'secondarymastersummaries_specialneeds';
+      } else if (["DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"].includes(code)) {
+        tableName = 'ualimumastersummary_specialneeds';
+      } else {
+        throw new Error(`Unsupported code for deletion: ${code}`);
+      }
 
       const { error } = await supabase
         .from(tableName)
@@ -199,7 +209,7 @@ const SpecialNeedsPage: React.FC = () => {
   return (
     <div className="">
       <div className="flex items-center justify-between mb-6">
-        
+        {/* You can add a back button or title here if needed */}
       </div>
 
       <Card className="shadow-lg rounded-xl overflow-hidden bg-white">
