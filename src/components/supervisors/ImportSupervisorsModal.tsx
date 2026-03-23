@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 const REQUIRED_HEADERS = ['region', 'district', 'first_name', 'last_name', 'center_no'];
 const OPTIONAL_HEADERS = ['middle_name', 'nin', 'cheque_no', 'tsc_no', 'index_no', 'csee_year', 'phone', 'notes'];
 const ALL_HEADERS = [...REQUIRED_HEADERS, ...OPTIONAL_HEADERS];
-const CHUNK_SIZE = 100;
+const CHUNK_SIZE = 50; // Smaller chunks for better error isolation
 
 // --- Schema Limits (Matching your DB definition) ---
 const LIMITS = {
@@ -51,18 +51,25 @@ const sanitizePhone = (phoneInput: any) => {
   if (phone.length === 9 && (phone.startsWith('7') || phone.startsWith('6'))) {
     return `0${phone}`;
   }
-  return phone;
+  return phone.slice(0, LIMITS.phone);
+};
+
+const sanitizeYear = (yearInput: any) => {
+  if (!yearInput) return null;
+  // Excel often imports 2023 as "2023.0"
+  let year = String(yearInput).trim().split('.')[0];
+  return year.slice(0, LIMITS.csee_year);
 };
 
 const sanitizeCenterNo = (centerInput: any) => {
   if (!centerInput) return null;
   let center = String(centerInput).trim().toUpperCase().replace(/O/g, '0').replace(/\./g, '');
   const match = center.match(/^([SP])(\d+)$/i);
-  if (!match) return center;
+  if (!match) return center.slice(0, LIMITS.center_no);
   
   const prefix = match[1];
   const digits = match[2].padStart(4, '0');
-  return `${prefix}${digits}`;
+  return `${prefix}${digits}`.slice(0, LIMITS.center_no);
 };
 
 const sanitizeIndexNo = (indexInput: any) => {
@@ -75,7 +82,7 @@ const sanitizeIndexNo = (indexInput: any) => {
     .replace(/[\s\/]+/g, '-');
 
   const match = index.match(/^([SP])(.*)$/i);
-  if (!match) return index;
+  if (!match) return index.slice(0, LIMITS.index_no);
 
   const prefix = match[1];
   let parts = match[2].split('-').filter(p => p);
@@ -83,7 +90,7 @@ const sanitizeIndexNo = (indexInput: any) => {
   if (parts[0]) parts[0] = parts[0].length === 3 ? parts[0].padStart(4, '0') : parts[0];
   if (parts[1]) parts[1] = parts[1].length === 3 ? parts[1].padStart(4, '0') : parts[1];
   
-  return parts[1] ? `${prefix}${parts[0]}-${parts[1]}` : `${prefix}${parts[0]}`;
+  return (parts[1] ? `${prefix}${parts[0]}-${parts[1]}` : `${prefix}${parts[0]}`).slice(0, LIMITS.index_no);
 };
 
 const validateLength = (val: any, max: number) => {
@@ -244,8 +251,8 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
 
         const toInsert: any[] = [];
         const localErrors: any[] = [];
-        const year_imported = new Date().getFullYear().toString();
-        const added_by = localStorage.getItem('username') || 'system';
+        const year_imported = new Date().getFullYear().toString().slice(0, LIMITS.year_imported);
+        const added_by = (localStorage.getItem('username') || 'system').slice(0, LIMITS.added_by);
 
         const processedRows = [];
         for (let i = 0; i < sanitizedData.length; i++) {
@@ -291,22 +298,20 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
 
           const sanitizedPhone = sanitizePhone(rowData.phone);
           const sanitizedIndex = sanitizeIndexNo(rowData.index_no);
-          const cseeYear = rowData.csee_year ? String(rowData.csee_year) : null;
+          const cseeYear = sanitizeYear(rowData.csee_year);
 
           // STRICT SCHEMA LENGTH VALIDATION
           const lengthErrors = [];
-          if (!validateLength(rowData.first_name, LIMITS.first_name)) lengthErrors.push(`First name too long (max ${LIMITS.first_name})`);
-          if (!validateLength(rowData.middle_name, LIMITS.middle_name)) lengthErrors.push(`Middle name too long (max ${LIMITS.middle_name})`);
-          if (!validateLength(rowData.last_name, LIMITS.last_name)) lengthErrors.push(`Last name too long (max ${LIMITS.last_name})`);
-          if (!validateLength(rowData.nin, LIMITS.nin)) lengthErrors.push(`NIN too long (max ${LIMITS.nin})`);
-          if (!validateLength(sanitizedPhone, LIMITS.phone)) lengthErrors.push(`Phone too long (max ${LIMITS.phone})`);
-          if (!validateLength(rowData.tsc_no, LIMITS.tsc_no)) lengthErrors.push(`TSC No too long (max ${LIMITS.tsc_no})`);
-          if (!validateLength(rowData.cheque_no, LIMITS.cheque_no)) lengthErrors.push(`Cheque No too long (max ${LIMITS.cheque_no})`);
-          if (!validateLength(sanitizedCenter, LIMITS.center_no)) lengthErrors.push(`Center No too long (max ${LIMITS.center_no})`);
-          if (!validateLength(sanitizedIndex, LIMITS.index_no)) lengthErrors.push(`Index No too long (max ${LIMITS.index_no})`);
-          if (!validateLength(cseeYear, LIMITS.csee_year)) lengthErrors.push(`CSEE Year too long (max ${LIMITS.csee_year})`);
-          if (!validateLength(year_imported, LIMITS.year_imported)) lengthErrors.push(`Year Imported too long (max ${LIMITS.year_imported})`);
-          if (!validateLength(added_by, LIMITS.added_by)) lengthErrors.push(`Added By too long (max ${LIMITS.added_by})`);
+          if (!validateLength(rowData.first_name, LIMITS.first_name)) lengthErrors.push(`First name too long`);
+          if (!validateLength(rowData.middle_name, LIMITS.middle_name)) lengthErrors.push(`Middle name too long`);
+          if (!validateLength(rowData.last_name, LIMITS.last_name)) lengthErrors.push(`Last name too long`);
+          if (!validateLength(rowData.nin, LIMITS.nin)) lengthErrors.push(`NIN too long`);
+          if (!validateLength(sanitizedPhone, LIMITS.phone)) lengthErrors.push(`Phone too long`);
+          if (!validateLength(rowData.tsc_no, LIMITS.tsc_no)) lengthErrors.push(`TSC No too long`);
+          if (!validateLength(rowData.cheque_no, LIMITS.cheque_no)) lengthErrors.push(`Cheque No too long`);
+          if (!validateLength(sanitizedCenter, LIMITS.center_no)) lengthErrors.push(`Center No too long`);
+          if (!validateLength(sanitizedIndex, LIMITS.index_no)) lengthErrors.push(`Index No too long`);
+          if (!validateLength(cseeYear, LIMITS.csee_year)) lengthErrors.push(`CSEE Year too long`);
 
           if (lengthErrors.length > 0) {
             localErrors.push({ ...rowData, error_message: lengthErrors.join(", ") });
@@ -334,17 +339,17 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
           }
 
           toInsert.push({
-            first_name: row.first_name,
-            middle_name: row.middle_name || null,
-            last_name: row.last_name,
-            nin: row.nin || null,
+            first_name: String(row.first_name).trim().slice(0, LIMITS.first_name),
+            middle_name: row.middle_name ? String(row.middle_name).trim().slice(0, LIMITS.middle_name) : null,
+            last_name: String(row.last_name).trim().slice(0, LIMITS.last_name),
+            nin: row.nin ? String(row.nin).trim().slice(0, LIMITS.nin) : null,
             phone: sanitizedPhone,
-            tsc_no: row.tsc_no || null,
-            cheque_no: row.cheque_no || null,
+            tsc_no: row.tsc_no ? String(row.tsc_no).trim().slice(0, LIMITS.tsc_no) : null,
+            cheque_no: row.cheque_no ? String(row.cheque_no).trim().slice(0, LIMITS.cheque_no) : null,
             region: centerInfo.region,
             district: centerInfo.district,
             center_no: sanitizedCenter,
-            center_type: type === 'public' ? 'government' : type, // Map to enum if needed
+            center_type: 'government', // Since we only allow public
             index_no: sanitizedIndex,
             csee_year: cseeYear,
             year_imported,
@@ -357,10 +362,20 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
         if (toInsert.length > 0) {
           for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
             const chunk = toInsert.slice(i, i + CHUNK_SIZE);
-            const { error } = await supabase.from('supervisors').insert(chunk);
-            
-            if (error) {
-              console.error("Chunk insert failed, falling back to individual inserts:", error);
+            try {
+              const { error } = await supabase.from('supervisors').insert(chunk);
+              
+              if (error) {
+                console.error("Chunk insert failed, falling back to individual inserts:", error);
+                for (const item of chunk) {
+                  const { error: singleError } = await supabase.from('supervisors').insert(item);
+                  if (singleError) {
+                    localErrors.push({ ...item, error_message: singleError.message });
+                  }
+                }
+              }
+            } catch (chunkErr: any) {
+              // Catch unexpected exceptions during insert
               for (const item of chunk) {
                 const { error: singleError } = await supabase.from('supervisors').insert(item);
                 if (singleError) {
@@ -383,7 +398,7 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
         }
         onSuccess();
       } catch (err: any) {
-        toast.error(err.message);
+        toast.error(`Import failed: ${err.message}`);
       } finally {
         setLoading(false);
       }
