@@ -29,6 +29,9 @@ function getCentersTable(code: string) {
     "GATCE": "ualimumastersummary",
     "DSEE": "ualimumastersummary",
     "GATSCCE": "ualimumastersummary",
+    "DSPEE": "ualimumastersummary",
+    "DPPEE": "ualimumastersummary",
+    "UALIMU": "ualimumastersummary" // Added as fallback
   };
   return map[code.toUpperCase()] || null;
 }
@@ -66,14 +69,6 @@ serve(async (req) => {
 
     if (!supervision_id) throw new Error("supervision_id is required");
 
-    console.log(`🚀 Assignment started: ${supervision_id} (${code}-${year})`);
-
-    // ── Input validation ────────────────────────────────────────────────────────
-    if ((regions.length > 1) || (districts.length > 1) ||
-        (regions.length > 0 && districts.length > 0 && regions.length + districts.length > 2)) {
-      throw new Error("Only one region OR one district OR one region + one district allowed");
-    }
-
     // ── Get current supervision & master ────────────────────────────────────────
     const { data: supervision, error: supErr } = await supabase
       .from('supervisions')
@@ -88,7 +83,12 @@ serve(async (req) => {
 
     const master = supervision.mastersummaries;
     const currentYear = year ?? master.Year;
-    const examCode = code?.toUpperCase() || master.Code.toUpperCase();
+    
+    // Ensure code is trimmed and standardized
+    const rawCode = (code || master.Code || "").toString().trim().toUpperCase();
+    const examCode = rawCode;
+
+    console.log(`🚀 Assignment started: ${supervision_id} (${examCode}-${currentYear})`);
 
     const isUalimu = examCode === "UALIMU" || UALIMU_CODES.includes(examCode);
     const isAcsee = examCode === "ACSEE";
@@ -194,7 +194,7 @@ serve(async (req) => {
         const streams = Math.ceil(c.totalStudents / 40);
         return {
           ...c,
-          required_supervisors: Math.ceil(streams / 10)
+          required_supervisors: Math.ceil(streams / 10) || 1
         };
       });
     } else {
