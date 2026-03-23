@@ -160,6 +160,33 @@ const SupervisorAssignmentsPage = () => {
 
       if (aErr) throw aErr;
 
+      // --- Fetch Workstation Names ---
+      const workstationCenterNos = [...new Set((assignmentsFromDb || [])
+        .map(a => a.workstation?.split('-')[0]?.trim().toUpperCase())
+        .filter(Boolean)
+      )];
+
+      const workstationNameMap: Record<string, string> = {};
+      if (workstationCenterNos.length > 0) {
+        const [secRes, tcRes, priRes] = await Promise.all([
+          supabase.from('secondaryschools').select('center_no, name').in('center_no', workstationCenterNos),
+          supabase.from('teacherscolleges').select('center_no, name').in('center_no', workstationCenterNos),
+          supabase.from('primaryschools').select('center_no, name').in('center_no', workstationCenterNos)
+        ]);
+
+        secRes.data?.forEach(r => { if (r.center_no) workstationNameMap[r.center_no.trim().toUpperCase()] = r.name; });
+        tcRes.data?.forEach(r => { if (r.center_no) workstationNameMap[r.center_no.trim().toUpperCase()] = r.name; });
+        priRes.data?.forEach(r => { if (r.center_no) workstationNameMap[r.center_no.trim().toUpperCase()] = r.name; });
+      }
+
+      const formatWorkstation = (ws: string) => {
+        if (!ws) return '—';
+        const centerNo = ws.split('-')[0]?.trim().toUpperCase();
+        const name = workstationNameMap[centerNo];
+        return name ? `${centerNo} - ${abbreviateSchoolName(name)}` : ws;
+      };
+      // -------------------------------
+
       const allRegions = [
         ...centers.map(c => c.region?.trim()),
         ...(assignmentsFromDb || []).map(a => a.region?.trim())
@@ -179,14 +206,13 @@ const SupervisorAssignmentsPage = () => {
           district: c.district?.trim() || 'N/A',
           location: `${c.center_number} - ${abbreviateSchoolName(c.center_name || '')}`,
           supervisor: assign?.supervisor_name || 'PENDING',
-          workstation: assign?.workstation || '—',
+          workstation: assign ? formatWorkstation(assign.workstation) : '—',
           phone: assign?.phone || '—',
           assignment_id: assign?.assignment_id || null,
           is_assigned: !!assign
         };
       });
 
-      // Sort center rows by region and district ascending
       const sortedCenterRows = centerRows.sort((a, b) => {
         const regionCompare = a.region.localeCompare(b.region);
         if (regionCompare !== 0) return regionCompare;
@@ -201,7 +227,7 @@ const SupervisorAssignmentsPage = () => {
           district: r.district?.trim() || 'N/A',
           location: `RESERVE`,
           supervisor: r.supervisor_name || '—',
-          workstation: r.workstation || '—',
+          workstation: formatWorkstation(r.workstation),
           phone: r.phone || '—',
           assignment_id: r.assignment_id,
           is_assigned: true
