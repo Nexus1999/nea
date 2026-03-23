@@ -19,7 +19,6 @@ import { showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
 
-// --- Constants ---
 const EXCLUDED_REGIONS = [
   "KASKAZINI PEMBA",
   "KUSINI PEMBA",
@@ -28,14 +27,15 @@ const EXCLUDED_REGIONS = [
   "MJINI MAGHARIBI"
 ];
 
-// --- Types ---
+const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
+
 interface SummaryStats {
   required: number;
   assigned: number;
   missing: number;
   progress: number;
   fullyAssigned: boolean;
-  poolAvailable?: number; // New field for available supervisors
+  poolAvailable?: number;
 }
 
 interface RegionGroup {
@@ -45,8 +45,6 @@ interface RegionGroup {
   fullyAssigned: boolean;
   districts: Record<string, { centers: SummaryStats; supervisors: SummaryStats; fullyAssigned: boolean; poolAvailable: number }>;
 }
-
-// --- Components ---
 
 const SummaryCard = ({ title, stats, icon: Icon, colorClass, gradient }: any) => {
   const progress = stats.progress || 0;
@@ -106,7 +104,7 @@ const SummaryAssignmentsPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [regions, setRegions] = useState<RegionGroup[]>([]);
-  const [examInfo, setExamInfo] = useState({ code: '', year: '' });
+  const [examInfo, setExamInfo] = useState({ code: '', year: '', isUalimu: false });
   const [overallStats, setOverallStats] = useState({
     regions: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
     districts: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
@@ -129,33 +127,76 @@ const SummaryAssignmentsPage = () => {
         .single();
 
       if (supErr) throw supErr;
+      
+      const code = supervision.mastersummaries.Code;
+      const isUalimu = UALIMU_CODES.includes(code);
+
       setExamInfo({ 
-        code: supervision.mastersummaries.Code, 
-        year: supervision.mastersummaries.Year.toString() 
+        code: isUalimu ? 'UALIMU' : code, 
+        year: supervision.mastersummaries.Year.toString(),
+        isUalimu
       });
 
-      const centersTableMap: Record<string, string> = {
-        "SFNA": "primarymastersummary", "SSNA": "primarymastersummary", "PSLE": "primarymastersummary",
-        "FTNA": "secondarymastersummaries", "CSEE": "secondarymastersummaries", "ACSEE": "secondarymastersummaries",
-        "DPEE": "dpeemastersummary", "DPNE": "dpnemastersummary"
-      };
+      let centers: any[] = [];
+      let assigned: any[] = [];
+      let pool: any[] = [];
 
-      const centersTable = centersTableMap[supervision.mastersummaries.Code];
-      if (!centersTable) throw new Error("Unsupported exam code");
+      if (isUalimu) {
+        const { data: ualimuMasters } = await supabase
+          .from('mastersummaries')
+          .select('id')
+          .in('Code', UALIMU_CODES)
+          .eq('Year', supervision.mastersummaries.Year)
+          .eq('is_latest', true);
+        
+        const mids = ualimuMasters?.map(m => m.id) || [];
+        
+        const { data: ualimuCenters } = await supabase
+          .from('ualimumastersummary')
+          .select('*')
+          .in('mid', mids)
+          .eq('is_latest', 1);
+        
+        // Group by center and sum max streams
+        const centerMap = new Map();
+        ualimuCenters?.forEach(c => {
+          const key = c.center_number;
+          const subjectValues = Object.entries(c)
+            .filter(([k]) => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k) && typeof c[k] === 'number')
+            .map(([, v]) => Number(v) || 0);
+          
+          const maxStudents = subjectValues.length > 0 ? Math.max(...subjectValues) : 0;
+          
+          if (!centerMap.has(key)) {
+            centerMap.set(key, { ...c, totalStudents: maxStudents });
+          } else {
+            const existing = centerMap.get(key);
+            existing.totalStudents += maxStudents;
+          }
+        });
+        centers = Array.from(centerMap.values());
+      } else {
+        const centersTableMap: Record<string, string> = {
+          "SFNA": "primarymastersummary", "SSNA": "primarymastersummary", "PSLE": "primarymastersummary",
+          "FTNA": "secondarymastersummaries", "CSEE": "secondarymastersummaries", "ACSEE": "secondarymastersummaries",
+          "DPEE": "ualimumastersummary", "DPNE": "dpnemastersummary"
+        };
+        const centersTable = centersTableMap[code];
+        const { data: cData } = await supabase.from(centersTable).select("*").eq("mid", supervision.mid).eq("is_latest", 1);
+        centers = cData || [];
+      }
 
-      const [centersRes, assignedSupsRes, poolRes] = await Promise.all([
-        supabase.from(centersTable).select("region, district, center_number").eq("mid", supervision.mid).eq("is_latest", 1),
+      const [assignedSupsRes, poolRes] = await Promise.all([
         supabase.from("supervisorassignments").select("region, district, center_no").eq("supervision_id", supervisionId),
         supabase.from("supervisors").select("region, district").eq("status", "ACTIVE").eq("is_latest", 1)
       ]);
 
       const filterData = (data: any[]) => data?.filter(item => !EXCLUDED_REGIONS.includes(item.region?.toUpperCase())) || [];
       
-      const centers = filterData(centersRes.data);
-      const assigned = filterData(assignedSupsRes.data);
-      const pool = filterData(poolRes.data);
+      centers = filterData(centers);
+      assigned = filterData(assignedSupsRes.data);
+      pool = filterData(poolRes.data);
 
-      // Create a map of total pool counts per district
       const poolMap: Record<string, number> = {};
       pool.forEach(p => {
         const key = `${p.region}|${p.district}`;
@@ -189,6 +230,15 @@ const SummaryAssignmentsPage = () => {
 
         regionMap[rName].centers.required++;
         regionMap[rName].districts[dName].centers.required++;
+
+        // Calculate supervisor requirement for this center
+        let streams = 0;
+        if (isUalimu) {
+          streams = Math.ceil((c.totalStudents || 0) / 40);
+          const supsNeeded = Math.ceil(streams / 10);
+          regionMap[rName].supervisors.required += supsNeeded;
+          regionMap[rName].districts[dName].supervisors.required += supsNeeded;
+        }
       });
 
       assigned.forEach(a => {
@@ -197,8 +247,6 @@ const SummaryAssignmentsPage = () => {
         if (regionMap[rName] && regionMap[rName].districts[dName]) {
           regionMap[rName].supervisors.assigned++;
           regionMap[rName].districts[dName].supervisors.assigned++;
-          
-          // Subtract from available pool for this district
           regionMap[rName].districts[dName].poolAvailable = Math.max(0, regionMap[rName].districts[dName].poolAvailable - 1);
 
           if (a.center_no !== 'RESERVE') {
@@ -213,8 +261,10 @@ const SummaryAssignmentsPage = () => {
       let totalDistricts = 0, assignedDistricts = 0;
 
       Object.values(regionMap).forEach(r => {
-        const districtCount = Object.keys(r.districts).length;
-        r.supervisors.required = r.centers.required + (districtCount * 5);
+        if (!isUalimu) {
+          const districtCount = Object.keys(r.districts).length;
+          r.supervisors.required = r.centers.required + (districtCount * 5);
+        }
         
         r.centers.missing = Math.max(0, r.centers.required - r.centers.assigned);
         r.centers.progress = r.centers.required > 0 ? Math.round((r.centers.assigned / r.centers.required) * 100) : 0;
@@ -229,7 +279,9 @@ const SummaryAssignmentsPage = () => {
 
         Object.values(r.districts).forEach(d => {
           totalDistricts++;
-          d.supervisors.required = d.centers.required + 5;
+          if (!isUalimu) {
+            d.supervisors.required = d.centers.required + 5;
+          }
           d.centers.missing = Math.max(0, d.centers.required - d.centers.assigned);
           d.centers.progress = d.centers.required > 0 ? Math.round((d.centers.assigned / d.centers.required) * 100) : 0;
           d.supervisors.missing = Math.max(0, d.supervisors.required - d.supervisors.assigned);
@@ -246,28 +298,22 @@ const SummaryAssignmentsPage = () => {
 
       setOverallStats({
         regions: {
-          required: totalRegions,
-          assigned: assignedRegions,
-          missing: totalRegions - assignedRegions,
+          required: totalRegions, assigned: assignedRegions, missing: totalRegions - assignedRegions,
           progress: totalRegions > 0 ? Math.round((assignedRegions / totalRegions) * 100) : 0,
           fullyAssigned: assignedRegions === totalRegions
         },
         districts: {
-          required: totalDistricts,
-          assigned: assignedDistricts,
-          missing: totalDistricts - assignedDistricts,
+          required: totalDistricts, assigned: assignedDistricts, missing: totalDistricts - assignedDistricts,
           progress: totalDistricts > 0 ? Math.round((assignedDistricts / totalDistricts) * 100) : 0,
           fullyAssigned: assignedDistricts === totalDistricts
         },
         centers: { 
-          required: totalCentersReq, assigned: totalCentersAss, 
-          missing: totalCentersReq - totalCentersAss, 
+          required: totalCentersReq, assigned: totalCentersAss, missing: totalCentersReq - totalCentersAss, 
           progress: totalCentersReq > 0 ? Math.round((totalCentersAss / totalCentersReq) * 100) : 0,
           fullyAssigned: totalCentersAss >= totalCentersReq
         },
         supervisors: { 
-          required: totalSupsReq, assigned: totalSupsAss, 
-          missing: totalSupsReq - totalSupsAss, 
+          required: totalSupsReq, assigned: totalSupsAss, missing: totalSupsReq - totalSupsAss, 
           progress: totalSupsReq > 0 ? Math.round((totalSupsAss / totalSupsReq) * 100) : 0,
           fullyAssigned: totalSupsAss >= totalSupsReq
         }
@@ -296,14 +342,12 @@ const SummaryAssignmentsPage = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 space-y-10 max-w-7xl mx-auto pb-32">
-      {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 py-1 px-3 rounded-full">
               <Info className="h-3 w-3 mr-2" /> {examInfo.code} {examInfo.year}
             </Badge>
-             
           </div>
           <h4 className="text-4xl font-black text-slate-900 tracking-tight">Assignments Summary</h4>       
         </div>
@@ -319,39 +363,13 @@ const SummaryAssignmentsPage = () => {
         </div>
       </div>
 
-      {/* Grid Summary */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard 
-          title="Regions" 
-          stats={overallStats.regions} 
-          icon={Globe2} 
-          colorClass="text-amber-600" 
-          gradient="from-amber-400 to-orange-500"
-        />
-        <SummaryCard 
-          title="Districts" 
-          stats={overallStats.districts} 
-          icon={Building2} 
-          colorClass="text-blue-600" 
-          gradient="from-blue-400 to-indigo-500"
-        />
-        <SummaryCard 
-          title="Centers" 
-          stats={overallStats.centers} 
-          icon={School} 
-          colorClass="text-red-600" 
-          gradient="from-red-400 to-rose-500"
-        />
-        <SummaryCard 
-          title="Supervisors" 
-          stats={overallStats.supervisors} 
-          icon={Users} 
-          colorClass="text-emerald-600" 
-          gradient="from-emerald-400 to-teal-500"
-        />
+        <SummaryCard title="Regions" stats={overallStats.regions} icon={Globe2} colorClass="text-amber-600" gradient="from-amber-400 to-orange-500" />
+        <SummaryCard title="Districts" stats={overallStats.districts} icon={Building2} colorClass="text-blue-600" gradient="from-blue-400 to-indigo-500" />
+        <SummaryCard title="Centers" stats={overallStats.centers} icon={School} colorClass="text-red-600" gradient="from-red-400 to-rose-500" />
+        <SummaryCard title="Supervisors" stats={overallStats.supervisors} icon={Users} colorClass="text-emerald-600" gradient="from-emerald-400 to-teal-500" />
       </div>
 
-      {/* Regional Section */}
       <div className="space-y-6">
         <div className="flex items-center justify-between border-b pb-4 border-slate-200">
           <div className="flex items-center gap-3">
@@ -426,17 +444,12 @@ const SummaryAssignmentsPage = () => {
                           </div>
                           <Progress value={dStats.supervisors.progress} className="h-1" indicatorClassName="bg-blue-500" />
                         </div>
-                        
-                        {/* Available Pool Section */}
                         <div className="flex justify-between items-center pt-2 mt-1 border-t border-black/5">
                           <div className="flex items-center gap-1.5">
                             <UserPlus className="h-3 w-3 text-slate-400" />
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Available Pool</span>
                           </div>
-                          <span className={cn(
-                            "text-xs font-black",
-                            dStats.poolAvailable > 0 ? "text-slate-900" : "text-red-500"
-                          )}>
+                          <span className={cn("text-xs font-black", dStats.poolAvailable > 0 ? "text-slate-900" : "text-red-500")}>
                             {dStats.poolAvailable}
                           </span>
                         </div>

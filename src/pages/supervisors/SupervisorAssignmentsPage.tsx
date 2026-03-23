@@ -46,12 +46,14 @@ import Spinner from "@/components/Spinner";
 import ReassignSupervisorModal from "@/components/supervisors/ReassignSupervisorModal";
 import abbreviateSchoolName from "@/utils/abbreviateSchoolName";
 
+const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
+
 const SupervisorAssignmentsPage = () => {
   const { id } = useParams(); 
   const [allData, setAllData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [summaryInfo, setSummaryInfo] = useState({ code: '', year: '', mid: null as any });
+  const [summaryInfo, setSummaryInfo] = useState({ code: '', year: '', mid: null as any, isUalimu: false });
   
   const [regions, setRegions] = useState<string[]>([]);
   const [selectedRegion, setSelectedRegion] = useState('all');
@@ -94,44 +96,82 @@ const SupervisorAssignmentsPage = () => {
       if (supError) throw supError;
       if (!supervision) return;
 
+      const code = supervision.mastersummaries.Code;
+      const isUalimu = UALIMU_CODES.includes(code);
+
       setSummaryInfo({
-        code: supervision.mastersummaries.Code || '',
+        code: isUalimu ? 'UALIMU' : code,
         year: supervision.mastersummaries.Year || '',
-        mid: supervision.mid
+        mid: supervision.mid,
+        isUalimu
       });
 
-      const centersTableMap: Record<string, string> = {
-        'SFNA': 'primarymastersummary', 'SSNA': 'primarymastersummary', 'PSLE': 'primarymastersummary',
-        'FTNA': 'secondarymastersummaries', 'CSEE': 'secondarymastersummaries', 'ACSEE': 'secondarymastersummaries',
-        'DPEE': 'ualimumastersummary','DSEE': 'ualimumastersummary','DSPEE': 'ualimumastersummary',
-        'DPPE': 'ualimumastersummary','GATCE': 'ualimumastersummary','GATSCCE': 'ualimumastersummary',
-         'DPNE': 'dpnemastersummary'
-      };
+      let centers: any[] = [];
       
-      const centersTable = centersTableMap[supervision.mastersummaries.Code?.toUpperCase() || ''];
-      if (!centersTable) throw new Error(`Unsupported exam code`);
+      if (isUalimu) {
+        // Fetch all Ualimu MIDs for that year
+        const { data: ualimuMasters } = await supabase
+          .from('mastersummaries')
+          .select('id')
+          .in('Code', UALIMU_CODES)
+          .eq('Year', supervision.mastersummaries.Year)
+          .eq('is_latest', true);
+        
+        const mids = ualimuMasters?.map(m => m.id) || [];
+        
+        const { data: ualimuCenters, error: cErr } = await supabase
+          .from('ualimumastersummary')
+          .select('region, district, center_number, center_name')
+          .in('mid', mids)
+          .eq('is_latest', 1);
+        
+        if (cErr) throw cErr;
+        
+        // Distinct by center_number
+        const uniqueMap = new Map();
+        ualimuCenters?.forEach(c => {
+          if (!uniqueMap.has(c.center_number)) {
+            uniqueMap.set(c.center_number, c);
+          }
+        });
+        centers = Array.from(uniqueMap.values());
+      } else {
+        const centersTableMap: Record<string, string> = {
+          'SFNA': 'primarymastersummary', 'SSNA': 'primarymastersummary', 'PSLE': 'primarymastersummary',
+          'FTNA': 'secondarymastersummaries', 'CSEE': 'secondarymastersummaries', 'ACSEE': 'secondarymastersummaries',
+          'DPEE': 'ualimumastersummary', 'DPNE': 'dpnemastersummary'
+        };
+        
+        const centersTable = centersTableMap[code?.toUpperCase() || ''];
+        if (!centersTable) throw new Error(`Unsupported exam code`);
 
-      const [centersRes, assignmentsRes] = await Promise.all([
-        supabase.from(centersTable).select('region, district, center_number, center_name').eq('mid', supervision.mid).eq('is_latest', 1),
-        supabase.from('supervisorassignments').select('*').eq('supervision_id', id)
-      ]);
+        const { data: cData, error: cErr } = await supabase
+          .from(centersTable)
+          .select('region, district, center_number, center_name')
+          .eq('mid', supervision.mid)
+          .eq('is_latest', 1);
+        
+        if (cErr) throw cErr;
+        centers = cData || [];
+      }
 
-      if (centersRes.error) throw centersRes.error;
-      if (assignmentsRes.error) throw assignmentsRes.error;
+      const { data: assignmentsFromDb, error: aErr } = await supabase
+        .from('supervisorassignments')
+        .select('*')
+        .eq('supervision_id', id);
 
-      const centers = centersRes.data || [];
-      const assignmentsFromDb = assignmentsRes.data || [];
+      if (aErr) throw aErr;
 
       const allRegions = [
         ...centers.map(c => c.region?.trim()),
-        ...assignmentsFromDb.map(a => a.region?.trim())
+        ...(assignmentsFromDb || []).map(a => a.region?.trim())
       ].filter(Boolean);
       
       const uniqueRegions = [...new Set(allRegions)].sort();
       setRegions(uniqueRegions);
 
       const centerRows = centers.map((c) => {
-        const assign = assignmentsFromDb.find(a => 
+        const assign = assignmentsFromDb?.find(a => 
           a.center_no === c.center_number && 
           a.center_no !== 'RESERVE'
         );
@@ -148,7 +188,7 @@ const SupervisorAssignmentsPage = () => {
         };
       });
 
-      const reserveRows = assignmentsFromDb
+      const reserveRows = (assignmentsFromDb || [])
         .filter(a => a.center_no === 'RESERVE')
         .map((r) => ({
           id: `reserve-${r.assignment_id}`,
@@ -189,7 +229,7 @@ const SupervisorAssignmentsPage = () => {
     try {
       const payload = {
         supervision_id: id,
-        code: summaryInfo.code,
+        code: summaryInfo.isUalimu ? 'UALIMU' : summaryInfo.code,
         year: summaryInfo.year,
         regions: selectedRegion !== 'all' ? [selectedRegion] : [],
         districts: selectedDistrict !== 'all' ? [selectedDistrict] : [],

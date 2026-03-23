@@ -25,6 +25,8 @@ import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
 import { AddSupervisionModal } from "./../../components/supervisors/AddSupervisionModal";
 
+const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
+
 interface Supervision {
   id: string;
   mid: number;
@@ -72,15 +74,20 @@ const SupervisionsPage = () => {
     if (error) {
       showError(error.message);
     } else {
-      const formattedData = data.map((item: any) => ({
-        id: item.id,
-        mid: item.mid,
-        status: item.status,
-        exam_name: item.mastersummaries?.Examination || 'N/A',
-        exam_code: item.mastersummaries?.Code || 'N/A',
-        year: item.mastersummaries?.Year || 0,
-        created_at: item.created_at
-      }));
+      const formattedData = data.map((item: any) => {
+        const code = item.mastersummaries?.Code || 'N/A';
+        const isUalimu = UALIMU_CODES.includes(code);
+        
+        return {
+          id: item.id,
+          mid: item.mid,
+          status: item.status,
+          exam_name: isUalimu ? 'UALIMU EXAMINATIONS' : (item.mastersummaries?.Examination || 'N/A'),
+          exam_code: isUalimu ? 'UALIMU' : code,
+          year: item.mastersummaries?.Year || 0,
+          created_at: item.created_at
+        };
+      });
       setSupervisions(formattedData);
     }
     setLoading(false);

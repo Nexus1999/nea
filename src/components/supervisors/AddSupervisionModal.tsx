@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -11,6 +11,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+
+const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
 
 const supervisionSchema = z.object({
   mid: z.coerce.number().min(1, "Please select an examination"),
@@ -31,14 +33,13 @@ export const AddSupervisionModal = ({ open, onOpenChange, onSuccess }: any) => {
     },
   });
 
-  // Fetch Master Summaries to populate the dropdown
   useEffect(() => {
     const fetchMasters = async () => {
       setFetchingMasters(true);
       const { data, error } = await supabase
         .from("mastersummaries")
         .select("id, Examination, Code, Year")
-        .eq("is_latest", true) // Only show current versions
+        .eq("is_latest", true)
         .order("Year", { ascending: false });
 
       if (error) {
@@ -52,10 +53,42 @@ export const AddSupervisionModal = ({ open, onOpenChange, onSuccess }: any) => {
     if (open) fetchMasters();
   }, [open]);
 
+  // Group Ualimu codes by year
+  const groupedOptions = useMemo(() => {
+    const options: any[] = [];
+    const ualimuByYear: Record<number, any> = {};
+    const processedUalimuYears = new Set<number>();
+
+    masterSummaries.forEach(ms => {
+      if (UALIMU_CODES.includes(ms.Code)) {
+        if (!ualimuByYear[ms.Year]) {
+          ualimuByYear[ms.Year] = ms; // Keep the first one found as the proxy ID
+        }
+      } else {
+        options.push({
+          id: ms.id,
+          label: `${ms.Examination} (${ms.Code}) - ${ms.Year}`,
+          isUalimu: false
+        });
+      }
+    });
+
+    Object.keys(ualimuByYear).forEach(year => {
+      const yr = parseInt(year);
+      options.push({
+        id: ualimuByYear[yr].id,
+        label: `UALIMU - ${yr}`,
+        isUalimu: true,
+        year: yr
+      });
+    });
+
+    return options.sort((a, b) => b.label.localeCompare(a.label));
+  }, [masterSummaries]);
+
   const onSubmit = async (values: z.infer<typeof supervisionSchema>) => {
     setLoading(true);
     
-    // Insert into supervisions table
     const { error } = await supabase
       .from("supervisions")
       .insert({
@@ -65,13 +98,13 @@ export const AddSupervisionModal = ({ open, onOpenChange, onSuccess }: any) => {
 
     if (error) {
       if (error.code === '23505') {
-        showError("This examination already has a supervision record.");
+        showError("This examination session already has a supervision record.");
       } else {
         showError(error.message);
       }
     } else {
       showSuccess("Supervision initialized successfully");
-      onSuccess(); // Refresh the parent table
+      onSuccess();
       onOpenChange(false);
       form.reset();
     }
@@ -91,7 +124,6 @@ export const AddSupervisionModal = ({ open, onOpenChange, onSuccess }: any) => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
             
-            {/* Master Summary Selection */}
             <FormField
               control={form.control}
               name="mid"
@@ -109,9 +141,9 @@ export const AddSupervisionModal = ({ open, onOpenChange, onSuccess }: any) => {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {masterSummaries.map((exam) => (
-                        <SelectItem key={exam.id} value={exam.id.toString()}>
-                          {exam.Examination} ({exam.Code}) - {exam.Year}
+                      {groupedOptions.map((opt) => (
+                        <SelectItem key={opt.id} value={opt.id.toString()}>
+                          {opt.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -121,7 +153,6 @@ export const AddSupervisionModal = ({ open, onOpenChange, onSuccess }: any) => {
               )}
             />
 
-            {/* Status Selection */}
             <FormField
               control={form.control}
               name="status"
