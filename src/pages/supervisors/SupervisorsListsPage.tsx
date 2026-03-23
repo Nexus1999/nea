@@ -63,9 +63,13 @@ const SupervisorsListsPage = () => {
   const [isRegionPopoverOpen, setIsRegionPopoverOpen] = useState(false);
   const [isDistrictPopoverOpen, setIsDistrictPopoverOpen] = useState(false);
 
-  const code = supervision?.mastersummaries?.Code || '';
+  const code = (supervision?.mastersummaries?.Code || '').trim().toUpperCase();
   const year = supervision?.mastersummaries?.Year?.toString() || '';
-  const isUalimu = UALIMU_CODES.includes(code.toUpperCase());
+  
+  const isUalimu = useMemo(() => {
+    return UALIMU_CODES.includes(code);
+  }, [code]);
+
   const sessionDisplay = isUalimu ? `UALIMU-${year}` : `${code}-${year}`;
 
   const mainContentHeightClass = "h-[calc(100vh-160px)]";
@@ -218,6 +222,8 @@ const SupervisorsListsPage = () => {
         const url = URL.createObjectURL(blob);
 
         setPreviewUrl(url);
+        
+        // Explicitly use UALIMU for the file name if it's a teacher education code
         const fileSuffix = isUalimu ? `UALIMU-${year}` : `${code}-${year}`;
         setFileName(`WASIMAMIZI ${selectedRegion} ${fileSuffix}.pdf`);
 
