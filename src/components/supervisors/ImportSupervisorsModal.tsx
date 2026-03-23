@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 const REQUIRED_HEADERS = ['region', 'district', 'first_name', 'last_name', 'center_no'];
 const OPTIONAL_HEADERS = ['middle_name', 'nin', 'cheque_no', 'tsc_no', 'index_no', 'csee_year', 'phone', 'notes'];
 const ALL_HEADERS = [...REQUIRED_HEADERS, ...OPTIONAL_HEADERS];
-const CHUNK_SIZE = 200;
+const CHUNK_SIZE = 100; // Reduced chunk size for better error isolation
 
 // --- Sanitization Utilities ---
 
@@ -29,15 +29,18 @@ const sanitizePhone = (phoneInput: any) => {
   let phone = String(phoneInput).trim().replace(/\D/g, '');
   if (phone.startsWith('255')) phone = phone.slice(3);
   if (phone.startsWith('0')) phone = phone.slice(1);
+  
+  // If it's a standard 9-digit TZ number, we'll keep it as 10 digits (adding leading 0) 
+  // to fit in varchar(10) if that's the constraint, or just return the 9 digits.
+  // The error "varying(10)" suggests we should keep it short.
   if (phone.length === 9 && (phone.startsWith('7') || phone.startsWith('6'))) {
-    return `+255 ${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6, 9)}`;
+    return `0${phone}`; // Returns 10 digits: e.g., 0712345678
   }
   return phone;
 };
 
 const sanitizeCenterNo = (centerInput: any) => {
   if (!centerInput) return null;
-  // Standardize: S.0614 or s614 -> S0614
   let center = String(centerInput).trim().toUpperCase().replace(/O/g, '0').replace(/\./g, '');
   const match = center.match(/^([SP])(\d+)$/i);
   if (!match) return center;
@@ -49,7 +52,6 @@ const sanitizeCenterNo = (centerInput: any) => {
 
 const sanitizeIndexNo = (indexInput: any) => {
   if (!indexInput) return null;
-  // 1. Clean characters first
   let index = String(indexInput)
     .trim()
     .toUpperCase()
@@ -57,14 +59,12 @@ const sanitizeIndexNo = (indexInput: any) => {
     .replace(/\./g, '')
     .replace(/[\s\/]+/g, '-');
 
-  // 2. Extract Prefix and digits
   const match = index.match(/^([SP])(.*)$/i);
   if (!match) return index;
 
   const prefix = match[1];
   let parts = match[2].split('-').filter(p => p);
   
-  // Pad center part and candidate part if they are 3 digits
   if (parts[0]) parts[0] = parts[0].length === 3 ? parts[0].padStart(4, '0') : parts[0];
   if (parts[1]) parts[1] = parts[1].length === 3 ? parts[1].padStart(4, '0') : parts[1];
   
@@ -188,7 +188,6 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
           return;
         }
 
-        // Pre-sanitize center numbers for batch fetching
         const sanitizedData = rawData.map(row => ({
             ...row,
             sanitizedCenter: sanitizeCenterNo(row.center_no)
@@ -249,9 +248,10 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
             continue;
           }
 
+          // STRICT PUBLIC CHECK
           const type = centerInfo.center_type?.toLowerCase() || 'public';
-          if (type === 'private' || type === 'seminary') {
-            localErrors.push({ ...rowData, error_message: `Center ${sanitizedCenter} is Private/Seminary (Not allowed)` });
+          if (type !== 'public') {
+            localErrors.push({ ...rowData, error_message: `Center ${sanitizedCenter} is ${type} (Only Public allowed)` });
             continue;
           }
 
@@ -270,6 +270,20 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
 
           const sanitizedPhone = sanitizePhone(rowData.phone);
           const sanitizedIndex = sanitizeIndexNo(rowData.index_no);
+
+          // LENGTH VALIDATION (Prevent "value too long for type character varying(10)")
+          if (sanitizedPhone && sanitizedPhone.length > 10) {
+            localErrors.push({ ...rowData, error_message: `Phone number too long (${sanitizedPhone.length} chars)` });
+            continue;
+          }
+          if (sanitizedCenter && sanitizedCenter.length > 10) {
+            localErrors.push({ ...rowData, error_message: `Center number too long (${sanitizedCenter.length} chars)` });
+            continue;
+          }
+          if (sanitizedIndex && sanitizedIndex.length > 15) { // Assuming index_no might be slightly longer but checking anyway
+            localErrors.push({ ...rowData, error_message: `Index number too long (${sanitizedIndex.length} chars)` });
+            continue;
+          }
 
           processedRows.push({ row: rowData, sanitizedPhone, sanitizedIndex, sanitizedCenter, type, centerInfo });
         }
@@ -301,7 +315,7 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
             cheque_no: row.cheque_no || null,
             region: centerInfo.region,
             district: centerInfo.district,
-            center_no: sanitizedCenter, // Storing standardized center_no
+            center_no: sanitizedCenter,
             center_type: type,
             index_no: sanitizedIndex,
             csee_year: row.csee_year ? String(row.csee_year) : null,
@@ -316,7 +330,17 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
           for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
             const chunk = toInsert.slice(i, i + CHUNK_SIZE);
             const { error } = await supabase.from('supervisors').insert(chunk);
-            if (error) throw error;
+            
+            if (error) {
+              // If chunk fails, try inserting one by one to skip the problematic row
+              console.error("Chunk insert failed, falling back to individual inserts:", error);
+              for (const item of chunk) {
+                const { error: singleError } = await supabase.from('supervisors').insert(item);
+                if (singleError) {
+                  localErrors.push({ ...item, error_message: singleError.message });
+                }
+              }
+            }
             setProgress(75 + Math.round(((i + chunk.length) / toInsert.length) * 25));
           }
         }
@@ -348,7 +372,7 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
             <RefreshCw className={cn("h-5 w-5", loading && "animate-spin")} />
             Import Supervisors
           </DialogTitle>
-          <DialogDescription>Upload Excel or CSV file format.</DialogDescription>
+          <DialogDescription>Upload Excel or CSV file format. Only Public centers allowed.</DialogDescription>
         </DialogHeader>
 
         {headerError && (
