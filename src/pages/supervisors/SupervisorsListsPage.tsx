@@ -66,7 +66,7 @@ const SupervisorsListsPage = () => {
   const code = supervision?.mastersummaries?.Code || '';
   const year = supervision?.mastersummaries?.Year?.toString() || '';
   const isUalimu = UALIMU_CODES.includes(code);
-  const sessionDisplay = isUalimu ? "UALIMU" : `${code}-${year}`;
+  const sessionDisplay = isUalimu ? `UALIMU-${year}` : `${code}-${year}`;
 
   const mainContentHeightClass = "h-[calc(100vh-160px)]";
 
@@ -218,8 +218,8 @@ const SupervisorsListsPage = () => {
         const url = URL.createObjectURL(blob);
 
         setPreviewUrl(url);
-        setFileName(`WASIMAMIZI ${selectedRegion} ${code}-${year}.pdf`
-);
+        const fileSuffix = isUalimu ? `UALIMU-${year}` : `${code}-${year}`;
+        setFileName(`WASIMAMIZI ${selectedRegion} ${fileSuffix}.pdf`);
 
         showSuccess("Supervisors list generated successfully!");
       } else {
