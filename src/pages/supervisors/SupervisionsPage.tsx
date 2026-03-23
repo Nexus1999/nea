@@ -63,6 +63,7 @@ const SupervisionsPage = () => {
           mid,
           created_at,
           mastersummaries (
+            id,
             Examination,
             Code,
             Year
@@ -90,56 +91,65 @@ const SupervisionsPage = () => {
         }
       });
 
-      // 2. Group supervisions by exam type to fetch center counts efficiently
-      const midsByType: Record<string, number[]> = {
-        primary: [],
-        secondary: [],
-        ualimu: [],
-        dpne: []
-      };
-
-      sups.forEach((s: any) => {
-        const code = s.mastersummaries?.Code || '';
-        if (UALIMU_CODES.includes(code)) midsByType.ualimu.push(s.mid);
-        else if (["SFNA", "SSNA", "PSLE"].includes(code)) midsByType.primary.push(s.mid);
-        else if (["FTNA", "CSEE", "ACSEE"].includes(code)) midsByType.secondary.push(s.mid);
-        else if (code === "DPNE") midsByType.dpne.push(s.mid);
-      });
-
-      const centerCounts: Record<number, number> = {};
-
-      const fetchCounts = async (table: string, mids: number[]) => {
-        if (mids.length === 0) return;
-        const { data } = await supabase
-          .from(table)
-          .select('mid')
-          .in('mid', mids)
-          .eq('is_latest', 1);
-        
-        data?.forEach(d => {
-          centerCounts[d.mid] = (centerCounts[d.mid] || 0) + 1;
-        });
-      };
-
-      await Promise.all([
-        fetchCounts('primarymastersummary', midsByType.primary),
-        fetchCounts('secondarymastersummaries', midsByType.secondary),
-        fetchCounts('ualimumastersummary', midsByType.ualimu),
-        fetchCounts('dpnemastersummary', midsByType.dpne)
-      ]);
-
-      // 3. Format data and calculate dynamic status
-      const formattedData = sups.map((item: any) => {
-        const code = item.mastersummaries?.Code || 'N/A';
+      // 2. Calculate required centers for each supervision
+      // For UALIMU, we need to sum unique centers across all related MIDs for that year
+      const formattedData = await Promise.all(sups.map(async (item: any) => {
+        const code = (item.mastersummaries?.Code || '').trim().toUpperCase();
+        const year = item.mastersummaries?.Year;
         const isUalimu = UALIMU_CODES.includes(code);
-        const stats = assignmentCounts[item.id] || { total: 0, centers: 0 };
-        const requiredCenters = centerCounts[item.mid] || 0;
+        
+        let requiredCenters = 0;
 
+        if (isUalimu) {
+          // Fetch all MIDs for UALIMU in this year
+          const { data: ualimuMids } = await supabase
+            .from('mastersummaries')
+            .select('id')
+            .in('Code', UALIMU_CODES)
+            .eq('Year', year)
+            .eq('is_latest', true);
+          
+          const mids = ualimuMids?.map(m => m.id) || [];
+          
+          const { data: ualimuCenters } = await supabase
+            .from('ualimumastersummary')
+            .select('center_number')
+            .in('mid', mids)
+            .eq('is_latest', 1);
+          
+          // Count unique center numbers
+          requiredCenters = new Set(ualimuCenters?.map(c => c.center_number)).size;
+        } else {
+          const tableMap: Record<string, string> = {
+            "SFNA": "primarymastersummary", "SSNA": "primarymastersummary", "PSLE": "primarymastersummary",
+            "FTNA": "secondarymastersummaries", "CSEE": "secondarymastersummaries", "ACSEE": "secondarymastersummaries",
+            "DPNE": "dpnemastersummary"
+          };
+          const table = tableMap[code];
+          if (table) {
+            const { count } = await supabase
+              .from(table)
+              .select('*', { count: 'exact', head: true })
+              .eq('mid', item.mid)
+              .eq('is_latest', 1);
+            requiredCenters = count || 0;
+          }
+        }
+
+        const stats = assignmentCounts[item.id] || { total: 0, centers: 0 };
+        
         let status: 'pending' | 'ongoing' | 'completed' = 'pending';
+        
+        // Logic: 
+        // - Pending: No assignments at all
+        // - Completed: All required centers have been assigned (at least one supervisor)
+        // - Ongoing: Some assignments exist, but not all centers are covered
         if (stats.total > 0) {
-          // If all centers are assigned, mark as completed
-          // We use a small buffer or exact match depending on requirements
-          status = (stats.centers >= requiredCenters && requiredCenters > 0) ? 'completed' : 'ongoing';
+          if (requiredCenters > 0 && stats.centers >= requiredCenters) {
+            status = 'completed';
+          } else {
+            status = 'ongoing';
+          }
         }
 
         return {
@@ -148,10 +158,10 @@ const SupervisionsPage = () => {
           status,
           exam_name: isUalimu ? 'UALIMU EXAMINATIONS' : (item.mastersummaries?.Examination || 'N/A'),
           exam_code: isUalimu ? 'UALIMU' : code,
-          year: item.mastersummaries?.Year || 0,
+          year: year || 0,
           created_at: item.created_at
         };
-      });
+      }));
 
       setSupervisions(formattedData);
     } catch (err: any) {
