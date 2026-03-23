@@ -430,7 +430,7 @@ serve(async (req) => {
           if (preferredName) {
             const sup = supervisorByName[preferredName];
             if (sup && !assignedSupervisorIds.has(sup.id)) {
-              const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
+              const ws = `${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}-${sup.center_no}`;
               assignments.push({
                 supervision_id, center_no: center.center_number, supervisor_name: sup.full_name, phone: sup.phone,
                 region: center.region, district: center.district, workstation: ws, assigned_by: assigned_by || "system"
@@ -498,7 +498,7 @@ serve(async (req) => {
           }
 
           if (sup) {
-            const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
+            const ws = `${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}-${sup.center_no}`;
             const payload = {
               supervision_id, center_no: center.center_number, supervisor_name: sup.full_name, phone: sup.phone,
               region: center.region, district: center.district, workstation: ws, assigned_by: assigned_by || "system"
@@ -522,7 +522,7 @@ serve(async (req) => {
             .sort((a, b) => a.assignment_count - b.assignment_count);
           if (pool.length === 0) { centerAssignmentCount[home]++; continue; }
           const sup = pool[0];
-          const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
+          const ws = `${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}-${sup.center_no}`;
           reserves.push({
             supervision_id, center_no: "RESERVE", supervisor_name: sup.full_name, phone: sup.phone,
             region: sup.region, district: sup.district, workstation: ws, assigned_by: assigned_by || "system"

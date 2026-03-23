@@ -28,6 +28,8 @@ import {
   X
 } from "lucide-react";
 
+const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
+
 interface Supervision {
   id: string;
   mid: number;
@@ -63,6 +65,8 @@ const SupervisorsListsPage = () => {
 
   const code = supervision?.mastersummaries?.Code || '';
   const year = supervision?.mastersummaries?.Year?.toString() || '';
+  const isUalimu = UALIMU_CODES.includes(code);
+  const sessionDisplay = isUalimu ? "UALIMU" : `${code}-${year}`;
 
   const mainContentHeightClass = "h-[calc(100vh-160px)]";
 
@@ -296,7 +300,7 @@ const SupervisorsListsPage = () => {
               </Button>
             </CardTitle>
             <CardDescription className="text-sm font-semibold text-gray-700">
-              Session: <span className="text-gray-800">{code}-{year}</span>
+              Session: <span className="text-gray-800 uppercase">{sessionDisplay}</span>
             </CardDescription>
           </CardHeader>
 
