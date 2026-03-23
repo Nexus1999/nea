@@ -22,7 +22,7 @@ function getCentersTable(code: string) {
     "FTNA": "secondarymastersummaries",
     "CSEE": "secondarymastersummaries",
     "ACSEE": "secondarymastersummaries",
-    "DPEE": "dpeemastersummary",
+    "DPEE": "ualimumastersummary",
     "DPNE": "dpnemastersummary",
     "GATCE": "ualimumastersummary",
     "DSEE": "ualimumastersummary",
@@ -511,23 +511,26 @@ serve(async (req) => {
         }
       }
 
-      let resCount = 0;
-      while (resCount < 5) {
-        const home = getNextHomeCenter();
-        if (!home) break;
-        const pool = [...(supMap.PUBLIC?.[home] || []), ...(supMap.PRIVATE?.[home] || [])]
-          .filter(s => !assignedSupervisorIds.has(s.id))
-          .sort((a, b) => a.assignment_count - b.assignment_count);
-        if (pool.length === 0) { centerAssignmentCount[home]++; continue; }
-        const sup = pool[0];
-        const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
-        reserves.push({
-          supervision_id, center_no: "RESERVE", supervisor_name: sup.full_name, phone: sup.phone,
-          region: sup.region, district: sup.district, workstation: ws, assigned_by: assigned_by || "system"
-        });
-        assignedSupervisorIds.add(sup.id);
-        centerAssignmentCount[home]++;
-        resCount++;
+      // ── Reserves (Skip for Ualimu) ────────────────────────────────────────────
+      if (!isUalimu) {
+        let resCount = 0;
+        while (resCount < 5) {
+          const home = getNextHomeCenter();
+          if (!home) break;
+          const pool = [...(supMap.PUBLIC?.[home] || []), ...(supMap.PRIVATE?.[home] || [])]
+            .filter(s => !assignedSupervisorIds.has(s.id))
+            .sort((a, b) => a.assignment_count - b.assignment_count);
+          if (pool.length === 0) { centerAssignmentCount[home]++; continue; }
+          const sup = pool[0];
+          const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
+          reserves.push({
+            supervision_id, center_no: "RESERVE", supervisor_name: sup.full_name, phone: sup.phone,
+            region: sup.region, district: sup.district, workstation: ws, assigned_by: assigned_by || "system"
+          });
+          assignedSupervisorIds.add(sup.id);
+          centerAssignmentCount[home]++;
+          resCount++;
+        }
       }
     }
 
