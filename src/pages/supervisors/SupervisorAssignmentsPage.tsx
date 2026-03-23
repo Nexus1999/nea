@@ -109,7 +109,6 @@ const SupervisorAssignmentsPage = () => {
       let centers: any[] = [];
       
       if (isUalimu) {
-        // Fetch all Ualimu MIDs for that year
         const { data: ualimuMasters } = await supabase
           .from('mastersummaries')
           .select('id')
@@ -127,7 +126,6 @@ const SupervisorAssignmentsPage = () => {
         
         if (cErr) throw cErr;
         
-        // Distinct by center_number
         const uniqueMap = new Map();
         ualimuCenters?.forEach(c => {
           if (!uniqueMap.has(c.center_number)) {
@@ -188,6 +186,13 @@ const SupervisorAssignmentsPage = () => {
         };
       });
 
+      // Sort center rows by region and district ascending
+      const sortedCenterRows = centerRows.sort((a, b) => {
+        const regionCompare = a.region.localeCompare(b.region);
+        if (regionCompare !== 0) return regionCompare;
+        return a.district.localeCompare(b.district);
+      });
+
       const reserveRows = (assignmentsFromDb || [])
         .filter(a => a.center_no === 'RESERVE')
         .map((r) => ({
@@ -202,7 +207,7 @@ const SupervisorAssignmentsPage = () => {
           is_assigned: true
         }));
 
-      setAllData([...centerRows, ...reserveRows]);
+      setAllData([...sortedCenterRows, ...reserveRows]);
 
     } catch (err: any) {
       showError(err.message || "Failed to load assignments");
