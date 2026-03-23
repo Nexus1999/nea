@@ -20,7 +20,25 @@ import { cn } from "@/lib/utils";
 const REQUIRED_HEADERS = ['region', 'district', 'first_name', 'last_name', 'center_no'];
 const OPTIONAL_HEADERS = ['middle_name', 'nin', 'cheque_no', 'tsc_no', 'index_no', 'csee_year', 'phone', 'notes'];
 const ALL_HEADERS = [...REQUIRED_HEADERS, ...OPTIONAL_HEADERS];
-const CHUNK_SIZE = 100; // Reduced chunk size for better error isolation
+const CHUNK_SIZE = 100;
+
+// --- Schema Limits (Matching your DB definition) ---
+const LIMITS = {
+  region: 100,
+  district: 100,
+  first_name: 100,
+  middle_name: 100,
+  last_name: 100,
+  nin: 50,
+  cheque_no: 50,
+  tsc_no: 50,
+  index_no: 50,
+  csee_year: 10,
+  center_no: 50,
+  phone: 50,
+  year_imported: 10,
+  added_by: 100
+};
 
 // --- Sanitization Utilities ---
 
@@ -30,11 +48,8 @@ const sanitizePhone = (phoneInput: any) => {
   if (phone.startsWith('255')) phone = phone.slice(3);
   if (phone.startsWith('0')) phone = phone.slice(1);
   
-  // If it's a standard 9-digit TZ number, we'll keep it as 10 digits (adding leading 0) 
-  // to fit in varchar(10) if that's the constraint, or just return the 9 digits.
-  // The error "varying(10)" suggests we should keep it short.
   if (phone.length === 9 && (phone.startsWith('7') || phone.startsWith('6'))) {
-    return `0${phone}`; // Returns 10 digits: e.g., 0712345678
+    return `0${phone}`;
   }
   return phone;
 };
@@ -69,6 +84,11 @@ const sanitizeIndexNo = (indexInput: any) => {
   if (parts[1]) parts[1] = parts[1].length === 3 ? parts[1].padStart(4, '0') : parts[1];
   
   return parts[1] ? `${prefix}${parts[0]}-${parts[1]}` : `${prefix}${parts[0]}`;
+};
+
+const validateLength = (val: any, max: number) => {
+  if (!val) return true;
+  return String(val).length <= max;
 };
 
 const importSchema = z.object({
@@ -225,6 +245,7 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
         const toInsert: any[] = [];
         const localErrors: any[] = [];
         const year_imported = new Date().getFullYear().toString();
+        const added_by = localStorage.getItem('username') || 'system';
 
         const processedRows = [];
         for (let i = 0; i < sanitizedData.length; i++) {
@@ -270,22 +291,29 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
 
           const sanitizedPhone = sanitizePhone(rowData.phone);
           const sanitizedIndex = sanitizeIndexNo(rowData.index_no);
+          const cseeYear = rowData.csee_year ? String(rowData.csee_year) : null;
 
-          // LENGTH VALIDATION (Prevent "value too long for type character varying(10)")
-          if (sanitizedPhone && sanitizedPhone.length > 10) {
-            localErrors.push({ ...rowData, error_message: `Phone number too long (${sanitizedPhone.length} chars)` });
-            continue;
-          }
-          if (sanitizedCenter && sanitizedCenter.length > 10) {
-            localErrors.push({ ...rowData, error_message: `Center number too long (${sanitizedCenter.length} chars)` });
-            continue;
-          }
-          if (sanitizedIndex && sanitizedIndex.length > 15) { // Assuming index_no might be slightly longer but checking anyway
-            localErrors.push({ ...rowData, error_message: `Index number too long (${sanitizedIndex.length} chars)` });
+          // STRICT SCHEMA LENGTH VALIDATION
+          const lengthErrors = [];
+          if (!validateLength(rowData.first_name, LIMITS.first_name)) lengthErrors.push(`First name too long (max ${LIMITS.first_name})`);
+          if (!validateLength(rowData.middle_name, LIMITS.middle_name)) lengthErrors.push(`Middle name too long (max ${LIMITS.middle_name})`);
+          if (!validateLength(rowData.last_name, LIMITS.last_name)) lengthErrors.push(`Last name too long (max ${LIMITS.last_name})`);
+          if (!validateLength(rowData.nin, LIMITS.nin)) lengthErrors.push(`NIN too long (max ${LIMITS.nin})`);
+          if (!validateLength(sanitizedPhone, LIMITS.phone)) lengthErrors.push(`Phone too long (max ${LIMITS.phone})`);
+          if (!validateLength(rowData.tsc_no, LIMITS.tsc_no)) lengthErrors.push(`TSC No too long (max ${LIMITS.tsc_no})`);
+          if (!validateLength(rowData.cheque_no, LIMITS.cheque_no)) lengthErrors.push(`Cheque No too long (max ${LIMITS.cheque_no})`);
+          if (!validateLength(sanitizedCenter, LIMITS.center_no)) lengthErrors.push(`Center No too long (max ${LIMITS.center_no})`);
+          if (!validateLength(sanitizedIndex, LIMITS.index_no)) lengthErrors.push(`Index No too long (max ${LIMITS.index_no})`);
+          if (!validateLength(cseeYear, LIMITS.csee_year)) lengthErrors.push(`CSEE Year too long (max ${LIMITS.csee_year})`);
+          if (!validateLength(year_imported, LIMITS.year_imported)) lengthErrors.push(`Year Imported too long (max ${LIMITS.year_imported})`);
+          if (!validateLength(added_by, LIMITS.added_by)) lengthErrors.push(`Added By too long (max ${LIMITS.added_by})`);
+
+          if (lengthErrors.length > 0) {
+            localErrors.push({ ...rowData, error_message: lengthErrors.join(", ") });
             continue;
           }
 
-          processedRows.push({ row: rowData, sanitizedPhone, sanitizedIndex, sanitizedCenter, type, centerInfo });
+          processedRows.push({ row: rowData, sanitizedPhone, sanitizedIndex, sanitizedCenter, type, centerInfo, cseeYear });
         }
 
         setProgress(35);
@@ -294,7 +322,7 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
         setProgress(50);
 
         for (let i = 0; i < processedRows.length; i++) {
-          const { row, sanitizedPhone, sanitizedIndex, sanitizedCenter, type, centerInfo } = processedRows[i];
+          const { row, sanitizedPhone, sanitizedIndex, sanitizedCenter, type, centerInfo, cseeYear } = processedRows[i];
 
           if (i % 10 === 0) {
             setProgress(50 + Math.round((i / processedRows.length) * 25));
@@ -316,11 +344,11 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
             region: centerInfo.region,
             district: centerInfo.district,
             center_no: sanitizedCenter,
-            center_type: type,
+            center_type: type === 'public' ? 'government' : type, // Map to enum if needed
             index_no: sanitizedIndex,
-            csee_year: row.csee_year ? String(row.csee_year) : null,
+            csee_year: cseeYear,
             year_imported,
-            added_by: localStorage.getItem('username') || 'system'
+            added_by
           });
         }
 
@@ -332,7 +360,6 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
             const { error } = await supabase.from('supervisors').insert(chunk);
             
             if (error) {
-              // If chunk fails, try inserting one by one to skip the problematic row
               console.error("Chunk insert failed, falling back to individual inserts:", error);
               for (const item of chunk) {
                 const { error: singleError } = await supabase.from('supervisors').insert(item);
