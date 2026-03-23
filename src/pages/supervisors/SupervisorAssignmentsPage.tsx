@@ -336,7 +336,7 @@ const SupervisorAssignmentsPage = () => {
   const currentData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="">
       <Card className="w-full relative min-h-[600px] border-none shadow-sm">
         {(loading || isResetting) && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80">
