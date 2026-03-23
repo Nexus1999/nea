@@ -28,7 +28,7 @@ import {
   X
 } from "lucide-react";
 
-const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
+const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE", "UALIMU"];
 
 interface Supervision {
   id: string;
@@ -65,7 +65,7 @@ const SupervisorsListsPage = () => {
 
   const code = supervision?.mastersummaries?.Code || '';
   const year = supervision?.mastersummaries?.Year?.toString() || '';
-  const isUalimu = UALIMU_CODES.includes(code);
+  const isUalimu = UALIMU_CODES.includes(code.toUpperCase());
   const sessionDisplay = isUalimu ? `UALIMU-${year}` : `${code}-${year}`;
 
   const mainContentHeightClass = "h-[calc(100vh-160px)]";
