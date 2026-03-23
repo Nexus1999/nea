@@ -4,8 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, ArrowUpDown, Eye, Users } from "lucide-react";
-import { FileText, UserPlus, Download } from "lucide-react";
+import { PlusCircle, Trash2, ArrowUpDown, Users, FileText, UserPlus, Download } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -56,41 +55,110 @@ const SupervisionsPage = () => {
 
   const fetchSupervisions = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('supervisions')
-      .select(`
-        id,
-        mid,
-        status,
-        created_at,
-        mastersummaries (
-          Examination,
-          Code,
-          Year
-        )
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      const { data: sups, error: supErr } = await supabase
+        .from('supervisions')
+        .select(`
+          id,
+          mid,
+          created_at,
+          mastersummaries (
+            Examination,
+            Code,
+            Year
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      showError(error.message);
-    } else {
-      const formattedData = data.map((item: any) => {
+      if (supErr) throw supErr;
+
+      // 1. Fetch all assignment counts grouped by supervision_id
+      const { data: assignments, error: assErr } = await supabase
+        .from('supervisorassignments')
+        .select('supervision_id, center_no');
+      
+      if (assErr) throw assErr;
+
+      const assignmentCounts: Record<string, { total: number, centers: number }> = {};
+      assignments?.forEach(a => {
+        if (!assignmentCounts[a.supervision_id]) {
+          assignmentCounts[a.supervision_id] = { total: 0, centers: 0 };
+        }
+        assignmentCounts[a.supervision_id].total++;
+        if (a.center_no && a.center_no !== 'RESERVE') {
+          assignmentCounts[a.supervision_id].centers++;
+        }
+      });
+
+      // 2. Group supervisions by exam type to fetch center counts efficiently
+      const midsByType: Record<string, number[]> = {
+        primary: [],
+        secondary: [],
+        ualimu: [],
+        dpne: []
+      };
+
+      sups.forEach((s: any) => {
+        const code = s.mastersummaries?.Code || '';
+        if (UALIMU_CODES.includes(code)) midsByType.ualimu.push(s.mid);
+        else if (["SFNA", "SSNA", "PSLE"].includes(code)) midsByType.primary.push(s.mid);
+        else if (["FTNA", "CSEE", "ACSEE"].includes(code)) midsByType.secondary.push(s.mid);
+        else if (code === "DPNE") midsByType.dpne.push(s.mid);
+      });
+
+      const centerCounts: Record<number, number> = {};
+
+      const fetchCounts = async (table: string, mids: number[]) => {
+        if (mids.length === 0) return;
+        const { data } = await supabase
+          .from(table)
+          .select('mid')
+          .in('mid', mids)
+          .eq('is_latest', 1);
+        
+        data?.forEach(d => {
+          centerCounts[d.mid] = (centerCounts[d.mid] || 0) + 1;
+        });
+      };
+
+      await Promise.all([
+        fetchCounts('primarymastersummary', midsByType.primary),
+        fetchCounts('secondarymastersummaries', midsByType.secondary),
+        fetchCounts('ualimumastersummary', midsByType.ualimu),
+        fetchCounts('dpnemastersummary', midsByType.dpne)
+      ]);
+
+      // 3. Format data and calculate dynamic status
+      const formattedData = sups.map((item: any) => {
         const code = item.mastersummaries?.Code || 'N/A';
         const isUalimu = UALIMU_CODES.includes(code);
-        
+        const stats = assignmentCounts[item.id] || { total: 0, centers: 0 };
+        const requiredCenters = centerCounts[item.mid] || 0;
+
+        let status: 'pending' | 'ongoing' | 'completed' = 'pending';
+        if (stats.total > 0) {
+          // If all centers are assigned, mark as completed
+          // We use a small buffer or exact match depending on requirements
+          status = (stats.centers >= requiredCenters && requiredCenters > 0) ? 'completed' : 'ongoing';
+        }
+
         return {
           id: item.id,
           mid: item.mid,
-          status: item.status,
+          status,
           exam_name: isUalimu ? 'UALIMU EXAMINATIONS' : (item.mastersummaries?.Examination || 'N/A'),
           exam_code: isUalimu ? 'UALIMU' : code,
           year: item.mastersummaries?.Year || 0,
           created_at: item.created_at
         };
       });
+
       setSupervisions(formattedData);
+    } catch (err: any) {
+      showError(err.message || "Failed to load supervisions");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleDeleteSupervision = async (record: Supervision) => {
@@ -149,7 +217,7 @@ const SupervisionsPage = () => {
       <Card className="w-full relative min-h-[500px]">
         {loading && (
           <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-[50] rounded-lg">
-            <Spinner label="Loading..." size="lg" />
+            <Spinner label="Calculating Status..." size="lg" />
           </div>
         )}
 
