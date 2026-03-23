@@ -43,13 +43,19 @@ function abbreviateSchoolName(name: string) {
     'TECHNICAL COLLEGE': 'TEC',
     'UNIVERSITY': 'UNIV',
     'INSTITUTE': 'INST',
-    'SEMINARY': 'SEM'
+    'SEMINARY': 'SEM',
+    'GIRLS': 'G',
+    'BOYS': 'B',
+    'DAY': 'D',
+    'BOARDING': 'BD'
   };
   let abbreviated = name.toUpperCase();
   for (const [full, abbr] of Object.entries(abbreviations)) {
-    abbreviated = abbreviated.replace(full, abbr);
+    // Use regex for whole word replacement to avoid partial matches
+    const regex = new RegExp(`\\b${full}\\b`, 'g');
+    abbreviated = abbreviated.replace(regex, abbr);
   }
-  return abbreviated.substring(0, 20);
+  return abbreviated.trim();
 }
 
 serve(async (req) => {
@@ -67,7 +73,6 @@ serve(async (req) => {
 
     if (!supervision_id) throw new Error("supervision_id is required");
 
-    // ── Get current supervision & master ────────────────────────────────────────
     const { data: supervision, error: supErr } = await supabase
       .from('supervisions')
       .select(`
@@ -90,15 +95,12 @@ serve(async (req) => {
     const isUalimu = examCode === "UALIMU" || ualimuCodes.includes(examCode);
     const isAcsee = examCode === "ACSEE";
 
-    // ── Input validation ────────────────────────────────────────────────────────
     if ((regions.length > 1) || (districts.length > 1) ||
         (regions.length > 0 && districts.length > 0 && regions.length + districts.length > 2)) {
       throw new Error("Only one region OR one district OR one region + one district allowed");
     }
 
-    // ── SYMMETRIC EXCLUSION: ACSEE ↔ Ualimu ─────────────────────────────────────
     const forbiddenNames = new Set<string>();
-
     if (isUalimu || isAcsee) {
       let conflictCodes: string[] = [];
       if (isUalimu) conflictCodes = ["ACSEE"];
@@ -131,9 +133,7 @@ serve(async (req) => {
       }
     }
 
-    // ── Ualimu-only: Reuse same supervisor for same center across Ualimu exams ──
     const centerSupervisorReuse: Record<string, string> = {};
-
     if (isUalimu) {
       const { data: otherUalimu } = await supabase
         .from('mastersummaries')
@@ -165,7 +165,6 @@ serve(async (req) => {
       }
     }
 
-    // ── Prevent duplicate assignments in this supervision + area ────────────────
     let dupQ = supabase
       .from('supervisorassignments')
       .select('id', { count: 'exact', head: true })
@@ -182,13 +181,9 @@ serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ── Load centers ────────────────────────────────────────────────────────────
     let centers: any[] = [];
-
     if (isUalimu) {
-      console.log("Processing Ualimu combined assignment...");
       const allUalimuData: any[] = [];
-      
       for (const uCode of ualimuCodes) {
         const { data: uMaster } = await supabase
           .from('mastersummaries')
@@ -199,16 +194,10 @@ serve(async (req) => {
           .maybeSingle();
         
         if (!uMaster) continue;
-
         const uTable = getCentersTable(uCode);
         if (!uTable) continue;
 
-        let q = supabase
-          .from(uTable)
-          .select('*')
-          .eq('mid', uMaster.id)
-          .eq('is_latest', true);
-
+        let q = supabase.from(uTable).select('*').eq('mid', uMaster.id).eq('is_latest', true);
         if (regions[0] && !districts[0]) q = q.eq('region', regions[0]);
         else if (districts[0] && !regions[0]) q = q.eq('district', districts[0]);
         else if (regions[0] && districts[0]) q = q.eq('region', regions[0]).eq('district', districts[0]);
@@ -217,17 +206,13 @@ serve(async (req) => {
         if (uData) allUalimuData.push(...uData);
       }
 
-      if (!allUalimuData.length) throw new Error("No Ualimu centers found");
-
       const centerMap = new Map();
       allUalimuData.forEach(c => {
         const key = c.center_number;
         const subjectValues = Object.entries(c)
           .filter(([k]) => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k) && typeof c[k] === 'number')
           .map(([, v]) => Number(v) || 0);
-        
         const maxStudents = subjectValues.length > 0 ? Math.max(...subjectValues) : 0;
-        
         if (!centerMap.has(key)) {
           centerMap.set(key, { ...c, totalStudents: maxStudents });
         } else {
@@ -238,37 +223,24 @@ serve(async (req) => {
 
       centers = Array.from(centerMap.values()).map(c => {
         const streams = Math.ceil(c.totalStudents / 40);
-        return {
-          ...c,
-          required_supervisors: Math.ceil(streams / 10) || 1
-        };
+        return { ...c, required_supervisors: Math.ceil(streams / 10) || 1 };
       });
     } else {
       const table = getCentersTable(examCode);
       if (!table) throw new Error(`Unknown exam code: ${examCode}`);
-
-      let q = supabase
-        .from(table)
-        .select('region, district, center_name, center_number')
-        .eq('mid', mid)
-        .eq('is_latest', true);
-
+      let q = supabase.from(table).select('region, district, center_name, center_number').eq('mid', mid).eq('is_latest', true);
       if (regions[0] && !districts[0]) q = q.eq('region', regions[0]);
       else if (districts[0] && !regions[0]) q = q.eq('district', districts[0]);
       else if (regions[0] && districts[0]) q = q.eq('region', regions[0]).eq('district', districts[0]);
-
       const { data: cData, error: cErr } = await q;
       if (cErr) throw cErr;
       centers = (cData || []).map(c => ({ ...c, required_supervisors: 1 }));
     }
 
     if (!centers.length) throw new Error("No centers found");
-    console.log(`Found ${centers.length} centers`);
 
-    // ── S/P grouping (only for FTNA/CSEE/ACSEE) ─────────────────────────────────
     const special = ["FTNA", "CSEE", "ACSEE"].includes(examCode);
     const centerGroups: Record<string, any> = {};
-
     if (special) {
       centers.forEach(c => {
         let no = c.center_number;
@@ -280,7 +252,6 @@ serve(async (req) => {
       });
     }
 
-    // ── Load supervisors + apply exclusion ──────────────────────────────────────
     let supQ = supabase
       .from('supervisors')
       .select('id, region, district, center_no, center_type, first_name, middle_name, last_name, phone')
@@ -294,7 +265,6 @@ serve(async (req) => {
     if (sErr) throw sErr;
 
     let supervisors = rawSups || [];
-
     if ((isUalimu || isAcsee) && forbiddenNames.size > 0) {
       supervisors = supervisors.filter(s => {
         const name = `${s.first_name} ${s.middle_name || ''} ${s.last_name}`.trim().replace(/\s+/g, ' ');
@@ -304,18 +274,13 @@ serve(async (req) => {
 
     if (!supervisors.length) throw new Error("No available supervisors after exclusions");
 
-    // ── Existing assignment counts (global) ─────────────────────────────────────
-    const { data: allAssigns } = await supabase
-      .from('supervisorassignments')
-      .select('supervisor_name');
-
+    const { data: allAssigns } = await supabase.from('supervisorassignments').select('supervisor_name');
     const assignmentCounts: Record<string, number> = {};
     allAssigns?.forEach(a => {
       const name = a.supervisor_name;
       assignmentCounts[name] = (assignmentCounts[name] || 0) + 1;
     });
 
-    // ── Shuffle & prepare ───────────────────────────────────────────────────────
     const shuffled = shuffleArray([...supervisors]);
     const supervisorsWithCounts = shuffled.map(s => {
       const full = `${s.first_name} ${s.middle_name || ''} ${s.last_name}`.trim().replace(/\s+/g, ' ');
@@ -323,24 +288,23 @@ serve(async (req) => {
     });
 
     const supervisorByName: Record<string, any> = {};
-    supervisorsWithCounts.forEach(s => {
-      supervisorByName[s.full_name] = s;
-    });
+    supervisorsWithCounts.forEach(s => { supervisorByName[s.full_name] = s; });
 
-    // ── Supervisor home center names ────────────────────────────────────────────
-    const centerNos = [...new Set(supervisorsWithCounts.map(s => s.center_no))];
+    // ── Supervisor home center names (Improved Lookup) ──────────────────────────
+    const centerNos = [...new Set(supervisorsWithCounts.map(s => s.center_no?.trim().toUpperCase()))].filter(Boolean);
     const supervisorCenterNames: Record<string, string> = {};
 
     if (centerNos.length) {
       const { data: sec } = await supabase.from('secondaryschools').select('center_no, name').in('center_no', centerNos);
       const { data: tc } = await supabase.from('teacherscolleges').select('center_no, name').in('center_no', centerNos);
-      sec?.forEach(r => supervisorCenterNames[r.center_no] = r.name);
-      tc?.forEach(r => supervisorCenterNames[r.center_no] = r.name);
+      const { data: pri } = await supabase.from('primaryschools').select('center_no, name').in('center_no', centerNos);
+      
+      sec?.forEach(r => { if (r.center_no) supervisorCenterNames[r.center_no.trim().toUpperCase()] = r.name; });
+      tc?.forEach(r => { if (r.center_no) supervisorCenterNames[r.center_no.trim().toUpperCase()] = r.name; });
+      pri?.forEach(r => { if (r.center_no) supervisorCenterNames[r.center_no.trim().toUpperCase()] = r.name; });
     }
 
-    // ── Group centers by district ───────────────────────────────────────────────
     const districtCenters: Record<string, any[]> = {};
-
     if (special) {
       const processed = new Set();
       Object.values(centerGroups).forEach((g: any) => {
@@ -352,11 +316,8 @@ serve(async (req) => {
             processed.add(g.S.center_number);
             processed.add(g.P.center_number);
           }
-        } else if (g.S) {
-          districtCenters[d].push({ ...g.S, required_supervisors: 1 });
-        } else if (g.P) {
-          districtCenters[d].push({ ...g.P, required_supervisors: 1 });
-        }
+        } else if (g.S) districtCenters[d].push({ ...g.S, required_supervisors: 1 });
+        else if (g.P) districtCenters[d].push({ ...g.P, required_supervisors: 1 });
       });
     } else {
       centers.forEach(c => {
@@ -365,15 +326,11 @@ serve(async (req) => {
       });
     }
 
-    // ── Group supervisors by district / type / center ───────────────────────────
     const districtSupervisors: Record<string, { PUBLIC: Record<string, any[]>, PRIVATE: Record<string, any[]> }> = {};
-
     supervisorsWithCounts.forEach(s => {
       if (!districtSupervisors[s.district]) districtSupervisors[s.district] = { PUBLIC: {}, PRIVATE: {} };
       const type = s.center_type?.toUpperCase().includes('PRIVATE') ? 'PRIVATE' : 'PUBLIC';
-      if (!districtSupervisors[s.district][type][s.center_no]) {
-        districtSupervisors[s.district][type][s.center_no] = [];
-      }
+      if (!districtSupervisors[s.district][type][s.center_no]) districtSupervisors[s.district][type][s.center_no] = [];
       districtSupervisors[s.district][type][s.center_no].push(s);
     });
 
@@ -385,31 +342,24 @@ serve(async (req) => {
       }
     }
 
-    // ── Validation: enough supervisors per district? ────────────────────────────
     const skippedDistricts: string[] = [];
-
     for (const d in districtCenters) {
       const totalNeeded = districtCenters[d].reduce((sum, c) => sum + (c.required_supervisors || 1), 0);
       const pub = Object.values(districtSupervisors[d]?.PUBLIC || {}).flat().length;
       const priv = Object.values(districtSupervisors[d]?.PRIVATE || {}).flat().length;
-      const total = pub + priv;
-      if (total < totalNeeded + 5) {
-        skippedDistricts.push(d);
-      }
+      if (pub + priv < totalNeeded + 5) skippedDistricts.push(d);
     }
 
     if (skippedDistricts.length === Object.keys(districtCenters).length) {
       throw new Error("All districts have insufficient supervisors (need centers + 5 reserves)");
     }
 
-    // ── Assignment ──────────────────────────────────────────────────────────────
     const assignments: any[] = [];
     const reserves: any[] = [];
     const assignedSupervisorIds = new Set();
 
     for (const district in districtCenters) {
       if (skippedDistricts.includes(district)) continue;
-
       let remainingCenters = [...districtCenters[district]];
       const supMap = districtSupervisors[district] || { PUBLIC: {}, PRIVATE: {} };
       const allHomeCenters = [...Object.keys(supMap.PUBLIC || {}), ...Object.keys(supMap.PRIVATE || {})];
@@ -423,6 +373,13 @@ serve(async (req) => {
         centerPointers[cn] = 0;
       });
 
+      const getWorkstation = (sup: any) => {
+        const homeName = supervisorCenterNames[sup.center_no?.trim().toUpperCase()] || "";
+        return homeName 
+          ? `${sup.center_no} - ${abbreviateSchoolName(homeName)}`
+          : sup.center_no;
+      };
+
       if (isUalimu) {
         for (let i = remainingCenters.length - 1; i >= 0; i--) {
           const center = remainingCenters[i];
@@ -430,10 +387,9 @@ serve(async (req) => {
           if (preferredName) {
             const sup = supervisorByName[preferredName];
             if (sup && !assignedSupervisorIds.has(sup.id)) {
-              const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
               assignments.push({
                 supervision_id, center_no: center.center_number, supervisor_name: sup.full_name, phone: sup.phone,
-                region: center.region, district: center.district, workstation: ws, assigned_by: assigned_by || "system"
+                region: center.region, district: center.district, workstation: getWorkstation(sup), assigned_by: assigned_by || "system"
               });
               assignedSupervisorIds.add(sup.id);
               centerAssignmentCount[sup.center_no] = (centerAssignmentCount[sup.center_no] || 0) + 1;
@@ -496,12 +452,10 @@ serve(async (req) => {
             if (!sup) centerAssignmentCount[home]++;
             attempts++;
           }
-
           if (sup) {
-            const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
             const payload = {
               supervision_id, center_no: center.center_number, supervisor_name: sup.full_name, phone: sup.phone,
-              region: center.region, district: center.district, workstation: ws, assigned_by: assigned_by || "system"
+              region: center.region, district: center.district, workstation: getWorkstation(sup), assigned_by: assigned_by || "system"
             };
             assignments.push(payload);
             if (center.linked_center) assignments.push({ ...payload, center_no: center.linked_center });
@@ -511,7 +465,6 @@ serve(async (req) => {
         }
       }
 
-      // ── Reserves (Skip for Ualimu) ────────────────────────────────────────────
       if (!isUalimu) {
         let resCount = 0;
         while (resCount < 5) {
@@ -522,10 +475,9 @@ serve(async (req) => {
             .sort((a, b) => a.assignment_count - b.assignment_count);
           if (pool.length === 0) { centerAssignmentCount[home]++; continue; }
           const sup = pool[0];
-          const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
           reserves.push({
             supervision_id, center_no: "RESERVE", supervisor_name: sup.full_name, phone: sup.phone,
-            region: sup.region, district: sup.district, workstation: ws, assigned_by: assigned_by || "system"
+            region: sup.region, district: sup.district, workstation: getWorkstation(sup), assigned_by: assigned_by || "system"
           });
           assignedSupervisorIds.add(sup.id);
           centerAssignmentCount[home]++;
