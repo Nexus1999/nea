@@ -6,8 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
-
 function shuffleArray<T>(array: T[]): T[] {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -24,7 +22,7 @@ function getCentersTable(code: string) {
     "FTNA": "secondarymastersummaries",
     "CSEE": "secondarymastersummaries",
     "ACSEE": "secondarymastersummaries",
-    "DPEE": "ualimumastersummary",
+    "DPEE": "dpeemastersummary",
     "DPNE": "dpnemastersummary",
     "GATCE": "ualimumastersummary",
     "DSEE": "ualimumastersummary",
@@ -81,17 +79,22 @@ serve(async (req) => {
 
     if (supErr || !supervision) throw new Error("Supervision not found");
 
+    const mid = supervision.mid;
     const master = supervision.mastersummaries;
     const currentYear = year ?? master.Year;
-    
-    // Ensure code is trimmed and standardized
-    const rawCode = (code || master.Code || "").toString().trim().toUpperCase();
-    const examCode = rawCode;
+    const examCode = (code || master.Code || "").toString().trim().toUpperCase();
 
     console.log(`🚀 Assignment started: ${supervision_id} (${examCode}-${currentYear})`);
 
-    const isUalimu = examCode === "UALIMU" || UALIMU_CODES.includes(examCode);
+    const ualimuCodes = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
+    const isUalimu = examCode === "UALIMU" || ualimuCodes.includes(examCode);
     const isAcsee = examCode === "ACSEE";
+
+    // ── Input validation ────────────────────────────────────────────────────────
+    if ((regions.length > 1) || (districts.length > 1) ||
+        (regions.length > 0 && districts.length > 0 && regions.length + districts.length > 2)) {
+      throw new Error("Only one region OR one district OR one region + one district allowed");
+    }
 
     // ── SYMMETRIC EXCLUSION: ACSEE ↔ Ualimu ─────────────────────────────────────
     const forbiddenNames = new Set<string>();
@@ -99,7 +102,7 @@ serve(async (req) => {
     if (isUalimu || isAcsee) {
       let conflictCodes: string[] = [];
       if (isUalimu) conflictCodes = ["ACSEE"];
-      else if (isAcsee) conflictCodes = UALIMU_CODES;
+      else if (isAcsee) conflictCodes = ualimuCodes;
 
       const { data: conflictMasters } = await supabase
         .from('mastersummaries')
@@ -123,6 +126,40 @@ serve(async (req) => {
 
           assigns?.forEach(a => {
             if (a.supervisor_name) forbiddenNames.add(a.supervisor_name);
+          });
+        }
+      }
+    }
+
+    // ── Ualimu-only: Reuse same supervisor for same center across Ualimu exams ──
+    const centerSupervisorReuse: Record<string, string> = {};
+
+    if (isUalimu) {
+      const { data: otherUalimu } = await supabase
+        .from('mastersummaries')
+        .select('id')
+        .in('Code', ualimuCodes)
+        .eq('Year', currentYear)
+        .neq('id', master.id);
+
+      if (otherUalimu?.length) {
+        const mids = otherUalimu.map(m => m.id);
+        const { data: otherSups } = await supabase
+          .from('supervisions')
+          .select('id')
+          .in('mid', mids);
+
+        if (otherSups?.length) {
+          const supIds = otherSups.map(s => s.id);
+          const { data: prevAssigns } = await supabase
+            .from('supervisorassignments')
+            .select('center_no, supervisor_name')
+            .in('supervision_id', supIds);
+
+          prevAssigns?.forEach(a => {
+            if (a.center_no && a.supervisor_name) {
+              centerSupervisorReuse[a.center_no] = a.supervisor_name;
+            }
           });
         }
       }
@@ -152,8 +189,7 @@ serve(async (req) => {
       console.log("Processing Ualimu combined assignment...");
       const allUalimuData: any[] = [];
       
-      // Fetch centers for each Ualimu code in a loop as requested
-      for (const uCode of UALIMU_CODES) {
+      for (const uCode of ualimuCodes) {
         const { data: uMaster } = await supabase
           .from('mastersummaries')
           .select('id')
@@ -164,11 +200,14 @@ serve(async (req) => {
         
         if (!uMaster) continue;
 
+        const uTable = getCentersTable(uCode);
+        if (!uTable) continue;
+
         let q = supabase
-          .from('ualimumastersummary')
+          .from(uTable)
           .select('*')
           .eq('mid', uMaster.id)
-          .eq('is_latest', 1);
+          .eq('is_latest', true);
 
         if (regions[0] && !districts[0]) q = q.eq('region', regions[0]);
         else if (districts[0] && !regions[0]) q = q.eq('district', districts[0]);
@@ -178,9 +217,8 @@ serve(async (req) => {
         if (uData) allUalimuData.push(...uData);
       }
 
-      if (!allUalimuData.length) throw new Error("No Ualimu centers found for the specified criteria");
+      if (!allUalimuData.length) throw new Error("No Ualimu centers found");
 
-      // Group by center and calculate requirements
       const centerMap = new Map();
       allUalimuData.forEach(c => {
         const key = c.center_number;
@@ -194,7 +232,6 @@ serve(async (req) => {
           centerMap.set(key, { ...c, totalStudents: maxStudents });
         } else {
           const existing = centerMap.get(key);
-          // For combined Ualimu, we take the max students across all Ualimu exam types at that center
           existing.totalStudents = Math.max(existing.totalStudents, maxStudents);
         }
       });
@@ -213,7 +250,7 @@ serve(async (req) => {
       let q = supabase
         .from(table)
         .select('region, district, center_name, center_number')
-        .eq('mid', master.id)
+        .eq('mid', mid)
         .eq('is_latest', true);
 
       if (regions[0] && !districts[0]) q = q.eq('region', regions[0]);
@@ -226,13 +263,13 @@ serve(async (req) => {
     }
 
     if (!centers.length) throw new Error("No centers found");
-    console.log(`Found ${centers.length} distinct centers`);
+    console.log(`Found ${centers.length} centers`);
 
     // ── S/P grouping (only for FTNA/CSEE/ACSEE) ─────────────────────────────────
-    const isSecondary = ["FTNA", "CSEE", "ACSEE"].includes(examCode);
+    const special = ["FTNA", "CSEE", "ACSEE"].includes(examCode);
     const centerGroups: Record<string, any> = {};
 
-    if (isSecondary) {
+    if (special) {
       centers.forEach(c => {
         let no = c.center_number;
         let t: 'S'|'P'|null = null;
@@ -285,6 +322,11 @@ serve(async (req) => {
       return { ...s, full_name: full, assignment_count: assignmentCounts[full] || 0 };
     });
 
+    const supervisorByName: Record<string, any> = {};
+    supervisorsWithCounts.forEach(s => {
+      supervisorByName[s.full_name] = s;
+    });
+
     // ── Supervisor home center names ────────────────────────────────────────────
     const centerNos = [...new Set(supervisorsWithCounts.map(s => s.center_no))];
     const supervisorCenterNames: Record<string, string> = {};
@@ -299,7 +341,7 @@ serve(async (req) => {
     // ── Group centers by district ───────────────────────────────────────────────
     const districtCenters: Record<string, any[]> = {};
 
-    if (isSecondary) {
+    if (special) {
       const processed = new Set();
       Object.values(centerGroups).forEach((g: any) => {
         const d = g.district;
@@ -335,7 +377,6 @@ serve(async (req) => {
       districtSupervisors[s.district][type][s.center_no].push(s);
     });
 
-    // Sort each group by current load (lowest first)
     for (const d in districtSupervisors) {
       for (const t of ['PUBLIC', 'PRIVATE']) {
         for (const cn in districtSupervisors[d][t]) {
@@ -344,12 +385,32 @@ serve(async (req) => {
       }
     }
 
+    // ── Validation: enough supervisors per district? ────────────────────────────
+    const skippedDistricts: string[] = [];
+
+    for (const d in districtCenters) {
+      const totalNeeded = districtCenters[d].reduce((sum, c) => sum + (c.required_supervisors || 1), 0);
+      const pub = Object.values(districtSupervisors[d]?.PUBLIC || {}).flat().length;
+      const priv = Object.values(districtSupervisors[d]?.PRIVATE || {}).flat().length;
+      const total = pub + priv;
+      if (total < totalNeeded + 5) {
+        skippedDistricts.push(d);
+      }
+    }
+
+    if (skippedDistricts.length === Object.keys(districtCenters).length) {
+      throw new Error("All districts have insufficient supervisors (need centers + 5 reserves)");
+    }
+
     // ── Assignment ──────────────────────────────────────────────────────────────
     const assignments: any[] = [];
     const reserves: any[] = [];
     const assignedSupervisorIds = new Set();
 
     for (const district in districtCenters) {
+      if (skippedDistricts.includes(district)) continue;
+
+      let remainingCenters = [...districtCenters[district]];
       const supMap = districtSupervisors[district] || { PUBLIC: {}, PRIVATE: {} };
       const allHomeCenters = [...Object.keys(supMap.PUBLIC || {}), ...Object.keys(supMap.PRIVATE || {})];
       const centerCapacities: Record<string, number> = {};
@@ -361,6 +422,26 @@ serve(async (req) => {
         centerAssignmentCount[cn] = 0;
         centerPointers[cn] = 0;
       });
+
+      if (isUalimu) {
+        for (let i = remainingCenters.length - 1; i >= 0; i--) {
+          const center = remainingCenters[i];
+          const preferredName = centerSupervisorReuse[center.center_number];
+          if (preferredName) {
+            const sup = supervisorByName[preferredName];
+            if (sup && !assignedSupervisorIds.has(sup.id)) {
+              const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
+              assignments.push({
+                supervision_id, center_no: center.center_number, supervisor_name: sup.full_name, phone: sup.phone,
+                region: center.region, district: center.district, workstation: ws, assigned_by: assigned_by || "system"
+              });
+              assignedSupervisorIds.add(sup.id);
+              centerAssignmentCount[sup.center_no] = (centerAssignmentCount[sup.center_no] || 0) + 1;
+              remainingCenters.splice(i, 1);
+            }
+          }
+        }
+      }
 
       const getNextHomeCenter = () => {
         let minScore = Infinity;
@@ -403,7 +484,7 @@ serve(async (req) => {
         return null;
       };
 
-      for (const center of districtCenters[district]) {
+      for (const center of remainingCenters) {
         const needed = center.required_supervisors || 1;
         for (let i = 0; i < needed; i++) {
           let sup = null;
@@ -419,14 +500,8 @@ serve(async (req) => {
           if (sup) {
             const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
             const payload = {
-              supervision_id,
-              center_no: center.center_number,
-              supervisor_name: sup.full_name,
-              phone: sup.phone,
-              region: center.region,
-              district: center.district,
-              workstation: ws,
-              assigned_by: assigned_by || "system"
+              supervision_id, center_no: center.center_number, supervisor_name: sup.full_name, phone: sup.phone,
+              region: center.region, district: center.district, workstation: ws, assigned_by: assigned_by || "system"
             };
             assignments.push(payload);
             if (center.linked_center) assignments.push({ ...payload, center_no: center.linked_center });
@@ -436,30 +511,26 @@ serve(async (req) => {
         }
       }
 
-      // ── Reserves (Skip for Ualimu) ────────────────────────────────────────────
-      if (!isUalimu) {
-        let resCount = 0;
-        while (resCount < 5) {
-          const home = getNextHomeCenter();
-          if (!home) break;
-          const pool = [...(supMap.PUBLIC?.[home] || []), ...(supMap.PRIVATE?.[home] || [])]
-            .filter(s => !assignedSupervisorIds.has(s.id))
-            .sort((a, b) => a.assignment_count - b.assignment_count);
-          if (pool.length === 0) { centerAssignmentCount[home]++; continue; }
-          const sup = pool[0];
-          const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
-          reserves.push({
-            supervision_id, center_no: "RESERVE", supervisor_name: sup.full_name, phone: sup.phone,
-            region: sup.region, district: sup.district, workstation: ws, assigned_by: assigned_by || "system"
-          });
-          assignedSupervisorIds.add(sup.id);
-          centerAssignmentCount[home]++;
-          resCount++;
-        }
+      let resCount = 0;
+      while (resCount < 5) {
+        const home = getNextHomeCenter();
+        if (!home) break;
+        const pool = [...(supMap.PUBLIC?.[home] || []), ...(supMap.PRIVATE?.[home] || [])]
+          .filter(s => !assignedSupervisorIds.has(s.id))
+          .sort((a, b) => a.assignment_count - b.assignment_count);
+        if (pool.length === 0) { centerAssignmentCount[home]++; continue; }
+        const sup = pool[0];
+        const ws = `${sup.center_no}-${abbreviateSchoolName(supervisorCenterNames[sup.center_no] || sup.center_no)}`;
+        reserves.push({
+          supervision_id, center_no: "RESERVE", supervisor_name: sup.full_name, phone: sup.phone,
+          region: sup.region, district: sup.district, workstation: ws, assigned_by: assigned_by || "system"
+        });
+        assignedSupervisorIds.add(sup.id);
+        centerAssignmentCount[home]++;
+        resCount++;
       }
     }
 
-    // ── Save ────────────────────────────────────────────────────────────────────
     const allRecords = [...assignments, ...reserves];
     if (allRecords.length > 0) {
       const { error: insertErr } = await supabase.from('supervisorassignments').insert(allRecords);
@@ -470,7 +541,9 @@ serve(async (req) => {
       success: true,
       count: assignments.length,
       reserves: reserves.length,
-      message: `Assigned ${assignments.length} supervisors ${isUalimu ? '' : `+ ${reserves.length} reserves`}`
+      message: `Assigned ${assignments.length} supervisors + ${reserves.length} reserves`,
+      skipped_districts: skippedDistricts,
+      ualimu_reused: isUalimu ? Object.keys(centerSupervisorReuse).length : 0
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (err: any) {
