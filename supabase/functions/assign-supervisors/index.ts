@@ -31,7 +31,7 @@ function getCentersTable(code: string) {
     "GATSCCE": "ualimumastersummary",
     "DSPEE": "ualimumastersummary",
     "DPPEE": "ualimumastersummary",
-    "UALIMU": "ualimumastersummary" // Added as fallback
+    "UALIMU": "ualimumastersummary"
   };
   return map[code.toUpperCase()] || null;
 }
@@ -149,32 +149,40 @@ serve(async (req) => {
     let centers: any[] = [];
 
     if (isUalimu) {
-      // Fetch all Ualimu MIDs for the year
-      const { data: ualimuMasters } = await supabase
-        .from('mastersummaries')
-        .select('id')
-        .in('Code', UALIMU_CODES)
-        .eq('Year', currentYear)
-        .eq('is_latest', true);
+      console.log("Processing Ualimu combined assignment...");
+      const allUalimuData: any[] = [];
       
-      const mids = ualimuMasters?.map(m => m.id) || [];
-      
-      let q = supabase
-        .from('ualimumastersummary')
-        .select('*')
-        .in('mid', mids)
-        .eq('is_latest', 1);
+      // Fetch centers for each Ualimu code in a loop as requested
+      for (const uCode of UALIMU_CODES) {
+        const { data: uMaster } = await supabase
+          .from('mastersummaries')
+          .select('id')
+          .eq('Code', uCode)
+          .eq('Year', currentYear)
+          .eq('is_latest', true)
+          .maybeSingle();
+        
+        if (!uMaster) continue;
 
-      if (regions[0] && !districts[0]) q = q.eq('region', regions[0]);
-      else if (districts[0] && !regions[0]) q = q.eq('district', districts[0]);
-      else if (regions[0] && districts[0]) q = q.eq('region', regions[0]).eq('district', districts[0]);
+        let q = supabase
+          .from('ualimumastersummary')
+          .select('*')
+          .eq('mid', uMaster.id)
+          .eq('is_latest', 1);
 
-      const { data: ualimuData, error: cErr } = await q;
-      if (cErr) throw cErr;
+        if (regions[0] && !districts[0]) q = q.eq('region', regions[0]);
+        else if (districts[0] && !regions[0]) q = q.eq('district', districts[0]);
+        else if (regions[0] && districts[0]) q = q.eq('region', regions[0]).eq('district', districts[0]);
+
+        const { data: uData } = await q;
+        if (uData) allUalimuData.push(...uData);
+      }
+
+      if (!allUalimuData.length) throw new Error("No Ualimu centers found for the specified criteria");
 
       // Group by center and calculate requirements
       const centerMap = new Map();
-      ualimuData?.forEach(c => {
+      allUalimuData.forEach(c => {
         const key = c.center_number;
         const subjectValues = Object.entries(c)
           .filter(([k]) => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k) && typeof c[k] === 'number')
@@ -186,7 +194,8 @@ serve(async (req) => {
           centerMap.set(key, { ...c, totalStudents: maxStudents });
         } else {
           const existing = centerMap.get(key);
-          existing.totalStudents += maxStudents;
+          // For combined Ualimu, we take the max students across all Ualimu exam types at that center
+          existing.totalStudents = Math.max(existing.totalStudents, maxStudents);
         }
       });
 
