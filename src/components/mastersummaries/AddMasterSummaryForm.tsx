@@ -1,10 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, UploadCloud, TriangleAlert, Download } from "lucide-react";
+import { 
+  Loader2, 
+  UploadCloud, 
+  TriangleAlert, 
+  Download, 
+  FileSpreadsheet, 
+  Calendar, 
+  Hash,
+  CheckCircle2,
+  X
+} from "lucide-react";
 import * as XLSX from 'xlsx';
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 const CSEE_FTNA_SUBJECT_CODES = ['011','012','013','014','015','016','017','018','019','021','022','023','024','025','026','031','032','033','034','035','036','041','042','050','051','052','061','062','071','072','073','074','080','081','082','083','087','088','090','091'];
 const ACSEE_SUBJECT_CODES = ['111','112','113','114','115','116','118','121','122','123','125','126','131','132','133','134','136','137','141','142','151','152','153','155','161'];
@@ -48,10 +59,8 @@ interface ExaminationOption {
 }
 
 const addMasterSummaryFormSchema = z.object({
-  examination: z.string().min(2, { message: "Examination name is required." }),
-  code: z.enum(["SFNA", "SSNA", "PSLE", "FTNA", "CSEE", "ACSEE", "DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"], {
-    required_error: "Examination code is required.",
-  }),
+  examination: z.string().min(1, { message: "Examination is required." }),
+  code: z.string().min(1, { message: "Code is required." }),
   year: z.preprocess(
     (val) => Number(val),
     z.number().int().min(1900).max(2100)
@@ -70,40 +79,40 @@ interface AddMasterSummaryFormProps {
 const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpenChange, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [examinations, setExaminations] = useState<ExaminationOption[]>([]);
-  const [examinationsLoading, setExaminationsLoading] = useState(true);
   const [missingHeadersError, setMissingHeadersError] = useState<string | null>(null);
   const [expectedHeadersForTemplate, setExpectedHeadersForTemplate] = useState<string[]>([]);
   const [parsedFileData, setParsedFileData] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<AddMasterSummaryFormValues>({
     resolver: zodResolver(addMasterSummaryFormSchema),
-    defaultValues: { examination: "", code: undefined, year: new Date().getFullYear(), file: undefined },
+    defaultValues: { examination: "", code: "", year: new Date().getFullYear(), file: undefined },
   });
 
-  const watchedExamination = useWatch({ control: form.control, name: 'examination' });
   const watchedCode = useWatch({ control: form.control, name: 'code' });
 
   useEffect(() => {
     if (open) {
       const fetchExaminations = async () => {
-        setExaminationsLoading(true);
-        const { data, error } = await supabase.from('examinations').select('*').eq('status', 'active').order('examination');
+        const { data, error } = await supabase.from('examinations').select('*').eq('status', 'active').order('code');
         if (!error) setExaminations(data || []);
-        setExaminationsLoading(false);
       };
       fetchExaminations();
       form.reset();
       setMissingHeadersError(null);
       setParsedFileData(null);
+      setFileName(null);
     }
   }, [open, form]);
 
-  useEffect(() => {
-    if (watchedExamination) {
-      const selectedExam = examinations.find(e => e.examination === watchedExamination);
-      if (selectedExam) form.setValue('code', selectedExam.code as any, { shouldValidate: true });
+  const handleCodeChange = (code: string) => {
+    const selectedExam = examinations.find(e => e.code === code);
+    if (selectedExam) {
+      form.setValue('code', code, { shouldValidate: true });
+      form.setValue('examination', selectedExam.examination, { shouldValidate: true });
     }
-  }, [watchedExamination, examinations, form]);
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -112,13 +121,14 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
     const selectedCode = form.getValues('code');
 
     if (!selectedCode) {
-      showError("Please select an examination first.");
+      showError("Please select an examination code first.");
       event.target.value = '';
       return;
     }
 
     setLoading(true);
     setMissingHeadersError(null);
+    setFileName(file.name);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -161,6 +171,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         if (!isValid) {
           showError(errorMsg);
           setParsedFileData(null);
+          setFileName(null);
           event.target.value = '';
         } else {
           setParsedFileData(JSON.stringify(jsonData));
@@ -168,6 +179,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         }
       } catch (err: any) {
         showError(err.message);
+        setFileName(null);
       } finally {
         setLoading(false);
       }
@@ -201,7 +213,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         return;
       }
 
-      showSuccess("Processed successfully!");
+      showSuccess("Master summary created successfully!");
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
@@ -213,63 +225,163 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Add New Master Summary</DialogTitle>
-          <DialogDescription>Upload data for the selected examination.</DialogDescription>
+      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden border-none shadow-2xl">
+        <DialogHeader className="bg-slate-900 text-white p-6">
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5 text-blue-400" />
+            Add Master Summary
+          </DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Upload and process examination data for the master records.
+          </DialogDescription>
         </DialogHeader>
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-6">
             {missingHeadersError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-md text-sm">
-                <p className="font-semibold flex items-center"><TriangleAlert className="h-4 w-4 mr-2" /> {missingHeadersError}</p>
-                {expectedHeadersForTemplate.length > 0 && (
-                  <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => {}}>
-                    <Download className="h-4 w-4 mr-2" /> Download Template
-                  </Button>
-                )}
+              <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-start gap-3">
+                  <TriangleAlert className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold mb-1">Validation Error</p>
+                    <p className="opacity-90">{missingHeadersError}</p>
+                    {expectedHeadersForTemplate.length > 0 && (
+                      <Button type="button" variant="link" size="sm" className="p-0 h-auto text-red-700 font-bold mt-2 hover:no-underline" onClick={() => {}}>
+                        <Download className="h-3.5 w-3.5 mr-1" /> Download Template
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="examination" render={({ field }) => (
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField control={form.control} name="code" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Examination Name</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger></FormControl>
-                    <SelectContent>
+                  <FormLabel className="text-slate-700 font-semibold flex items-center gap-2">
+                    <Hash className="h-4 w-4 text-slate-400" /> Exam Code
+                  </FormLabel>
+                  <Select onValueChange={handleCodeChange} value={field.value} disabled={loading}>
+                    <FormControl>
+                      <SelectTrigger className="h-11 rounded-xl border-slate-200 focus:ring-blue-500">
+                        <SelectValue placeholder="Select code" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="rounded-xl">
                       {examinations.map((exam) => (
-                        <SelectItem key={exam.exam_id} value={exam.examination}>{exam.examination} ({exam.code})</SelectItem>
+                        <SelectItem key={exam.exam_id} value={exam.code} className="rounded-lg">
+                          <span className="font-bold">{exam.code}</span>
+                          <span className="ml-2 text-slate-400 text-xs">— {exam.examination}</span>
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="code" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code</FormLabel>
-                  <FormControl><Input {...field} readOnly className="bg-gray-100" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+
               <FormField control={form.control} name="year" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Year</FormLabel>
-                  <FormControl><Input type="number" {...field} disabled={loading} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="file" render={() => (
-                <FormItem>
-                  <FormLabel>File (.xlsx, .csv)</FormLabel>
-                  <FormControl><Input type="file" accept=".xlsx,.csv" onChange={handleFileChange} disabled={loading || !watchedCode} /></FormControl>
+                  <FormLabel className="text-slate-700 font-semibold flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-slate-400" /> Academic Year
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      {...field} 
+                      disabled={loading} 
+                      className="h-11 rounded-xl border-slate-200 focus:ring-blue-500"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
             </div>
-            <DialogFooter>
-              <Button type="submit" disabled={loading || !parsedFileData}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><UploadCloud className="mr-2 h-4 w-4" /> Create Summary</>}
+
+            <FormField control={form.control} name="file" render={() => (
+              <FormItem>
+                <FormLabel className="text-slate-700 font-semibold">Data Source</FormLabel>
+                <FormControl>
+                  <div 
+                    onClick={() => !loading && watchedCode && fileInputRef.current?.click()}
+                    className={cn(
+                      "relative border-2 border-dashed rounded-2xl p-8 transition-all cursor-pointer flex flex-col items-center justify-center gap-3",
+                      !watchedCode ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed" : "bg-blue-50/30 border-blue-200 hover:border-blue-400 hover:bg-blue-50/50",
+                      fileName && "border-green-200 bg-green-50/30"
+                    )}
+                  >
+                    <input 
+                      type="file" 
+                      ref={fileInputRef}
+                      className="hidden" 
+                      accept=".xlsx,.csv" 
+                      onChange={handleFileChange} 
+                      disabled={loading || !watchedCode} 
+                    />
+                    
+                    {fileName ? (
+                      <>
+                        <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                          <CheckCircle2 className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-slate-900 truncate max-w-[300px]">{fileName}</p>
+                          <p className="text-xs text-slate-500 mt-1">File ready for processing</p>
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          className="absolute top-2 right-2 h-8 w-8 rounded-full hover:bg-red-50 hover:text-red-500"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFileName(null);
+                            setParsedFileData(null);
+                            form.setValue('file', undefined);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                          <UploadCloud className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-slate-900">
+                            {watchedCode ? "Click to upload spreadsheet" : "Select exam code first"}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">Supports .xlsx and .csv files</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <DialogFooter className="pt-4">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                onClick={() => onOpenChange(false)}
+                disabled={loading}
+                className="rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={loading || !parsedFileData}
+                className="rounded-xl bg-slate-900 hover:bg-slate-800 px-8 min-w-[140px]"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>Process Data</>
+                )}
               </Button>
             </DialogFooter>
           </form>
