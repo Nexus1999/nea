@@ -169,7 +169,7 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         }
 
         if (!isValid) {
-          showError(errorMsg);
+          setMissingHeadersError(errorMsg);
           setParsedFileData(null);
           setFileName(null);
           event.target.value = '';
@@ -238,23 +238,6 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-6">
-            {missingHeadersError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-start gap-3">
-                  <TriangleAlert className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold mb-1">Validation Error</p>
-                    <p className="opacity-90">{missingHeadersError}</p>
-                    {expectedHeadersForTemplate.length > 0 && (
-                      <Button type="button" variant="link" size="sm" className="p-0 h-auto text-red-700 font-bold mt-2 hover:no-underline" onClick={() => {}}>
-                        <Download className="h-3.5 w-3.5 mr-1" /> Download Template
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField control={form.control} name="code" render={({ field }) => (
                 <FormItem>
@@ -271,7 +254,6 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
                       {examinations.map((exam) => (
                         <SelectItem key={exam.exam_id} value={exam.code} className="rounded-lg">
                           <span className="font-bold">{exam.code}</span>
-                          <span className="ml-2 text-slate-400 text-xs">— {exam.examination}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -298,69 +280,90 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
               )} />
             </div>
 
-            <FormField control={form.control} name="file" render={() => (
-              <FormItem>
-                <FormLabel className="text-slate-700 font-semibold">Data Source</FormLabel>
-                <FormControl>
-                  <div 
-                    onClick={() => !loading && watchedCode && fileInputRef.current?.click()}
-                    className={cn(
-                      "relative border-2 border-dashed rounded-2xl p-8 transition-all cursor-pointer flex flex-col items-center justify-center gap-3",
-                      !watchedCode ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed" : "bg-blue-50/30 border-blue-200 hover:border-blue-400 hover:bg-blue-50/50",
-                      fileName && "border-green-200 bg-green-50/30"
-                    )}
-                  >
-                    <input 
-                      type="file" 
-                      ref={fileInputRef}
-                      className="hidden" 
-                      accept=".xlsx,.csv" 
-                      onChange={handleFileChange} 
-                      disabled={loading || !watchedCode} 
-                    />
-                    
-                    {fileName ? (
-                      <>
-                        <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                          <CheckCircle2 className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-slate-900 truncate max-w-[300px]">{fileName}</p>
-                          <p className="text-xs text-slate-500 mt-1">File ready for processing</p>
-                        </div>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="icon" 
-                          className="absolute top-2 right-2 h-8 w-8 rounded-full hover:bg-red-50 hover:text-red-500"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFileName(null);
-                            setParsedFileData(null);
-                            form.setValue('file', undefined);
-                          }}
-                        >
-                          <X className="h-4 w-4" />
+            <div className="space-y-4">
+              {missingHeadersError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-start gap-3">
+                    <TriangleAlert className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold mb-1">Validation Error</p>
+                      <p className="opacity-90">{missingHeadersError}</p>
+                      {expectedHeadersForTemplate.length > 0 && (
+                        <Button type="button" variant="link" size="sm" className="p-0 h-auto text-red-700 font-bold mt-2 hover:no-underline" onClick={() => {}}>
+                          <Download className="h-3.5 w-3.5 mr-1" /> Download Template
                         </Button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                          <UploadCloud className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-slate-900">
-                            {watchedCode ? "Click to upload spreadsheet" : "Select exam code first"}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-1">Supports .xlsx and .csv files</p>
-                        </div>
-                      </>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+                </div>
+              )}
+
+              <FormField control={form.control} name="file" render={() => (
+                <FormItem>
+                  <FormLabel className="text-slate-700 font-semibold">Data Source</FormLabel>
+                  <FormControl>
+                    <div 
+                      onClick={() => !loading && watchedCode && fileInputRef.current?.click()}
+                      className={cn(
+                        "relative border-2 border-dashed rounded-2xl p-8 transition-all cursor-pointer flex flex-col items-center justify-center gap-3",
+                        !watchedCode ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed" : "bg-blue-50/30 border-blue-200 hover:border-blue-400 hover:bg-blue-50/50",
+                        fileName && "border-green-200 bg-green-50/30",
+                        missingHeadersError && "border-red-200 bg-red-50/30"
+                      )}
+                    >
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        accept=".xlsx,.csv" 
+                        onChange={handleFileChange} 
+                        disabled={loading || !watchedCode} 
+                      />
+                      
+                      {fileName ? (
+                        <>
+                          <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle2 className="h-6 w-6 text-green-600" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-slate-900 truncate max-w-[300px]">{fileName}</p>
+                            <p className="text-xs text-slate-500 mt-1">File ready for processing</p>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-2 right-2 h-8 w-8 rounded-full hover:bg-red-50 hover:text-red-500"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFileName(null);
+                              setParsedFileData(null);
+                              setMissingHeadersError(null);
+                              form.setValue('file', undefined);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                            <UploadCloud className="h-6 w-6 text-blue-600" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-slate-900">
+                              {watchedCode ? "Click to upload spreadsheet" : "Select exam code first"}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">Supports .xlsx and .csv files</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
 
             <DialogFooter className="pt-4">
               <Button 
