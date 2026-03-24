@@ -35,6 +35,10 @@ import {
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
 
+const CSEE_FTNA_SUBJECT_CODES = ['011','012','013','014','015','016','017','018','019','021','022','023','024','025','026','031','032','033','034','035','036','041','042','050','051','052','061','062','071','072','073','074','080','081','082','083','087','088','090','091'];
+const ACSEE_SUBJECT_CODES = ['111','112','113','114','115','116','118','121','122','123','125','126','131','132','133','134','136','137','141','142','151','152','153','155','161'];
+const UALIMU_SUBJECT_CODES = ['513','514','520','521','522-E','531','532','541','542','551','552','553','554','566','567','585','586','587','588','589','595','596','597','598','599','610','611','520-E','616','522','516','521-E','517','580','590','710','711','712','713','715','716','717','719','721','722','724','725','731','732','733','735','736','737','738','740','750','751','752','753','761','762','763','764','612','613','614','615','621','622','624','631','632','633','634','635','636','638','640','641','650','651','652','654','680','682','683','684','686','687','689','691','510','560','561','562','563','564','565','571','572','573','574','581','582','583','584','661','664','665','669','670','672','673','674','675','676','679','692','693','694','695','696'];
+
 interface ExaminationOption {
   exam_id: number;
   examination: string;
@@ -50,15 +54,9 @@ const addMasterSummaryFormSchema = z.object({
   }),
   year: z.preprocess(
     (val) => Number(val),
-    z.number().int().min(1900, { message: "Year must be a valid year." }).max(2100, { message: "Year must be a valid year." })
+    z.number().int().min(1900).max(2100)
   ),
-  file: z.any()
-    .refine((file) => file?.length > 0, "File is required.")
-    .refine((file) => file?.[0]?.size <= 10 * 1024 * 1024, `File size should be less than 10MB.`)
-    .refine(
-      (file) => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'].includes(file?.[0]?.type),
-      "Only .xlsx and .csv files are allowed."
-    ),
+  file: z.any().refine((file) => file?.length > 0, "File is required."),
 });
 
 export type AddMasterSummaryFormValues = z.infer<typeof addMasterSummaryFormSchema>;
@@ -79,137 +77,107 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
 
   const form = useForm<AddMasterSummaryFormValues>({
     resolver: zodResolver(addMasterSummaryFormSchema),
-    defaultValues: {
-      examination: "",
-      code: undefined,
-      year: new Date().getFullYear(),
-      file: undefined,
-    },
+    defaultValues: { examination: "", code: undefined, year: new Date().getFullYear(), file: undefined },
   });
 
   const watchedExamination = useWatch({ control: form.control, name: 'examination' });
+  const watchedCode = useWatch({ control: form.control, name: 'code' });
 
   useEffect(() => {
     if (open) {
       const fetchExaminations = async () => {
         setExaminationsLoading(true);
-        const { data, error } = await supabase
-          .from('examinations')
-          .select('exam_id, examination, code, level, status')
-          .eq('status', 'active')
-          .order('examination', { ascending: true });
-
-        if (error) {
-          showError(error.message);
-          setExaminations([]);
-        } else {
-          setExaminations(data || []);
-        }
+        const { data, error } = await supabase.from('examinations').select('*').eq('status', 'active').order('examination');
+        if (!error) setExaminations(data || []);
         setExaminationsLoading(false);
       };
       fetchExaminations();
-      
-      form.reset({
-        examination: "",
-        code: undefined,
-        year: new Date().getFullYear(),
-        file: undefined,
-      });
+      form.reset();
       setMissingHeadersError(null);
-      setExpectedHeadersForTemplate([]);
       setParsedFileData(null);
     }
   }, [open, form]);
 
   useEffect(() => {
     if (watchedExamination) {
-      const selectedExam = examinations.find(
-        (exam) => exam.examination === watchedExamination
-      );
-      if (selectedExam) {
-        const validCodes = ["SFNA", "SSNA", "PSLE", "FTNA", "CSEE", "ACSEE", "DSEE", "GATCE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
-        if (validCodes.includes(selectedExam.code)) {
-          form.setValue('code', selectedExam.code as AddMasterSummaryFormValues['code'], { shouldValidate: true });
-          form.clearErrors('code');
-        } else {
-          form.setError('code', { type: 'manual', message: `Invalid code '${selectedExam.code}' for master summary.` });
-          form.setValue('code', undefined as any);
-        }
-      }
-    } else {
-      form.setValue('code', undefined as any);
+      const selectedExam = examinations.find(e => e.examination === watchedExamination);
+      if (selectedExam) form.setValue('code', selectedExam.code as any, { shouldValidate: true });
     }
   }, [watchedExamination, examinations, form]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (!files || files.length === 0) {
-      setParsedFileData(null);
-      return;
-    }
-
+    if (!files || files.length === 0) return;
     const file = files[0];
-    form.setValue('file', files, { shouldValidate: true });
+    const selectedCode = form.getValues('code');
 
-    if (file.size > 10 * 1024 * 1024) {
-      setParsedFileData(null);
-      return;
-    }
-    if (!['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'].includes(file.type)) {
-      setParsedFileData(null);
+    if (!selectedCode) {
+      showError("Please select an examination first.");
+      event.target.value = '';
       return;
     }
 
     setLoading(true);
     setMissingHeadersError(null);
-    setExpectedHeadersForTemplate([]);
 
-    try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
         const data = e.target?.result;
-        let jsonData: any[] = [];
+        const workbook = XLSX.read(data, { type: 'array' });
+        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' });
 
-        if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
-        } else if (file.type === 'text/csv') {
-          const csvText = new TextDecoder().decode(data as ArrayBuffer);
-          const workbook = XLSX.read(csvText, { type: 'string' });
-          const sheetName = workbook.SheetNames[0];
-          jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+        if (jsonData.length === 0) throw new Error("File is empty.");
+
+        const headers = Object.keys(jsonData[0] as object).map(h => h.toLowerCase());
+        let isValid = true;
+        let errorMsg = "";
+
+        if (["SFNA", "SSNA", "PSLE"].includes(selectedCode)) {
+          if (!headers.includes('subjects') || !headers.includes('medium')) {
+            isValid = false;
+            errorMsg = "File is missing primary examination columns (subjects, medium).";
+          }
+        } else if (selectedCode === "ACSEE") {
+          const hasACSEE = ACSEE_SUBJECT_CODES.some(c => headers.includes(c.toLowerCase()));
+          if (!hasACSEE) {
+            isValid = false;
+            errorMsg = "File does not contain ACSEE subject columns.";
+          }
+        } else if (["FTNA", "CSEE"].includes(selectedCode)) {
+          const hasCSEE = CSEE_FTNA_SUBJECT_CODES.some(c => headers.includes(c.toLowerCase()));
+          if (!hasCSEE) {
+            isValid = false;
+            errorMsg = "File does not contain CSEE/FTNA subject columns.";
+          }
+        } else if (['DSEE', 'GATCE', 'GATSCCE', 'DPEE', 'DSPEE', 'DPPEE'].includes(selectedCode)) {
+          const hasUalimu = UALIMU_SUBJECT_CODES.some(c => headers.includes(c.toLowerCase()));
+          if (!hasUalimu) {
+            isValid = false;
+            errorMsg = "File does not contain Ualimu subject columns.";
+          }
         }
 
-        if (jsonData.length === 0) {
-          form.setError('file', { type: 'manual', message: 'Uploaded file contains no data or invalid format.' });
+        if (!isValid) {
+          showError(errorMsg);
           setParsedFileData(null);
-          return;
+          event.target.value = '';
+        } else {
+          setParsedFileData(JSON.stringify(jsonData));
+          form.setValue('file', files, { shouldValidate: true });
         }
-
-        setParsedFileData(JSON.stringify(jsonData));
-        form.clearErrors('file');
-      };
-      reader.readAsArrayBuffer(file);
-    } catch (error: any) {
-      form.setError('file', { type: 'manual', message: `Error parsing file: ${error.message}` });
-      setParsedFileData(null);
-    } finally {
-      setLoading(false);
-    }
+      } catch (err: any) {
+        showError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const onSubmit = async (values: AddMasterSummaryFormValues) => {
+    if (!parsedFileData) return;
     setLoading(true);
-    setMissingHeadersError(null);
-    setExpectedHeadersForTemplate([]);
-
-    if (!parsedFileData) {
-      showError("No parsed data available. Please upload a valid file.");
-      setLoading(false);
-      return;
-    }
-
     try {
       const formData = new FormData();
       formData.append('examination', values.examination);
@@ -223,44 +191,24 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
       });
 
       const result = await response.json();
-
       if (!response.ok) {
-        if (result.error && result.expectedHeaders) {
+        if (result.expectedHeaders) {
           setMissingHeadersError(result.error);
           setExpectedHeadersForTemplate(result.expectedHeaders);
         } else {
-          showError(result.error || 'Failed to process master summary data.');
+          showError(result.error || 'Failed to process.');
         }
         return;
       }
 
-      showSuccess(result.message || "Master summary processed successfully!");
+      showSuccess("Processed successfully!");
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      showError(error.message || "An unexpected error occurred.");
+      showError(error.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDownloadTemplate = () => {
-    if (expectedHeadersForTemplate.length === 0) {
-      showError("No template headers available.");
-      return;
-    }
-
-    const csvContent = expectedHeadersForTemplate.join(',') + '\n';
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${form.getValues('code') || 'master_summary'}_template.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showSuccess("Template downloaded successfully!");
   };
 
   return (
@@ -268,129 +216,60 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Add New Master Summary</DialogTitle>
-          <DialogDescription>
-            Upload an Excel/CSV file containing registration data for a specific examination.
-          </DialogDescription>
+          <DialogDescription>Upload data for the selected examination.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
             {missingHeadersError && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-md text-sm">
-                <p className="font-semibold mb-2 flex items-center"><TriangleAlert className="h-4 w-4 mr-2" /> {missingHeadersError}</p>
+                <p className="font-semibold flex items-center"><TriangleAlert className="h-4 w-4 mr-2" /> {missingHeadersError}</p>
                 {expectedHeadersForTemplate.length > 0 && (
-                  <div className="flex items-center justify-between mt-2">
-                    <p>Expected headers: <span className="font-mono text-xs bg-red-100 px-2 py-1 rounded">{expectedHeadersForTemplate.join(', ')}</span></p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownloadTemplate}
-                      className="text-red-700 border-red-700 hover:bg-red-100"
-                    >
-                      <Download className="h-4 w-4 mr-2" /> Download Template
-                    </Button>
-                  </div>
+                  <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => {}}>
+                    <Download className="h-4 w-4 mr-2" /> Download Template
+                  </Button>
                 )}
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="examination"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Examination Name</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={loading || examinationsLoading}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an examination" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {examinationsLoading ? (
-                          <div className="flex items-center justify-center p-4">
-                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                          </div>
-                        ) : examinations.length === 0 ? (
-                          <div className="p-4 text-center text-gray-500">No active examinations found.</div>
-                        ) : (
-                          examinations.map((exam) => (
-                            <SelectItem key={exam.exam_id} value={exam.examination}>
-                              {exam.examination} ({exam.code})
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Examination Code</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Auto-filled"
-                        {...field}
-                        readOnly
-                        className="bg-gray-100 cursor-not-allowed"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="year"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Year</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="e.g., 2023" {...field} disabled={loading} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="file"
-                render={({ field: { value, onChange, ...fieldProps } }) => (
-                  <FormItem>
-                    <FormLabel>Upload Data File (.xlsx, .csv)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...fieldProps}
-                        type="file"
-                        accept=".xlsx,.csv"
-                        onChange={handleFileChange}
-                        disabled={loading}
-                        className="file:text-primary file:font-semibold file:hover:bg-gray-100"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormField control={form.control} name="examination" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Examination Name</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {examinations.map((exam) => (
+                        <SelectItem key={exam.exam_id} value={exam.examination}>{exam.examination} ({exam.code})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="code" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Code</FormLabel>
+                  <FormControl><Input {...field} readOnly className="bg-gray-100" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="year" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Year</FormLabel>
+                  <FormControl><Input type="number" {...field} disabled={loading} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="file" render={() => (
+                <FormItem>
+                  <FormLabel>File (.xlsx, .csv)</FormLabel>
+                  <FormControl><Input type="file" accept=".xlsx,.csv" onChange={handleFileChange} disabled={loading || !watchedCode} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={loading || examinationsLoading || !parsedFileData}>
-                {loading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <UploadCloud className="mr-2 h-4 w-4" /> Create Summary
-                  </>
-                )}
+              <Button type="submit" disabled={loading || !parsedFileData}>
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><UploadCloud className="mr-2 h-4 w-4" /> Create Summary</>}
               </Button>
             </DialogFooter>
           </form>
