@@ -85,13 +85,16 @@ const ReassignSupervisorModal = ({
   }, [currentAssignment, isOpen]);
 
   const fetchAllSupervisors = async () => {
+    if (!currentAssignment?.district) return;
+    
     setFetching(true);
     try {
       const { data, error } = await supabase
         .from('supervisors')
         .select(`id, first_name, middle_name, last_name, phone, center_no, region, district`)
         .eq('status', 'ACTIVE')
-        .eq('is_latest', 1);
+        .eq('is_latest', 1)
+        .eq('district', currentAssignment.district);
 
       if (error) throw error;
 
@@ -218,7 +221,7 @@ const ReassignSupervisorModal = ({
 
             <div>
               <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#64748b', mb: 1.5, display: 'block' }}>
-                New Supervisor
+                New Supervisor (from {currentAssignment?.district})
               </Typography>
               <div className="space-y-3">
                 <Autocomplete

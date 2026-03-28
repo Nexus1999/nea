@@ -169,6 +169,11 @@ const TeacherSubmissionPage = () => {
     }
   };
 
+  const handleExit = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
   const currentDistrictName = districts.find(d => d.district_number.toString() === formData.district_number)?.district_name;
 
   if (loading) {
@@ -556,7 +561,7 @@ const TeacherSubmissionPage = () => {
               </Button>
               <Button 
                 variant="ghost"
-                onClick={() => navigate('/')} 
+                onClick={handleExit} 
                 className="h-14 rounded-2xl text-slate-500 font-bold hover:text-orange-600 hover:bg-orange-50"
               >
                 Toka Kwenye Mfumo
