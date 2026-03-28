@@ -559,13 +559,7 @@ const TeacherSubmissionPage = () => {
                 <ListRestart className="h-5 w-5 mr-3" />
                 Rudi Kwenye Orodha
               </Button>
-              <Button 
-                variant="ghost"
-                onClick={handleExit} 
-                className="h-14 rounded-2xl text-slate-500 font-bold hover:text-orange-600 hover:bg-orange-50"
-              >
-                Toka Kwenye Mfumo
-              </Button>
+              
             </div>
           </div>
         )}
