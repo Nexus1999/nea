@@ -302,6 +302,7 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
                 <SelectContent>
                   <SelectItem value="government">Government</SelectItem>
                   <SelectItem value="private">Private</SelectItem>
+                   <SelectItem value="public">Public</SelectItem>
                 </SelectContent>
               </Select>
               {errors.center_type && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.center_type}</p>}
