@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
   Divider,
 } from '@mui/material';
 import { AccountCircle, Search as SearchIcon } from '@mui/icons-material';
-import { X, UserPlus, RotateCcw } from 'lucide-react';
+import { X, UserPlus, RotateCcw, AlertTriangle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -115,6 +115,21 @@ const ReassignSupervisorModal = ({
     }
   };
 
+  const targetCenters = useMemo(() => {
+    if (!currentAssignment?.center_no) return [];
+    const centerNo = currentAssignment.center_no;
+    const centers = [centerNo];
+    
+    const match = centerNo.match(/^([SP])(\d+)$/);
+    if (match) {
+      const type = match[1];
+      const number = match[2];
+      const linkedType = type === 'S' ? 'P' : 'S';
+      centers.push(`${linkedType}${number}`);
+    }
+    return centers;
+  }, [currentAssignment]);
+
   const handleSupervisorSelect = (supervisor: any) => {
     setFormData((prev) => ({
       ...prev,
@@ -126,6 +141,15 @@ const ReassignSupervisorModal = ({
 
   const handleReassignClick = async () => {
     if (!formData.newSupervisor) return;
+
+    // Prevent self-supervision
+    const supervisorWorkstation = formData.newSupervisor.center_no?.trim().toUpperCase();
+    const isSelfSupervising = targetCenters.some(c => c.trim().toUpperCase() === supervisorWorkstation);
+
+    if (isSelfSupervising) {
+      showError(`Conflict: ${formData.newSupervisor.full_name} cannot supervise their own center (${supervisorWorkstation}).`);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -159,17 +183,6 @@ const ReassignSupervisorModal = ({
         workstation: formData.newSupervisor.center_no,
         phone: formData.newSupervisor.phone,
       };
-
-      const centerNo = currentAssignment.center_no || '';
-      const targetCenters = [centerNo];
-      
-      const match = centerNo.match(/^([SP])(\d+)$/);
-      if (match) {
-        const type = match[1];
-        const number = match[2];
-        const linkedType = type === 'S' ? 'P' : 'S';
-        targetCenters.push(`${linkedType}${number}`);
-      }
 
       const { error } = await supabase
         .from('supervisorassignments')
@@ -300,9 +313,25 @@ const ReassignSupervisorModal = ({
                 Confirm Reassignment?
               </AlertDialogTitle>
             </div>
-            <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
-              This will replace the current supervisor with <strong>{formData.newSupervisor?.full_name}</strong>. 
-              {currentAssignment?.center_no?.match(/^[SP]\d+$/) && " Both linked S and P centers will be updated."}
+            <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed space-y-3">
+              <p>
+                This will replace the current supervisor with <strong>{formData.newSupervisor?.full_name}</strong>.
+              </p>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mt-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Centers to be updated:</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {targetCenters.map(c => (
+                    <span key={c} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold text-slate-700">
+                      {c}
+                    </span>
+                  ))}
+                </div>
+                {targetCenters.length > 1 && (
+                  <p className="text-[10px] text-indigo-600 font-bold mt-2 italic">
+                    * Linked S and P centers detected
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
