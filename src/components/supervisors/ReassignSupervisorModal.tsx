@@ -16,18 +16,8 @@ import {
   Divider,
 } from '@mui/material';
 import { AccountCircle, Search as SearchIcon } from '@mui/icons-material';
-import { X, UserPlus, AlertTriangle } from 'lucide-react';
+import { X, UserPlus } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
@@ -64,11 +54,6 @@ const ReassignSupervisorModal = ({
   const [supervisors, setSupervisors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
-
-  const [dialogConfig, setDialogConfig] = useState({
-    open: false,
-    description: '',
-  });
 
   useEffect(() => {
     if (currentAssignment && isOpen) {
@@ -136,7 +121,7 @@ const ReassignSupervisorModal = ({
       // Check if already assigned to this supervision
       const { data: conflicts } = await supabase
         .from('supervisorassignments')
-        .select('id')
+        .select('assignment_id')
         .eq('supervision_id', supervisionId)
         .eq('supervisor_name', formData.newSupervisor.full_name);
 
@@ -163,10 +148,25 @@ const ReassignSupervisorModal = ({
         phone: formData.newSupervisor.phone,
       };
 
+      // Determine target centers (handle linked S/P centers for secondary exams)
+      const centerNo = currentAssignment.center_no || '';
+      const targetCenters = [centerNo];
+      
+      // Check if it's a secondary center (starts with S or P followed by digits)
+      const match = centerNo.match(/^([SP])(\d+)$/);
+      if (match) {
+        const type = match[1];
+        const number = match[2];
+        const linkedType = type === 'S' ? 'P' : 'S';
+        targetCenters.push(`${linkedType}${number}`);
+      }
+
+      // Update all matching centers in this supervision
       const { error } = await supabase
         .from('supervisorassignments')
         .update(payload)
-        .eq('id', currentAssignment.assignment_id);
+        .eq('supervision_id', supervisionId)
+        .in('center_no', targetCenters);
 
       if (error) throw error;
 
