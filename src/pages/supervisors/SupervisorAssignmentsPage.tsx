@@ -102,7 +102,7 @@ const SupervisorAssignmentsPage = () => {
       const isUalimu = UALIMU_CODES.includes(code);
 
       setSummaryInfo({
-        code: code,
+        code: isUalimu ? 'UALIMU' : code,
         year: supervision.mastersummaries.Year || '',
         mid: supervision.mid,
         isUalimu
@@ -216,6 +216,9 @@ const SupervisorAssignmentsPage = () => {
         
         for (let i = 0; i < c.required; i++) {
           const assign = centerAssignments[i];
+          const startStream = (i * 10) + 1;
+          const endStream = Math.min((i + 1) * 10, c.streams);
+          
           centerRows.push({
             id: `center-${c.center_number}-${i}`,
             center_no: c.center_number,
@@ -229,7 +232,8 @@ const SupervisorAssignmentsPage = () => {
             is_assigned: !!assign,
             slot: i + 1,
             total_slots: c.required,
-            streams: c.streams
+            streams: c.streams,
+            stream_range: isUalimu ? `${startStream}-${endStream}` : null
           });
         }
       });
@@ -257,7 +261,8 @@ const SupervisorAssignmentsPage = () => {
           is_assigned: true,
           slot: 1,
           total_slots: 1,
-          streams: 0
+          streams: 0,
+          stream_range: null
         }));
 
       setAllData([...sortedCenterRows, ...reserveRows]);
@@ -380,11 +385,14 @@ const SupervisorAssignmentsPage = () => {
               Supervision Assignments
             </CardTitle>
             <div className="flex items-center gap-4 mt-1">
-              <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase">
+              <Badge variant="outline" className={cn(
+                "text-[10px] font-black uppercase tracking-widest px-3 py-1",
+                summaryInfo.isUalimu ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-slate-50 text-slate-500 border-slate-200"
+              )}>
                 {summaryInfo.code || '—'}
-              </p>
+              </Badge>
               <span className="w-1 h-1 bg-slate-300 rounded-full" />
-              <p className="text-[10px] font-bold text-indigo-600 tracking-[0.2em] uppercase">
+              <p className="text-[10px] font-bold text-slate-600 tracking-[0.2em] uppercase">
                 {summaryInfo.year || '—'}
               </p>
             </div>
@@ -490,14 +498,16 @@ const SupervisorAssignmentsPage = () => {
                             <Building2 className="h-3.5 w-3.5 text-slate-400" />
                             {item.location}
                           </div>
-                          {item.total_slots > 1 && (
+                          {(item.total_slots > 1 || item.stream_range) && (
                             <div className="flex items-center gap-2 ml-5">
                               <Badge variant="outline" className="text-[9px] h-4 px-1.5 font-bold bg-slate-50 text-slate-500 border-slate-200">
                                 SLOT {item.slot}/{item.total_slots}
                               </Badge>
-                              <span className="text-[9px] text-slate-400 font-medium flex items-center gap-1">
-                                <Layers className="h-2.5 w-2.5" /> {item.streams} STREAMS
-                              </span>
+                              {item.stream_range && (
+                                <span className="text-[9px] text-indigo-600 font-black flex items-center gap-1 uppercase">
+                                  <Layers className="h-2.5 w-2.5" /> STREAMS {item.stream_range}
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>

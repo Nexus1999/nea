@@ -265,6 +265,10 @@ const SummaryAssignmentsPage = () => {
           r.supervisors.required = r.centers.required + (districtCount * 5);
         }
         
+        // Cap assigned at required to prevent > 100%
+        r.centers.assigned = Math.min(r.centers.assigned, r.centers.required);
+        r.supervisors.assigned = Math.min(r.supervisors.assigned, r.supervisors.required);
+
         r.centers.missing = Math.max(0, r.centers.required - r.centers.assigned);
         r.centers.progress = r.centers.required > 0 ? Math.round((r.centers.assigned / r.centers.required) * 100) : 0;
         
@@ -281,6 +285,10 @@ const SummaryAssignmentsPage = () => {
           if (!isUalimu) {
             d.supervisors.required = d.centers.required + 5;
           }
+          
+          d.centers.assigned = Math.min(d.centers.assigned, d.centers.required);
+          d.supervisors.assigned = Math.min(d.supervisors.assigned, d.supervisors.required);
+
           d.centers.missing = Math.max(0, d.centers.required - d.centers.assigned);
           d.centers.progress = d.centers.required > 0 ? Math.round((d.centers.assigned / d.centers.required) * 100) : 0;
           d.supervisors.missing = Math.max(0, d.supervisors.required - d.supervisors.assigned);
