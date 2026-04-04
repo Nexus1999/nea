@@ -12,15 +12,20 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    const { action, userData } = await req.json()
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const { action, userData } = await req.json();
 
     if (action === 'CREATE_USER') {
-      const { email, password, username, first_name, last_name, role_id } = userData
+      const { email, password, username, first_name, last_name, role_id } = userData;
+
+      console.log(`Attempting to create user: ${email}`);
 
       // 1. Create user in auth.users
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -28,71 +33,73 @@ serve(async (req) => {
         password,
         email_confirm: true,
         user_metadata: { username, first_name, last_name }
-      })
+      });
 
-      if (authError) throw authError
+      if (authError) {
+        console.error('Auth creation error:', authError);
+        throw authError;
+      }
 
-      // 2. Profile is usually created via trigger, but we ensure it's updated with metadata
+      if (!authUser.user) {
+        throw new Error('User creation failed: No user returned from Auth');
+      }
+
+      console.log(`User created in Auth: ${authUser.user.id}. Now updating profile...`);
+
+      // 2. Use upsert for the profile to handle cases with or without triggers
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .update({
+        .upsert({
+          id: authUser.user.id,
           username,
           first_name,
           last_name,
           role_id,
-          email
-        })
-        .eq('id', authUser.user.id)
+          email,
+          updated_at: new Date().toISOString()
+        });
 
-      if (profileError) throw profileError
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+        // If profile fails, we might want to delete the auth user to keep things clean
+        await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+        throw new Error(`Profile creation failed: ${profileError.message}`);
+      }
 
       return new Response(JSON.stringify({ success: true, user: authUser.user }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      });
     }
 
     if (action === 'DELETE_USER') {
-      const { userId } = userData
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
-      if (error) throw error
+      const { userId } = userData;
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (error) throw error;
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      });
     }
 
     if (action === 'UPDATE_PASSWORD') {
-      const { userId, newPassword } = userData
+      const { userId, newPassword } = userData;
       const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password: newPassword
-      })
-      if (error) throw error
+      });
+      if (error) throw error;
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      });
     }
 
-    if (action === 'TOGGLE_BLOCK') {
-      const { userId, isBlocked } = userData
-      // Supabase doesn't have a direct "block" but we can use ban or metadata
-      // For this implementation, we'll use the 'ban' feature or a custom metadata flag
-      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-        ban_duration: isBlocked ? 'none' : '100000h' // Effectively forever
-      })
-      if (error) throw error
-
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    throw new Error('Invalid action')
+    throw new Error('Invalid action');
 
   } catch (error: any) {
+    console.error('Function error:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
-    })
+    });
   }
 })

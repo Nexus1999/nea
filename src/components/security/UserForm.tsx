@@ -69,30 +69,52 @@ const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, onSuccess }) =>
   useEffect(() => {
     if (open) {
       fetchRoles();
-      form.reset();
+      form.reset({
+        email: "",
+        username: "",
+        password: "",
+        first_name: "",
+        last_name: "",
+        role_id: "",
+      });
     }
   }, [open, form]);
 
   const fetchRoles = async () => {
-    const { data } = await supabase.from("roles").select("id, name").order("name");
-    if (data) setRoles(data);
+    try {
+      const { data, error } = await supabase.from("roles").select("id, name").order("name");
+      if (error) throw error;
+      if (data) setRoles(data);
+    } catch (err: any) {
+      console.error("Error fetching roles:", err.message);
+    }
   };
 
   const onSubmit = async (values: UserFormValues) => {
     setLoading(true);
     try {
+      // Invoke the Edge Function
       const { data, error } = await supabase.functions.invoke('manage-users', {
         body: { action: 'CREATE_USER', userData: values }
       });
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      // Handle invocation errors (network, 404, etc)
+      if (error) {
+        console.error("Function invocation error:", error);
+        throw new Error(error.message || "Failed to connect to the user management service.");
+      }
+
+      // Handle logic errors returned by the function
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       showSuccess("User created successfully");
       onSuccess();
       onOpenChange(false);
     } catch (err: any) {
-      showError(err.message);
+      console.error("Form submission error:", err);
+      showError(err.message || "An unexpected error occurred while creating the user.");
     } finally {
       setLoading(false);
     }
@@ -168,9 +190,13 @@ const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, onSuccess }) =>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {roles.map(role => (
-                          <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
-                        ))}
+                        {roles.length > 0 ? (
+                          roles.map(role => (
+                            <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none" disabled>No roles available</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
