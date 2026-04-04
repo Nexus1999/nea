@@ -11,7 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectValue, SelectTrigger,
 } from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -28,6 +28,14 @@ import ReassignSupervisorModal from "@/components/supervisors/ReassignSupervisor
 import abbreviateSchoolName from "@/utils/abbreviateSchoolName";
 
 const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
+
+const EXCLUDED_REGIONS = [
+  "KASKAZINI PEMBA",
+  "KUSINI PEMBA",
+  "KASKAZINI UNGUJA",
+  "KUSINI UNGUJA",
+  "MJINI MAGHARIBI"
+];
 
 const SupervisorAssignmentsPage = () => {
   const { id } = useParams(); 
@@ -118,11 +126,13 @@ const SupervisorAssignmentsPage = () => {
           }
         });
 
-        centersWithRequirements = Array.from(centerMap.values()).map(c => {
-          const streams = Math.ceil(c.totalStudents / 40);
-          const required = Math.ceil(streams / 10) || 1;
-          return { ...c, required, streams, center_number: c.center_number, center_name: c.center_name };
-        });
+        centersWithRequirements = Array.from(centerMap.values())
+          .filter(c => !EXCLUDED_REGIONS.includes(c.region?.toUpperCase()))
+          .map(c => {
+            const streams = Math.ceil(c.totalStudents / 40);
+            const required = Math.ceil(streams / 10) || 1;
+            return { ...c, required, streams, center_number: c.center_number, center_name: c.center_name };
+          });
       } else {
         const centersTableMap: Record<string, string> = {
           'SFNA': 'primarymastersummary', 'SSNA': 'primarymastersummary', 'PSLE': 'primarymastersummary',
@@ -136,7 +146,9 @@ const SupervisorAssignmentsPage = () => {
           .eq('mid', supervision.mid)
           .eq('is_latest', 1);
         
-        centersWithRequirements = (cData || []).map(c => ({ ...c, required: 1, streams: 0 }));
+        centersWithRequirements = (cData || [])
+          .filter(c => !EXCLUDED_REGIONS.includes(c.region?.toUpperCase()))
+          .map(c => ({ ...c, required: 1, streams: 0 }));
       }
 
       const { data: assignmentsFromDb } = await supabase
@@ -170,7 +182,9 @@ const SupervisorAssignmentsPage = () => {
 
       const allRegions = [...new Set([
         ...centersWithRequirements.map(c => c.region?.trim()),
-        ...(assignmentsFromDb || []).map(a => a.region?.trim())
+        ...(assignmentsFromDb || [])
+          .filter(a => !EXCLUDED_REGIONS.includes(a.region?.toUpperCase()))
+          .map(a => a.region?.trim())
       ].filter(Boolean))].sort();
       setRegions(allRegions);
 
@@ -212,7 +226,7 @@ const SupervisorAssignmentsPage = () => {
       });
 
       const reserveRows = (assignmentsFromDb || [])
-        .filter(a => a.center_no === 'RESERVE')
+        .filter(a => a.center_no === 'RESERVE' && !EXCLUDED_REGIONS.includes(a.region?.toUpperCase()))
         .map((r) => ({
           id: `reserve-${r.assignment_id}`,
           center_no: 'RESERVE',
@@ -433,7 +447,7 @@ const SupervisorAssignmentsPage = () => {
                             <Building2 className="h-3.5 w-3.5 text-slate-400" />
                             {item.location}
                           </div>
-                          {(item.total_slots > 1 || item.stream_range) && (
+                          {item.total_slots > 1 && (
                             <div className="flex items-center gap-2 ml-5">
                               <Badge variant="outline" className="text-[9px] h-4 px-1.5 font-bold bg-slate-50 text-slate-500 border-slate-200">
                                 SLOT {item.slot}/{item.total_slots}

@@ -348,7 +348,7 @@ const SummaryAssignmentsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 space-y-10 max-w-7xl mx-auto pb-32">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-6 space-y-10 max-w-[1600px] mx-auto pb-32">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
