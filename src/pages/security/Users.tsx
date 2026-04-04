@@ -66,7 +66,8 @@ const Users = () => {
   };
 
   const handleToggleStatus = async (user: any) => {
-    const newStatus = user.status === 'active' ? 'blocked' : 'active';
+    const currentStatus = user.status || 'active';
+    const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
     const actionText = newStatus === 'active' ? 'activate' : 'block';
     
     const result = await showStyledSwal({
@@ -215,9 +216,9 @@ const Users = () => {
                         <TableCell>
                           <Badge className={cn(
                             "font-bold text-[10px] uppercase tracking-wider",
-                            user.status === 'blocked' ? "bg-red-50 text-red-700 border-red-100" : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                            (user.status || 'active') === 'blocked' ? "bg-red-50 text-red-700 border-red-100" : "bg-emerald-50 text-emerald-700 border-emerald-100"
                           )}>
-                            {user.status === 'blocked' ? <XCircle className="h-3 w-3 mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                            {(user.status || 'active') === 'blocked' ? <XCircle className="h-3 w-3 mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
                             {user.status || 'active'}
                           </Badge>
                         </TableCell>
@@ -244,11 +245,11 @@ const Users = () => {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className={cn("h-8 w-8", user.status === 'blocked' ? "text-emerald-600 hover:bg-emerald-50" : "text-orange-600 hover:bg-orange-50")}
-                              title={user.status === 'blocked' ? "Activate User" : "Block User"}
+                              className={cn("h-8 w-8", (user.status || 'active') === 'blocked' ? "text-emerald-600 hover:bg-emerald-50" : "text-orange-600 hover:bg-orange-50")}
+                              title={(user.status || 'active') === 'blocked' ? "Activate User" : "Block User"}
                               onClick={() => handleToggleStatus(user)}
                             >
-                              {user.status === 'blocked' ? <Power className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                              {(user.status || 'active') === 'blocked' ? <Power className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
                             </Button>
                             <Button 
                               variant="ghost" 
