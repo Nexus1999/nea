@@ -25,6 +25,7 @@ import { showStyledSwal } from '@/utils/alerts';
 import Spinner from "@/components/Spinner";
 import UserForm from "@/components/security/UserForm";
 import ChangePasswordModal from "@/components/security/ChangePasswordModal";
+import { logChange } from "@/utils/audit";
 import { cn } from "@/lib/utils";
 
 const Users = () => {
@@ -86,6 +87,14 @@ const Users = () => {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
+        await logChange({
+          tableName: 'profiles',
+          recordId: user.id,
+          actionType: 'UPDATE',
+          oldData: { status: currentStatus },
+          newData: { status: newStatus }
+        });
+
         showSuccess(`User ${newStatus === 'active' ? 'activated' : 'blocked'} successfully`);
         fetchUsers();
       } catch (err: any) {
@@ -112,6 +121,14 @@ const Users = () => {
         });
         if (error) throw error;
         if (data.error) throw new Error(data.error);
+
+        await logChange({
+          tableName: 'profiles',
+          recordId: user.id,
+          actionType: 'DELETE',
+          oldData: user
+        });
+
         showSuccess("User account deleted");
         fetchUsers();
       } catch (err: any) {
@@ -211,7 +228,7 @@ const Users = () => {
                           </Button>
                           <Button 
                             variant="ghost" size="icon" 
-                            className={cn("h-9 w-9", (user.status || 'active') === 'blocked' ? "text-emerald-600 hover:bg-emerald-50" : "text-red-600 hover:bg-red-50")}
+                            className={cn("h-9 w-9", (user.status || 'active') === 'blocked' ? "text-emerald-600 hover:bg-emerald-50" : "text-orange-600 hover:bg-orange-50")}
                             onClick={() => handleToggleStatus(user)}
                             title={(user.status || 'active') === 'blocked' ? "Activate User" : "Block User"}
                           >

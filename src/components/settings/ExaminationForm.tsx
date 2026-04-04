@@ -33,9 +33,10 @@ import {
 } from "@/components/ui/select";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
+import { logChange } from "@/utils/audit";
 
 const examinationFormSchema = z.object({
-  exam_id: z.number().optional(), // Only present for editing
+  exam_id: z.number().optional(),
   examination: z.string().min(2, { message: "Examination name must be at least 2 characters." }),
   code: z.string().min(2, { message: "Code must be at least 2 characters." }),
   level: z.enum(["Primary Education", "Secondary Education", "Teacher Education"], {
@@ -51,7 +52,7 @@ export type ExaminationFormValues = z.infer<typeof examinationFormSchema>;
 interface ExaminationFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  examination?: ExaminationFormValues; // Optional examination object for editing
+  examination?: ExaminationFormValues;
   onSuccess: () => void;
 }
 
@@ -64,8 +65,8 @@ const ExaminationForm: React.FC<ExaminationFormProps> = ({ open, onOpenChange, e
     defaultValues: {
       examination: "",
       code: "",
-      level: undefined, // Set to undefined for initial state to show placeholder
-      status: "active", // Default status for new examinations
+      level: undefined,
+      status: "active",
       ...examination,
     },
   });
@@ -88,9 +89,6 @@ const ExaminationForm: React.FC<ExaminationFormProps> = ({ open, onOpenChange, e
 
     try {
       if (isEditing) {
-        if (!values.exam_id) {
-          throw new Error("Examination ID is missing for update operation.");
-        }
         const { error } = await supabase
           .from('examinations')
           .update({
@@ -102,18 +100,37 @@ const ExaminationForm: React.FC<ExaminationFormProps> = ({ open, onOpenChange, e
           .eq('exam_id', values.exam_id);
 
         if (error) throw error;
+
+        await logChange({
+          tableName: 'examinations',
+          recordId: values.exam_id!,
+          actionType: 'UPDATE',
+          oldData: examination,
+          newData: values
+        });
+
         showSuccess("Examination updated successfully!");
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('examinations')
           .insert({
             examination: values.examination,
             code: values.code,
             level: values.level,
             status: values.status,
-          });
+          })
+          .select()
+          .single();
 
         if (error) throw error;
+
+        await logChange({
+          tableName: 'examinations',
+          recordId: data.exam_id,
+          actionType: 'INSERT',
+          newData: values
+        });
+
         showSuccess("New examination created successfully!");
       }
       onSuccess();

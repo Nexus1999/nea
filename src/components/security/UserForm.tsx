@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+import { logChange } from "@/utils/audit";
 
 const userSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -119,6 +120,15 @@ const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, user, onSuccess
           .eq('id', user.id);
 
         if (error) throw error;
+
+        await logChange({
+          tableName: 'profiles',
+          recordId: user.id,
+          actionType: 'UPDATE',
+          oldData: user,
+          newData: values
+        });
+
         showSuccess("User updated successfully");
       } else {
         const { data, error } = await supabase.functions.invoke('manage-users', {
@@ -127,6 +137,14 @@ const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, user, onSuccess
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
+
+        await logChange({
+          tableName: 'profiles',
+          recordId: data.user.id,
+          actionType: 'INSERT',
+          newData: values
+        });
+
         showSuccess("User created successfully");
       }
       
