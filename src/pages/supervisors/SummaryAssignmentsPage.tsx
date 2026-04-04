@@ -157,12 +157,11 @@ const SummaryAssignmentsPage = () => {
           .in('mid', mids)
           .eq('is_latest', 1);
         
-        // Group by center and sum max streams
         const centerMap = new Map();
         ualimuCenters?.forEach(c => {
           const key = c.center_number;
           const subjectValues = Object.entries(c)
-            .filter(([k]) => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k) && typeof c[k] === 'number')
+            .filter(([k, v]) => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k) && typeof v === 'number')
             .map(([, v]) => Number(v) || 0);
           
           const maxStudents = subjectValues.length > 0 ? Math.max(...subjectValues) : 0;
@@ -179,7 +178,7 @@ const SummaryAssignmentsPage = () => {
         const centersTableMap: Record<string, string> = {
           "SFNA": "primarymastersummary", "SSNA": "primarymastersummary", "PSLE": "primarymastersummary",
           "FTNA": "secondarymastersummaries", "CSEE": "secondarymastersummaries", "ACSEE": "secondarymastersummaries",
-          "DPEE": "ualimumastersummary", "DPNE": "dpnemastersummary"
+          "DPNE": "dpnemastersummary"
         };
         const centersTable = centersTableMap[code];
         const { data: cData } = await supabase.from(centersTable).select("*").eq("mid", supervision.mid).eq("is_latest", 1);
@@ -231,14 +230,14 @@ const SummaryAssignmentsPage = () => {
         regionMap[rName].centers.required++;
         regionMap[rName].districts[dName].centers.required++;
 
-        // Calculate supervisor requirement for this center
-        let streams = 0;
+        let supsNeeded = 1;
         if (isUalimu) {
-          streams = Math.ceil((c.totalStudents || 0) / 40);
-          const supsNeeded = Math.ceil(streams / 10);
-          regionMap[rName].supervisors.required += supsNeeded;
-          regionMap[rName].districts[dName].supervisors.required += supsNeeded;
+          const streams = Math.ceil((c.totalStudents || 0) / 40);
+          supsNeeded = Math.ceil(streams / 10) || 1;
         }
+        
+        regionMap[rName].supervisors.required += supsNeeded;
+        regionMap[rName].districts[dName].supervisors.required += supsNeeded;
       });
 
       assigned.forEach(a => {

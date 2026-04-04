@@ -10,7 +10,8 @@ import {
   RotateCcw,
   RefreshCw,
   Building2,
-  Users
+  Users,
+  Layers
 } from "lucide-react";
 import {
   Table,
@@ -38,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
@@ -100,13 +102,13 @@ const SupervisorAssignmentsPage = () => {
       const isUalimu = UALIMU_CODES.includes(code);
 
       setSummaryInfo({
-        code: code, // Keep original code for validation
+        code: code,
         year: supervision.mastersummaries.Year || '',
         mid: supervision.mid,
         isUalimu
       });
 
-      let centers: any[] = [];
+      let centersWithRequirements: any[] = [];
       
       if (isUalimu) {
         const { data: ualimuMasters } = await supabase
@@ -120,24 +122,39 @@ const SupervisorAssignmentsPage = () => {
         
         const { data: ualimuCenters, error: cErr } = await supabase
           .from('ualimumastersummary')
-          .select('region, district, center_number, center_name')
+          .select('*')
           .in('mid', mids)
           .eq('is_latest', 1);
         
         if (cErr) throw cErr;
         
-        const uniqueMap = new Map();
+        const centerMap = new Map();
         ualimuCenters?.forEach(c => {
-          if (!uniqueMap.has(c.center_number)) {
-            uniqueMap.set(c.center_number, c);
+          const key = c.center_number;
+          const subjectValues = Object.entries(c)
+            .filter(([k, v]) => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k) && typeof v === 'number')
+            .map(([, v]) => Number(v) || 0);
+          
+          const maxStudents = subjectValues.length > 0 ? Math.max(...subjectValues) : 0;
+          
+          if (!centerMap.has(key)) {
+            centerMap.set(key, { ...c, totalStudents: maxStudents });
+          } else {
+            const existing = centerMap.get(key);
+            existing.totalStudents += maxStudents;
           }
         });
-        centers = Array.from(uniqueMap.values());
+
+        centersWithRequirements = Array.from(centerMap.values()).map(c => {
+          const streams = Math.ceil(c.totalStudents / 40);
+          const required = Math.ceil(streams / 10) || 1;
+          return { ...c, required, streams, center_number: c.center_number, center_name: c.center_name };
+        });
       } else {
         const centersTableMap: Record<string, string> = {
           'SFNA': 'primarymastersummary', 'SSNA': 'primarymastersummary', 'PSLE': 'primarymastersummary',
           'FTNA': 'secondarymastersummaries', 'CSEE': 'secondarymastersummaries', 'ACSEE': 'secondarymastersummaries',
-          'DPEE': 'ualimumastersummary', 'DPNE': 'dpnemastersummary'
+          'DPNE': 'dpnemastersummary'
         };
         
         const centersTable = centersTableMap[code?.toUpperCase() || ''];
@@ -150,7 +167,7 @@ const SupervisorAssignmentsPage = () => {
           .eq('is_latest', 1);
         
         if (cErr) throw cErr;
-        centers = cData || [];
+        centersWithRequirements = (cData || []).map(c => ({ ...c, required: 1, streams: 0 }));
       }
 
       const { data: assignmentsFromDb, error: aErr } = await supabase
@@ -160,7 +177,6 @@ const SupervisorAssignmentsPage = () => {
 
       if (aErr) throw aErr;
 
-      // --- Fetch Workstation Names ---
       const workstationCenterNos = [...new Set((assignmentsFromDb || [])
         .map(a => a.workstation?.split('-')[0]?.trim().toUpperCase())
         .filter(Boolean)
@@ -185,39 +201,45 @@ const SupervisorAssignmentsPage = () => {
         const name = workstationNameMap[centerNo];
         return name ? `${centerNo} - ${abbreviateSchoolName(name)}` : ws;
       };
-      // -------------------------------
 
       const allRegions = [
-        ...centers.map(c => c.region?.trim()),
+        ...centersWithRequirements.map(c => c.region?.trim()),
         ...(assignmentsFromDb || []).map(a => a.region?.trim())
       ].filter(Boolean);
       
       const uniqueRegions = [...new Set(allRegions)].sort();
       setRegions(uniqueRegions);
 
-      const centerRows = centers.map((c) => {
-        const assign = assignmentsFromDb?.find(a => 
-          a.center_no === c.center_number && 
-          a.center_no !== 'RESERVE'
-        );
-        return {
-          id: `center-${c.center_number}`,
-          center_no: c.center_number,
-          region: c.region?.trim() || 'N/A',
-          district: c.district?.trim() || 'N/A',
-          location: `${c.center_number} - ${abbreviateSchoolName(c.center_name || '')}`,
-          supervisor: assign?.supervisor_name || 'PENDING',
-          workstation: assign ? formatWorkstation(assign.workstation) : '—',
-          phone: assign?.phone || '—',
-          assignment_id: assign?.assignment_id || null,
-          is_assigned: !!assign
-        };
+      const centerRows: any[] = [];
+      centersWithRequirements.forEach(c => {
+        const centerAssignments = assignmentsFromDb?.filter(a => a.center_no === c.center_number) || [];
+        
+        for (let i = 0; i < c.required; i++) {
+          const assign = centerAssignments[i];
+          centerRows.push({
+            id: `center-${c.center_number}-${i}`,
+            center_no: c.center_number,
+            region: c.region?.trim() || 'N/A',
+            district: c.district?.trim() || 'N/A',
+            location: `${c.center_number} - ${abbreviateSchoolName(c.center_name || '')}`,
+            supervisor: assign?.supervisor_name || 'PENDING',
+            workstation: assign ? formatWorkstation(assign.workstation) : '—',
+            phone: assign?.phone || '—',
+            assignment_id: assign?.assignment_id || null,
+            is_assigned: !!assign,
+            slot: i + 1,
+            total_slots: c.required,
+            streams: c.streams
+          });
+        }
       });
 
       const sortedCenterRows = centerRows.sort((a, b) => {
         const regionCompare = a.region.localeCompare(b.region);
         if (regionCompare !== 0) return regionCompare;
-        return a.district.localeCompare(b.district);
+        const districtCompare = a.district.localeCompare(b.district);
+        if (districtCompare !== 0) return districtCompare;
+        return a.center_no.localeCompare(b.center_no);
       });
 
       const reserveRows = (assignmentsFromDb || [])
@@ -232,7 +254,10 @@ const SupervisorAssignmentsPage = () => {
           workstation: formatWorkstation(r.workstation),
           phone: r.phone || '—',
           assignment_id: r.assignment_id,
-          is_assigned: true
+          is_assigned: true,
+          slot: 1,
+          total_slots: 1,
+          streams: 0
         }));
 
       setAllData([...sortedCenterRows, ...reserveRows]);
@@ -460,9 +485,21 @@ const SupervisorAssignmentsPage = () => {
                       <TableCell className="text-sm text-slate-600 font-medium">{item.region}</TableCell>
                       <TableCell className="text-sm text-slate-600 font-medium">{item.district}</TableCell>
                       <TableCell className="text-sm font-medium">
-                        <div className="flex items-center gap-1.5">
-                          <Building2 className="h-3.5 w-3.5 text-slate-400" />
-                          {item.location}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                            {item.location}
+                          </div>
+                          {item.total_slots > 1 && (
+                            <div className="flex items-center gap-2 ml-5">
+                              <Badge variant="outline" className="text-[9px] h-4 px-1.5 font-bold bg-slate-50 text-slate-500 border-slate-200">
+                                SLOT {item.slot}/{item.total_slots}
+                              </Badge>
+                              <span className="text-[9px] text-slate-400 font-medium flex items-center gap-1">
+                                <Layers className="h-2.5 w-2.5" /> {item.streams} STREAMS
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className={cn(
