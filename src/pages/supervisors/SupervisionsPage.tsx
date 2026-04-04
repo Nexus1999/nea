@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Trash2, ArrowUpDown, Users, FileText, UserPlus, Download } from "lucide-react";
+import { PlusCircle, Trash2, ArrowUpDown, Users, FileText, UserPlus, Printer } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -227,7 +227,7 @@ const SupervisionsPage = () => {
       <Card className="w-full relative min-h-[500px]">
         {loading && (
           <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-[50] rounded-lg">
-            <Spinner label="Calculating Status..." size="lg" />
+            <Spinner label="Loading..." size="lg" />
           </div>
         )}
 
@@ -336,7 +336,7 @@ const SupervisionsPage = () => {
                             title="View Supervisors Lists"
                             onClick={() => navigate(`/dashboard/supervisors/supervisors-lists/${item.id}`)}
                           >
-                            <Download className="h-4 w-4" />
+                            <Printer className="h-4 w-4" />
                           </Button>
 
                           <Button 
