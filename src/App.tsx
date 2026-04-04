@@ -36,6 +36,7 @@ import Districts from "./pages/settings/Districts";
 // Security Module Pages
 import SecurityOverview from "./pages/security/SecurityOverview";
 import Users from "./pages/security/Users";
+import UserProfile from "./pages/security/UserProfile";
 import Roles from "./pages/security/Roles";
 import Permissions from "./pages/security/Permissions";
 import AuditLogs from "./pages/security/AuditLogs";
@@ -102,6 +103,7 @@ const App = () => (
               {/* Security Routes */}
               <Route path="security" element={<SecurityOverview />} />
               <Route path="security/users" element={<Users />} />
+              <Route path="security/users/:id" element={<UserProfile />} />
               <Route path="security/roles" element={<Roles />} />
               <Route path="security/permissions" element={<Permissions />} />
               <Route path="security/audit-logs" element={<AuditLogs />} />

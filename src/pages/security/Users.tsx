@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Search, Edit, Trash2, UserPlus, 
-  Shield, Mail, CheckCircle2, XCircle, Lock, Ban
+  Shield, Mail, CheckCircle2, XCircle, Lock, Eye, Ban, Power
 } from "lucide-react";
 import {
   Table,
@@ -26,6 +27,7 @@ import ChangePasswordModal from "@/components/security/ChangePasswordModal";
 import { cn } from "@/lib/utils";
 
 const Users = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -49,6 +51,7 @@ const Users = () => {
           first_name,
           last_name,
           role_id,
+          status,
           roles (name)
         `)
         .order('username');
@@ -59,6 +62,34 @@ const Users = () => {
       showError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (user: any) => {
+    const newStatus = user.status === 'active' ? 'blocked' : 'active';
+    const actionText = newStatus === 'active' ? 'activate' : 'block';
+    
+    const result = await showStyledSwal({
+      title: `${actionText.charAt(0).toUpperCase() + actionText.slice(1)} User?`,
+      text: `Are you sure you want to ${actionText} ${user.username}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: `Yes, ${actionText}!`,
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ status: newStatus })
+          .eq('id', user.id);
+
+        if (error) throw error;
+        showSuccess(`User ${actionText}d successfully`);
+        fetchUsers();
+      } catch (err: any) {
+        showError(err.message);
+      }
     }
   };
 
@@ -90,6 +121,11 @@ const Users = () => {
     }
   };
 
+  const handleEditUser = (user: any) => {
+    setSelectedUser(user);
+    setIsFormOpen(true);
+  };
+
   const handleResetPassword = (user: any) => {
     setSelectedUser(user);
     setIsPasswordModalOpen(true);
@@ -109,7 +145,7 @@ const Users = () => {
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">User Management</h2>
           <p className="text-muted-foreground mt-1">Manage system users and their access levels.</p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="bg-black hover:bg-gray-800 text-white gap-2 h-11 rounded-xl px-6">
+        <Button onClick={() => { setSelectedUser(null); setIsFormOpen(true); }} className="bg-black hover:bg-gray-800 text-white gap-2 h-11 rounded-xl px-6">
           <UserPlus className="h-4 w-4" />
           Add New User
         </Button>
@@ -177,17 +213,47 @@ const Users = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-xs">
-                            <CheckCircle2 className="h-4 w-4" />
-                            Active
-                          </div>
+                          <Badge className={cn(
+                            "font-bold text-[10px] uppercase tracking-wider",
+                            user.status === 'blocked' ? "bg-red-50 text-red-700 border-red-100" : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                          )}>
+                            {user.status === 'blocked' ? <XCircle className="h-3 w-3 mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                            {user.status || 'active'}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-8 w-8 text-orange-600 hover:bg-orange-50"
+                              className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                              title="View Profile"
+                              onClick={() => navigate(`/dashboard/security/users/${user.id}`)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-slate-600 hover:bg-slate-100"
+                              title="Edit User"
+                              onClick={() => handleEditUser(user)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className={cn("h-8 w-8", user.status === 'blocked' ? "text-emerald-600 hover:bg-emerald-50" : "text-orange-600 hover:bg-orange-50")}
+                              title={user.status === 'blocked' ? "Activate User" : "Block User"}
+                              onClick={() => handleToggleStatus(user)}
+                            >
+                              {user.status === 'blocked' ? <Power className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-slate-600 hover:bg-slate-100"
                               title="Reset Password"
                               onClick={() => handleResetPassword(user)}
                             >
@@ -217,6 +283,7 @@ const Users = () => {
       <UserForm 
         open={isFormOpen} 
         onOpenChange={setIsFormOpen} 
+        user={selectedUser}
         onSuccess={fetchUsers} 
       />
 
