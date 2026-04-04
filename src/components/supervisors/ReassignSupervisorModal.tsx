@@ -16,8 +16,18 @@ import {
   Divider,
 } from '@mui/material';
 import { AccountCircle, Search as SearchIcon } from '@mui/icons-material';
-import { X, UserPlus } from 'lucide-react';
+import { X, UserPlus, RotateCcw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
@@ -54,6 +64,7 @@ const ReassignSupervisorModal = ({
   const [supervisors, setSupervisors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (currentAssignment && isOpen) {
@@ -113,12 +124,12 @@ const ReassignSupervisorModal = ({
     }));
   };
 
-  const validateAndSubmit = async () => {
+  const handleReassignClick = async () => {
     if (!formData.newSupervisor) return;
 
     setLoading(true);
     try {
-      // Check if already assigned to this supervision using correct column assignment_id
+      // Check if already assigned to this supervision
       const { data: conflicts } = await supabase
         .from('supervisorassignments')
         .select('assignment_id')
@@ -131,7 +142,7 @@ const ReassignSupervisorModal = ({
         return;
       }
 
-      await executeUpdate();
+      setIsConfirmOpen(true);
     } catch (err) {
       showError("Validation failed");
     } finally {
@@ -141,6 +152,7 @@ const ReassignSupervisorModal = ({
 
   const executeUpdate = async () => {
     setLoading(true);
+    setIsConfirmOpen(false);
     try {
       const payload = {
         supervisor_name: formData.newSupervisor.full_name,
@@ -148,11 +160,9 @@ const ReassignSupervisorModal = ({
         phone: formData.newSupervisor.phone,
       };
 
-      // Determine target centers (handle linked S/P centers for secondary exams)
       const centerNo = currentAssignment.center_no || '';
       const targetCenters = [centerNo];
       
-      // Check if it's a secondary center (starts with S or P followed by digits)
       const match = centerNo.match(/^([SP])(\d+)$/);
       if (match) {
         const type = match[1];
@@ -161,7 +171,6 @@ const ReassignSupervisorModal = ({
         targetCenters.push(`${linkedType}${number}`);
       }
 
-      // Update all matching centers in this supervision
       const { error } = await supabase
         .from('supervisorassignments')
         .update(payload)
@@ -171,11 +180,7 @@ const ReassignSupervisorModal = ({
       if (error) throw error;
 
       showSuccess('Supervisor reassigned successfully');
-      
-      // Close modal first then refresh
       onClose();
-      
-      // Small delay to ensure DB consistency before refresh
       setTimeout(() => {
         onAssignmentUpdated();
       }, 500);
@@ -194,7 +199,7 @@ const ReassignSupervisorModal = ({
         onClose={onClose}
         fullWidth
         maxWidth="sm"
-        sx={{ zIndex: 40 }} // Lowered z-index to stay below AlertDialog (z-50)
+        sx={{ zIndex: 40 }}
         PaperProps={{
           sx: { borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.12)' },
         }}
@@ -277,12 +282,42 @@ const ReassignSupervisorModal = ({
             variant="default"
             className={cn("bg-slate-900 hover:bg-black text-white uppercase tracking-wider font-black text-[10px] h-10 px-8 rounded-lg shadow-sm", (loading || !formData.newSupervisor) && "opacity-70 cursor-not-allowed")}
             disabled={loading || !formData.newSupervisor}
-            onClick={validateAndSubmit}
+            onClick={handleReassignClick}
           >
             {loading ? <CircularProgress size={14} sx={{ color: 'white', mr: 1.5 }} /> : <><UserPlus className="h-3.5 w-3.5 mr-1.5" /> Reassign</>}
           </Button>
         </DialogActions>
       </Dialog>
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6 z-[100]">
+          <AlertDialogHeader>
+            <div className="flex flex-col items-center text-center mb-2">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-indigo-50 text-indigo-600">
+                <RotateCcw className="h-7 w-7" />
+              </div>
+              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
+                Confirm Reassignment?
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
+              This will replace the current supervisor with <strong>{formData.newSupervisor?.full_name}</strong>. 
+              {currentAssignment?.center_no?.match(/^[SP]\d+$/) && " Both linked S and P centers will be updated."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
+            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl mt-0">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={executeUpdate}
+              className="flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Confirm Reassign
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
