@@ -28,11 +28,17 @@ serve(async (req) => {
       console.log(`Attempting to create user: ${email}`);
 
       // 1. Create user in auth.users
+      // We include role_id in metadata in case a DB trigger needs it
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
-        user_metadata: { username, first_name, last_name }
+        user_metadata: { 
+          username, 
+          first_name, 
+          last_name,
+          role_id 
+        }
       });
 
       if (authError) {
@@ -46,7 +52,8 @@ serve(async (req) => {
 
       console.log(`User created in Auth: ${authUser.user.id}. Now updating profile...`);
 
-      // 2. Use upsert for the profile to handle cases with or without triggers
+      // 2. Update the profile manually to ensure all fields are set
+      // This works even if a trigger already created a partial profile
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
         .upsert({
@@ -61,7 +68,7 @@ serve(async (req) => {
 
       if (profileError) {
         console.error('Profile update error:', profileError);
-        // If profile fails, we might want to delete the auth user to keep things clean
+        // Clean up the auth user if profile creation fails
         await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
         throw new Error(`Profile creation failed: ${profileError.message}`);
       }
