@@ -100,7 +100,7 @@ const SupervisorAssignmentsPage = () => {
       const isUalimu = UALIMU_CODES.includes(code);
 
       setSummaryInfo({
-        code: isUalimu ? 'UALIMU' : code,
+        code: code, // Keep original code for validation
         year: supervision.mastersummaries.Year || '',
         mid: supervision.mid,
         isUalimu
@@ -553,6 +553,8 @@ const SupervisorAssignmentsPage = () => {
         onClose={() => setIsReassignModalOpen(false)}
         currentAssignment={selectedAssignment}
         supervisionId={id!}
+        examCode={summaryInfo.code}
+        examYear={summaryInfo.year}
         onAssignmentUpdated={fetchAssignments}
       />
     </div>

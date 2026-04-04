@@ -16,7 +16,7 @@ import {
   Divider,
 } from '@mui/material';
 import { AccountCircle, Search as SearchIcon } from '@mui/icons-material';
-import { X, UserPlus, RotateCcw, AlertTriangle } from 'lucide-react';
+import { X, UserPlus, RotateCcw, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -37,11 +37,15 @@ const filter = createFilterOptions({
   stringify: (option: any) => option.searchBlob,
 });
 
+const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
+
 interface ReassignSupervisorModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentAssignment: any;
   supervisionId: string | number;
+  examCode: string;
+  examYear: string | number;
   onAssignmentUpdated: () => void;
 }
 
@@ -50,6 +54,8 @@ const ReassignSupervisorModal = ({
   onClose,
   currentAssignment,
   supervisionId,
+  examCode,
+  examYear,
   onAssignmentUpdated,
 }: ReassignSupervisorModalProps) => {
   const [formData, setFormData] = useState({
@@ -64,7 +70,9 @@ const ReassignSupervisorModal = ({
   const [supervisors, setSupervisors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
+  
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [errorDialog, setErrorDialog] = useState({ open: false, title: '', message: '' });
 
   useEffect(() => {
     if (currentAssignment && isOpen) {
@@ -142,28 +150,72 @@ const ReassignSupervisorModal = ({
   const handleReassignClick = async () => {
     if (!formData.newSupervisor) return;
 
-    // Prevent self-supervision
     const supervisorWorkstation = formData.newSupervisor.center_no?.trim().toUpperCase();
     const isSelfSupervising = targetCenters.some(c => c.trim().toUpperCase() === supervisorWorkstation);
 
     if (isSelfSupervising) {
-      showError(`Conflict: ${formData.newSupervisor.full_name} cannot supervise their own center (${supervisorWorkstation}).`);
+      setErrorDialog({
+        open: true,
+        title: 'Self-Supervision Conflict',
+        message: `${formData.newSupervisor.full_name} cannot supervise their own center (${supervisorWorkstation}). Please select a different supervisor.`
+      });
       return;
     }
 
     setLoading(true);
     try {
-      // Check if already assigned to this supervision
-      const { data: conflicts } = await supabase
+      // 1. Check if already assigned to THIS supervision
+      const { data: currentConflicts } = await supabase
         .from('supervisorassignments')
         .select('assignment_id')
         .eq('supervision_id', supervisionId)
         .eq('supervisor_name', formData.newSupervisor.full_name);
 
-      if (conflicts?.length) {
-        showError("This supervisor is already assigned to this examination.");
+      if (currentConflicts?.length) {
+        setErrorDialog({
+          open: true,
+          title: 'Already Assigned',
+          message: `${formData.newSupervisor.full_name} is already assigned to a center in this examination.`
+        });
         setLoading(false);
         return;
+      }
+
+      // 2. Check for simultaneous exams (ACSEE <-> UALIMU)
+      const isACSEE = examCode === 'ACSEE';
+      const isUalimu = UALIMU_CODES.includes(examCode);
+
+      if (isACSEE || isUalimu) {
+        const targetCodes = isACSEE ? UALIMU_CODES : ['ACSEE'];
+        
+        // Find other supervisions for the same year with target codes
+        const { data: otherSupervisions } = await supabase
+          .from('supervisions')
+          .select('id')
+          .eq('is_latest', 1)
+          .innerJoin('mastersummaries', 'mid', 'id')
+          .eq('mastersummaries.Year', examYear)
+          .in('mastersummaries.Code', targetCodes);
+
+        if (otherSupervisions?.length) {
+          const otherIds = otherSupervisions.map(s => s.id);
+          const { data: simultaneousConflicts } = await supabase
+            .from('supervisorassignments')
+            .select('assignment_id')
+            .in('supervision_id', otherIds)
+            .eq('supervisor_name', formData.newSupervisor.full_name);
+
+          if (simultaneousConflicts?.length) {
+            const otherExamType = isACSEE ? 'UALIMU' : 'ACSEE';
+            setErrorDialog({
+              open: true,
+              title: 'Simultaneous Exam Conflict',
+              message: `${formData.newSupervisor.full_name} is already assigned to the ${otherExamType} examination which takes place at the same time.`
+            });
+            setLoading(false);
+            return;
+          }
+        }
       }
 
       setIsConfirmOpen(true);
@@ -302,6 +354,7 @@ const ReassignSupervisorModal = ({
         </DialogActions>
       </Dialog>
 
+      {/* Confirmation Dialog */}
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
         <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6 z-[100]">
           <AlertDialogHeader>
@@ -343,6 +396,30 @@ const ReassignSupervisorModal = ({
               className="flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white bg-indigo-600 hover:bg-indigo-700"
             >
               Confirm Reassign
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Error Dialog */}
+      <AlertDialog open={errorDialog.open} onOpenChange={(val) => setErrorDialog(prev => ({ ...prev, open: val }))}>
+        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-red-100 shadow-2xl p-6 z-[110]">
+          <AlertDialogHeader>
+            <div className="flex flex-col items-center text-center mb-2">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-red-50 text-red-600">
+                <AlertCircle className="h-7 w-7" />
+              </div>
+              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-red-900">
+                {errorDialog.title}
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-sm text-slate-600 text-center leading-relaxed">
+              {errorDialog.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogAction className="w-full h-11 font-black uppercase text-[10px] tracking-widest rounded-xl bg-slate-900 hover:bg-black text-white">
+              Understood
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
