@@ -16,67 +16,49 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+      throw new Error('Missing environment variables');
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     const { action, userData } = await req.json();
 
-    console.log(`Action: ${action}`, userData);
-
     if (action === 'CREATE_USER') {
       const { email, password, username, first_name, last_name, role_id } = userData;
-
-      // 1. Create user in auth.users
-      // We pass all metadata so the DB trigger can access it
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
-        user_metadata: { 
-          username, 
-          first_name, 
-          last_name,
-          role_id 
-        }
+        user_metadata: { username, first_name, last_name, role_id }
       });
-
-      if (authError) {
-        console.error('Auth creation error details:', JSON.stringify(authError, null, 2));
-        throw authError;
-      }
-
-      if (!authUser.user) {
-        throw new Error('User creation failed: No user returned from Auth');
-      }
-
-      console.log(`User created in Auth: ${authUser.user.id}. Updating profile...`);
-
-      // 2. Update the profile manually as a backup
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .upsert({
-          id: authUser.user.id,
-          username,
-          first_name,
-          last_name,
-          role_id,
-          email,
-          updated_at: new Date().toISOString()
-        });
-
-      if (profileError) {
-        console.error('Profile update error:', profileError);
-        // We don't delete the user here because the trigger might have actually worked
-        // and this manual update might just be a conflict.
-      }
-
+      if (authError) throw authError;
       return new Response(JSON.stringify({ success: true, user: authUser.user }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // ... rest of the actions (DELETE_USER, UPDATE_PASSWORD) remain the same
+    if (action === 'TOGGLE_USER_STATUS') {
+      const { userId, status } = userData;
+      const isBlocking = status === 'blocked';
+      
+      // 1. Update Auth (Ban/Unban)
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+        userId, 
+        { ban_duration: isBlocking ? '876000h' : 'none' } // 100 years or none
+      );
+      if (authError) throw authError;
+
+      // 2. Update Profile Table
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update({ status })
+        .eq('id', userId);
+      if (profileError) throw profileError;
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (action === 'DELETE_USER') {
       const { userId } = userData;
       const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -92,9 +74,7 @@ serve(async (req) => {
     }
 
     throw new Error('Invalid action');
-
   } catch (error: any) {
-    console.error('Function error:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
