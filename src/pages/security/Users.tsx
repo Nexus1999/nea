@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Search, Edit, Trash2, UserPlus, 
-  Shield, Mail, CheckCircle2, XCircle, Lock, Ban, Unlock
+  Shield, Mail, CheckCircle2, XCircle, Lock, Ban
 } from "lucide-react";
 import {
   Table,
@@ -49,7 +49,6 @@ const Users = () => {
           first_name,
           last_name,
           role_id,
-          is_blocked,
           roles (name)
         `)
         .order('username');
@@ -60,37 +59,6 @@ const Users = () => {
       showError(err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleEditUser = (user: any) => {
-    setSelectedUser(user);
-    setIsFormOpen(true);
-  };
-
-  const handleToggleBlock = async (user: any) => {
-    const action = user.is_blocked ? 'ACTIVATE_USER' : 'BLOCK_USER';
-    const actionLabel = user.is_blocked ? 'Activate' : 'Block';
-    
-    const result = await showStyledSwal({
-      title: `${actionLabel} User?`,
-      text: `Are you sure you want to ${actionLabel.toLowerCase()} ${user.username}?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: `Yes, ${actionLabel}`,
-    });
-
-    if (result.isConfirmed) {
-      try {
-        const { data, error } = await supabase.functions.invoke('manage-users', {
-          body: { action, userData: { userId: user.id } }
-        });
-        if (error) throw error;
-        showSuccess(`User ${actionLabel.toLowerCase()}ed successfully`);
-        fetchUsers();
-      } catch (err: any) {
-        showError(err.message);
-      }
     }
   };
 
@@ -141,7 +109,7 @@ const Users = () => {
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">User Management</h2>
           <p className="text-muted-foreground mt-1">Manage system users and their access levels.</p>
         </div>
-        <Button onClick={() => { setSelectedUser(null); setIsFormOpen(true); }} className="bg-black hover:bg-gray-800 text-white gap-2 h-11 rounded-xl px-6">
+        <Button onClick={() => setIsFormOpen(true)} className="bg-black hover:bg-gray-800 text-white gap-2 h-11 rounded-xl px-6">
           <UserPlus className="h-4 w-4" />
           Add New User
         </Button>
@@ -185,7 +153,7 @@ const Users = () => {
                     </TableRow>
                   ) : (
                     filteredUsers.map((user) => (
-                      <TableRow key={user.id} className={cn("hover:bg-slate-50/50 transition-colors", user.is_blocked && "bg-red-50/30")}>
+                      <TableRow key={user.id} className="hover:bg-slate-50/50 transition-colors">
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-600 font-bold">
@@ -209,42 +177,17 @@ const Users = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {user.is_blocked ? (
-                            <div className="flex items-center gap-1.5 text-red-600 font-bold text-xs">
-                              <Ban className="h-4 w-4" />
-                              Blocked
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-xs">
-                              <CheckCircle2 className="h-4 w-4" />
-                              Active
-                            </div>
-                          )}
+                          <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-xs">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Active
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-8 w-8 text-blue-600 hover:bg-blue-50"
-                              title="Edit User"
-                              onClick={() => handleEditUser(user)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className={cn("h-8 w-8", user.is_blocked ? "text-emerald-600 hover:bg-emerald-50" : "text-orange-600 hover:bg-orange-50")}
-                              title={user.is_blocked ? "Activate User" : "Block User"}
-                              onClick={() => handleToggleBlock(user)}
-                            >
-                              {user.is_blocked ? <Unlock className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-slate-600 hover:bg-slate-50"
+                              className="h-8 w-8 text-orange-600 hover:bg-orange-50"
                               title="Reset Password"
                               onClick={() => handleResetPassword(user)}
                             >
@@ -275,7 +218,6 @@ const Users = () => {
         open={isFormOpen} 
         onOpenChange={setIsFormOpen} 
         onSuccess={fetchUsers} 
-        user={selectedUser}
       />
 
       <ChangePasswordModal 
