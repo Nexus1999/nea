@@ -5,38 +5,17 @@ import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  UserCheck, 
-  Search,
-  RotateCcw,
-  RefreshCw,
-  Building2,
-  Users,
-  Layers
+  UserCheck, Search, RotateCcw, RefreshCw, Building2, Users, Layers, UserPlus, AlertTriangle
 } from "lucide-react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +33,8 @@ const SupervisorAssignmentsPage = () => {
   const { id } = useParams(); 
   const [allData, setAllData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [search, setSearch] = useState('');
   const [summaryInfo, setSummaryInfo] = useState({ code: '', year: '', mid: null as any, isUalimu: false });
   
@@ -64,11 +45,7 @@ const SupervisorAssignmentsPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(15);
   
-  const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-
+  const [reassignModal, setReassignModal] = useState({ open: false, assignment: null as any });
   const [dialogConfig, setDialogConfig] = useState({ open: false, type: 'assign' as 'assign' | 'reset' });
 
   useEffect(() => {
@@ -119,14 +96,11 @@ const SupervisorAssignmentsPage = () => {
           .eq('is_latest', true);
         
         const mids = ualimuMasters?.map(m => m.id) || [];
-        
-        const { data: ualimuCenters, error: cErr } = await supabase
+        const { data: ualimuCenters } = await supabase
           .from('ualimumastersummary')
           .select('*')
           .in('mid', mids)
           .eq('is_latest', 1);
-        
-        if (cErr) throw cErr;
         
         const centerMap = new Map();
         ualimuCenters?.forEach(c => {
@@ -134,7 +108,6 @@ const SupervisorAssignmentsPage = () => {
           const subjectValues = Object.entries(c)
             .filter(([k, v]) => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k) && typeof v === 'number')
             .map(([, v]) => Number(v) || 0);
-          
           const maxStudents = subjectValues.length > 0 ? Math.max(...subjectValues) : 0;
           
           if (!centerMap.has(key)) {
@@ -156,26 +129,20 @@ const SupervisorAssignmentsPage = () => {
           'FTNA': 'secondarymastersummaries', 'CSEE': 'secondarymastersummaries', 'ACSEE': 'secondarymastersummaries',
           'DPNE': 'dpnemastersummary'
         };
-        
         const centersTable = centersTableMap[code?.toUpperCase() || ''];
-        if (!centersTable) throw new Error(`Unsupported exam code`);
-
-        const { data: cData, error: cErr } = await supabase
+        const { data: cData } = await supabase
           .from(centersTable)
           .select('region, district, center_number, center_name')
           .eq('mid', supervision.mid)
           .eq('is_latest', 1);
         
-        if (cErr) throw cErr;
         centersWithRequirements = (cData || []).map(c => ({ ...c, required: 1, streams: 0 }));
       }
 
-      const { data: assignmentsFromDb, error: aErr } = await supabase
+      const { data: assignmentsFromDb } = await supabase
         .from('supervisorassignments')
         .select('*')
         .eq('supervision_id', id);
-
-      if (aErr) throw aErr;
 
       const workstationCenterNos = [...new Set((assignmentsFromDb || [])
         .map(a => a.workstation?.split('-')[0]?.trim().toUpperCase())
@@ -189,7 +156,6 @@ const SupervisorAssignmentsPage = () => {
           supabase.from('teacherscolleges').select('center_no, name').in('center_no', workstationCenterNos),
           supabase.from('primaryschools').select('center_no, name').in('center_no', workstationCenterNos)
         ]);
-
         secRes.data?.forEach(r => { if (r.center_no) workstationNameMap[r.center_no.trim().toUpperCase()] = r.name; });
         tcRes.data?.forEach(r => { if (r.center_no) workstationNameMap[r.center_no.trim().toUpperCase()] = r.name; });
         priRes.data?.forEach(r => { if (r.center_no) workstationNameMap[r.center_no.trim().toUpperCase()] = r.name; });
@@ -202,13 +168,11 @@ const SupervisorAssignmentsPage = () => {
         return name ? `${centerNo} - ${abbreviateSchoolName(name)}` : ws;
       };
 
-      const allRegions = [
+      const allRegions = [...new Set([
         ...centersWithRequirements.map(c => c.region?.trim()),
         ...(assignmentsFromDb || []).map(a => a.region?.trim())
-      ].filter(Boolean);
-      
-      const uniqueRegions = [...new Set(allRegions)].sort();
-      setRegions(uniqueRegions);
+      ].filter(Boolean))].sort();
+      setRegions(allRegions);
 
       const centerRows: any[] = [];
       centersWithRequirements.forEach(c => {
@@ -225,11 +189,12 @@ const SupervisorAssignmentsPage = () => {
             region: c.region?.trim() || 'N/A',
             district: c.district?.trim() || 'N/A',
             location: `${c.center_number} - ${abbreviateSchoolName(c.center_name || '')}`,
-            supervisor: assign?.supervisor_name || 'PENDING',
+            supervisor: assign?.supervisor_name || 'VACANT SLOT',
             workstation: assign ? formatWorkstation(assign.workstation) : '—',
             phone: assign?.phone || '—',
             assignment_id: assign?.assignment_id || null,
             is_assigned: !!assign,
+            isPlaceholder: !assign,
             slot: i + 1,
             total_slots: c.required,
             streams: c.streams,
@@ -259,6 +224,7 @@ const SupervisorAssignmentsPage = () => {
           phone: r.phone || '—',
           assignment_id: r.assignment_id,
           is_assigned: true,
+          isPlaceholder: false,
           slot: 1,
           total_slots: 1,
           streams: 0,
@@ -266,24 +232,18 @@ const SupervisorAssignmentsPage = () => {
         }));
 
       setAllData([...sortedCenterRows, ...reserveRows]);
-
     } catch (err: any) {
       showError(err.message || "Failed to load assignments");
     }
   };
 
   const handleAssignClick = () => {
-    const hasExisting = allData.some(a => 
-      a.is_assigned && 
+    const hasExisting = allData.some(a => a.is_assigned && 
       (selectedRegion === 'all' || a.region === selectedRegion) &&
       (selectedDistrict === 'all' || a.district === selectedDistrict)
     );
-
-    if (hasExisting) {
-      setDialogConfig({ open: true, type: 'assign' });
-    } else {
-      executeAssignment();
-    }
+    if (hasExisting) setDialogConfig({ open: true, type: 'assign' });
+    else executeAssignment();
   };
 
   const executeAssignment = async () => {
@@ -298,14 +258,10 @@ const SupervisorAssignmentsPage = () => {
         districts: selectedDistrict !== 'all' ? [selectedDistrict] : [],
         assigned_by: "system_admin"
       };
-
       const { data, error } = await supabase.functions.invoke('assign-supervisors', { body: payload });
-      
       if (error) throw error;
-
-      if (data?.success === false) {
-        showError(data.error || "Assignment failed");
-      } else {
+      if (data?.success === false) showError(data.error || "Assignment failed");
+      else {
         showSuccess(data.message || "Assignments generated successfully!");
         setTimeout(fetchAssignments, 1000);
       }
@@ -316,24 +272,18 @@ const SupervisorAssignmentsPage = () => {
     }
   };
 
-  const handleResetClick = () => {
-    setDialogConfig({ open: true, type: 'reset' });
-  };
-
   const executeReset = async () => {
     setDialogConfig(prev => ({ ...prev, open: false }));
     setIsResetting(true);
     try {
       let query = supabase.from('supervisorassignments').delete().eq('supervision_id', id);
-      
       if (selectedRegion !== 'all') query = query.eq('region', selectedRegion);
       if (selectedDistrict !== 'all') query = query.eq('district', selectedDistrict);
-
       const { error } = await query;
       if (error) throw error;
-
-      showSuccess("Assignments cleared for selected criteria");
-      await fetchAssignments();
+      showSuccess("Assignments cleared");
+      if (dialogConfig.type === 'assign') executeAssignment();
+      else await fetchAssignments();
     } catch (err: any) {
       showError(err.message);
     } finally {
@@ -343,21 +293,16 @@ const SupervisorAssignmentsPage = () => {
 
   const availableDistricts = useMemo(() => {
     if (selectedRegion === 'all') return [];
-    const filteredDistricts = allData
-      .filter(item => item.region === selectedRegion)
-      .map(item => item.district);
-    return [...new Set(filteredDistricts)].sort();
+    return [...new Set(allData.filter(item => item.region === selectedRegion).map(item => item.district))].sort();
   }, [allData, selectedRegion]);
 
   const filteredData = useMemo(() => {
     return allData.filter(item => {
       const searchStr = search.toLowerCase();
-      const matchesSearch = 
-        item.location.toLowerCase().includes(searchStr) ||
+      const matchesSearch = item.location.toLowerCase().includes(searchStr) ||
         item.supervisor.toLowerCase().includes(searchStr) ||
         item.phone.toLowerCase().includes(searchStr) ||
         item.workstation.toLowerCase().includes(searchStr);
-
       const matchesRegion = selectedRegion === 'all' || item.region === selectedRegion;
       const matchesDistrict = selectedDistrict === 'all' || item.district === selectedDistrict;
       return matchesSearch && matchesRegion && matchesDistrict;
@@ -368,14 +313,11 @@ const SupervisorAssignmentsPage = () => {
   const currentData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
-    <div className="">
+    <div className="space-y-4">
       <Card className="w-full relative min-h-[600px] border-none shadow-sm">
         {(loading || isResetting) && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80">
-            <Spinner 
-              size="lg" 
-              label={isResetting ? "Clearing assignments..." : "Loading assignments..."} 
-            />
+            <Spinner size="lg" label={isResetting ? "Clearing..." : "Loading..."} />
           </div>
         )}
 
@@ -425,19 +367,15 @@ const SupervisorAssignmentsPage = () => {
               onClick={handleAssignClick}
               disabled={isProcessing || loading}
             >
-              {isProcessing ? (
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <UserCheck className="h-3.5 w-3.5 mr-1.5" />
-              )}
-              Assign
+              {isProcessing ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5 mr-1.5" />}
+              Auto-Assign
             </Button>
 
             <Button 
               variant="outline" 
               size="sm" 
               className="border-2 border-slate-200 text-slate-600 hover:border-red-600 hover:text-red-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-9 px-4 transition-all"
-              onClick={handleResetClick}
+              onClick={() => setDialogConfig({ open: true, type: 'reset' })}
             >
               <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reset
             </Button>
@@ -475,18 +413,15 @@ const SupervisorAssignmentsPage = () => {
                 {currentData.length === 0 && !loading ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                      No assignments found for the current selection.
+                      No assignments found.
                     </TableCell>
                   </TableRow>
                 ) : (
                   currentData.map((item, index) => (
-                    <TableRow 
-                      key={item.id} 
-                      className={cn(
-                        "hover:bg-slate-50/30 border-b border-slate-100 transition-colors",
-                        item.location === "RESERVE" && "bg-amber-50/40"
-                      )}
-                    >
+                    <TableRow key={item.id} className={cn(
+                      "hover:bg-slate-50/30 border-b border-slate-100 transition-colors",
+                      item.isPlaceholder && "bg-slate-50/50 italic"
+                    )}>
                       <TableCell className="text-slate-400 text-xs font-mono">
                         {((currentPage - 1) * itemsPerPage) + index + 1}
                       </TableCell>
@@ -513,31 +448,25 @@ const SupervisorAssignmentsPage = () => {
                         </div>
                       </TableCell>
                       <TableCell className={cn(
-                        "text-sm font-medium",
-                        !item.is_assigned ? "text-orange-600 italic" : "text-slate-800"
+                        "text-sm",
+                        item.isPlaceholder ? "text-slate-400 font-bold" : "text-slate-800 font-medium"
                       )}>
                         {item.supervisor}
                       </TableCell>
-                      <TableCell className="text-sm text-indigo-600 font-medium font-mono">
-                        {item.workstation}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600 font-medium">
-                        {item.phone}
-                      </TableCell>
+                      <TableCell className="text-sm text-indigo-600 font-medium font-mono">{item.workstation}</TableCell>
+                      <TableCell className="text-sm text-slate-600 font-medium">{item.phone}</TableCell>
                       <TableCell className="text-right px-6">
-                        {item.is_assigned && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-slate-900 transition-all"
-                            onClick={() => {
-                              setSelectedAssignment(item);
-                              setIsReassignModalOpen(true);
-                            }}
-                          >
-                            <RefreshCw className="h-3.5 w-3.5 text-blue-600" />
-                          </Button>
-                        )}
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className={cn(
+                            "h-8 w-8 p-0 rounded-lg transition-all",
+                            item.isPlaceholder ? "border-indigo-200 text-indigo-600 hover:bg-indigo-50" : "border-slate-200 hover:border-slate-900"
+                          )}
+                          onClick={() => setReassignModal({ open: true, assignment: item })}
+                        >
+                          {item.isPlaceholder ? <UserPlus className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -548,11 +477,7 @@ const SupervisorAssignmentsPage = () => {
 
           {!loading && totalPages > 1 && (
             <div className="mt-6 flex justify-center">
-              <PaginationControls 
-                currentPage={currentPage} 
-                totalPages={totalPages} 
-                onPageChange={setCurrentPage} 
-              />
+              <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
             </div>
           )}
         </CardContent>
@@ -562,33 +487,20 @@ const SupervisorAssignmentsPage = () => {
         <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6 z-[100]">
           <AlertDialogHeader>
             <div className="flex flex-col items-center text-center mb-2">
-              <div className={cn(
-                "w-14 h-14 rounded-full flex items-center justify-center mb-4",
-                dialogConfig.type === 'assign' ? 'bg-indigo-50 text-indigo-600' : 'bg-red-50 text-red-600'
-              )}>
-                <RotateCcw className="h-7 w-7" />
+              <div className={cn("w-14 h-14 rounded-full flex items-center justify-center mb-4", dialogConfig.type === 'assign' ? 'bg-indigo-50 text-indigo-600' : 'bg-red-50 text-red-600')}>
+                {dialogConfig.type === 'assign' ? <RefreshCw className="h-7 w-7" /> : <AlertTriangle className="h-7 w-7" />}
               </div>
               <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
                 {dialogConfig.type === 'assign' ? 'Existing Assignments Found' : 'Clear Assignments?'}
               </AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
-              {dialogConfig.type === 'assign' 
-                ? `Assignments already exist for the selected area. Clear them first to generate a new set.` 
-                : `This will permanently delete all supervisor assignments for the selected region/district.`}
+              {dialogConfig.type === 'assign' ? `Assignments already exist. Clear them first to generate a new set.` : `This will permanently delete all supervisor assignments for the selected area.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
-            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl mt-0">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={executeReset}
-              className={cn(
-                "flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white",
-                dialogConfig.type === 'assign' ? "bg-indigo-600 hover:bg-indigo-700" : "bg-red-600 hover:bg-red-700"
-              )}
-            >
+            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl mt-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={executeReset} className={cn("flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white", dialogConfig.type === 'assign' ? "bg-indigo-600 hover:bg-indigo-700" : "bg-red-600 hover:bg-red-700")}>
               Confirm Clear
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -596,9 +508,9 @@ const SupervisorAssignmentsPage = () => {
       </AlertDialog>
 
       <ReassignSupervisorModal 
-        isOpen={isReassignModalOpen}
-        onClose={() => setIsReassignModalOpen(false)}
-        currentAssignment={selectedAssignment}
+        isOpen={reassignModal.open}
+        onClose={() => setReassignModal({ open: false, assignment: null })}
+        currentAssignment={reassignModal.assignment}
         supervisionId={id!}
         examCode={summaryInfo.code}
         examYear={summaryInfo.year}

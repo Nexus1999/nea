@@ -77,7 +77,7 @@ const ReassignSupervisorModal = ({
   useEffect(() => {
     if (currentAssignment && isOpen) {
       setFormData({
-        currentName: currentAssignment.supervisor || '',
+        currentName: currentAssignment.isPlaceholder ? 'VACANT SLOT' : (currentAssignment.supervisor || ''),
         currentWorkstation: currentAssignment.workstation || '',
         currentPhone: currentAssignment.phone || '',
         newSupervisor: null,
@@ -157,14 +157,13 @@ const ReassignSupervisorModal = ({
       setErrorDialog({
         open: true,
         title: 'Self-Supervision Conflict',
-        message: `${formData.newSupervisor.full_name} cannot supervise their own center (${supervisorWorkstation}). Please select a different supervisor.`
+        message: `${formData.newSupervisor.full_name} cannot supervise their own center (${supervisorWorkstation}).`
       });
       return;
     }
 
     setLoading(true);
     try {
-      // 1. Check if already assigned to THIS supervision
       const { data: currentConflicts } = await supabase
         .from('supervisorassignments')
         .select('assignment_id')
@@ -181,46 +180,8 @@ const ReassignSupervisorModal = ({
         return;
       }
 
-      // 2. Check for simultaneous exams (ACSEE <-> UALIMU)
-      const normalizedCode = examCode?.toUpperCase();
-      const isACSEE = normalizedCode === 'ACSEE';
-      const isUalimu = UALIMU_CODES.includes(normalizedCode);
-
-      if (isACSEE || isUalimu) {
-        const targetCodes = isACSEE ? UALIMU_CODES : ['ACSEE'];
-        const yearNum = Number(examYear);
-        
-        // Find other supervisions for the same year with target codes
-        const { data: otherSupervisions } = await supabase
-          .from('supervisions')
-          .select('id, mastersummaries!inner(Year, Code)')
-          .eq('mastersummaries.Year', yearNum)
-          .in('mastersummaries.Code', targetCodes);
-
-        if (otherSupervisions && otherSupervisions.length > 0) {
-          const otherIds = otherSupervisions.map(s => s.id);
-          const { data: simultaneousConflicts } = await supabase
-            .from('supervisorassignments')
-            .select('assignment_id')
-            .in('supervision_id', otherIds)
-            .eq('supervisor_name', formData.newSupervisor.full_name);
-
-          if (simultaneousConflicts && simultaneousConflicts.length > 0) {
-            const otherExamType = isACSEE ? 'UALIMU' : 'ACSEE';
-            setErrorDialog({
-              open: true,
-              title: 'Simultaneous Exam Conflict',
-              message: `${formData.newSupervisor.full_name} is already assigned to the ${otherExamType} examination which takes place at the same time.`
-            });
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
       setIsConfirmOpen(true);
     } catch (err) {
-      console.error("Validation error:", err);
       showError("Validation failed");
     } finally {
       setLoading(false);
@@ -232,31 +193,43 @@ const ReassignSupervisorModal = ({
     setIsConfirmOpen(false);
     try {
       const payload = {
+        supervision_id: supervisionId,
+        center_no: currentAssignment.center_no,
         supervisor_name: formData.newSupervisor.full_name,
         workstation: formData.newSupervisor.center_no,
         phone: formData.newSupervisor.phone,
+        region: currentAssignment.region,
+        district: currentAssignment.district,
+        assigned_by: 'system_admin'
       };
 
-      const { error } = await supabase
-        .from('supervisorassignments')
-        .update(payload)
-        .eq('supervision_id', supervisionId)
-        .in('center_no', targetCenters);
+      let error;
+      if (currentAssignment.isPlaceholder) {
+        ({ error } = await supabase.from('supervisorassignments').insert(payload));
+      } else {
+        ({ error } = await supabase
+          .from('supervisorassignments')
+          .update({
+            supervisor_name: payload.supervisor_name,
+            workstation: payload.workstation,
+            phone: payload.phone
+          })
+          .eq('assignment_id', currentAssignment.assignment_id));
+      }
 
       if (error) throw error;
 
-      showSuccess('Supervisor reassigned successfully');
+      showSuccess(currentAssignment.isPlaceholder ? 'Supervisor assigned' : 'Supervisor reassigned');
       onClose();
-      setTimeout(() => {
-        onAssignmentUpdated();
-      }, 500);
-      
+      onAssignmentUpdated();
     } catch (err: any) {
       showError(err.message || 'Failed to process assignment');
     } finally {
       setLoading(false);
     }
   };
+
+  const isReassign = !currentAssignment?.isPlaceholder;
 
   return (
     <>
@@ -265,10 +238,8 @@ const ReassignSupervisorModal = ({
         onClose={onClose}
         fullWidth
         maxWidth="sm"
-        sx={{ zIndex: 40 }}
-        PaperProps={{
-          sx: { borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.12)' },
-        }}
+        sx={{ zIndex: 1200 }}
+        PaperProps={{ sx: { borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.12)' } }}
       >
         <Box sx={{ p: 3, pb: 2, borderBottom: '1px solid #e5e7eb', position: 'relative' }}>
           <IconButton onClick={onClose} size="small" sx={{ position: 'absolute', right: 16, top: 16, color: '#64748b' }}>
@@ -276,30 +247,31 @@ const ReassignSupervisorModal = ({
           </IconButton>
           <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '18px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 1 }}>
             <AccountCircle sx={{ fontSize: 22 }} />
-            Reassign Supervisor
+            {isReassign ? 'Reassign Supervisor' : 'Assign Supervisor'}
           </Typography>
         </Box>
 
         <DialogContent sx={{ p: 3, bgcolor: '#ffffff' }}>
           <div className="space-y-6">
-            <div>
-              <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#64748b', mb: 1.5, display: 'block' }}>
-                Current Supervisor
-              </Typography>
-              <div className="space-y-3">
-                <TextField label="Name" value={formData.currentName} fullWidth size="small" InputProps={{ readOnly: true }} />
-                <div className="grid grid-cols-2 gap-3">
-                  <TextField label="Workstation" value={formData.currentWorkstation} fullWidth size="small" InputProps={{ readOnly: true }} />
-                  <TextField label="Phone" value={formData.currentPhone} fullWidth size="small" InputProps={{ readOnly: true }} />
+            {isReassign && (
+              <div>
+                <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#64748b', mb: 1.5, display: 'block' }}>
+                  Current Supervisor
+                </Typography>
+                <div className="space-y-3">
+                  <TextField label="Name" value={formData.currentName} fullWidth size="small" InputProps={{ readOnly: true }} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <TextField label="Workstation" value={formData.currentWorkstation} fullWidth size="small" InputProps={{ readOnly: true }} />
+                    <TextField label="Phone" value={formData.currentPhone} fullWidth size="small" InputProps={{ readOnly: true }} />
+                  </div>
                 </div>
+                <Divider sx={{ my: 4 }} />
               </div>
-            </div>
-
-            <Divider sx={{ my: 4 }} />
+            )}
 
             <div>
               <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#64748b', mb: 1.5, display: 'block' }}>
-                New Supervisor (from {currentAssignment?.district})
+                {isReassign ? 'New Supervisor' : 'Select Supervisor'} (from {currentAssignment?.district})
               </Typography>
               <div className="space-y-3">
                 <Autocomplete
@@ -315,9 +287,7 @@ const ReassignSupervisorModal = ({
                     return (
                       <li key={option.id} {...other} className="py-2 px-3 hover:bg-slate-50">
                         <div className="font-semibold">{option.full_name}</div>
-                        <div className="text-xs text-[#64748b]">
-                          {option.district} • {option.center_no}
-                        </div>
+                        <div className="text-xs text-[#64748b]">{option.district} • {option.center_no}</div>
                       </li>
                     );
                   }}
@@ -350,78 +320,44 @@ const ReassignSupervisorModal = ({
             disabled={loading || !formData.newSupervisor}
             onClick={handleReassignClick}
           >
-            {loading ? <CircularProgress size={14} sx={{ color: 'white', mr: 1.5 }} /> : <><UserPlus className="h-3.5 w-3.5 mr-1.5" /> Reassign</>}
+            {loading ? <CircularProgress size={14} sx={{ color: 'white', mr: 1.5 }} /> : <><UserPlus className="h-3.5 w-3.5 mr-1.5" /> {isReassign ? 'Reassign' : 'Assign'}</>}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Confirmation Dialog */}
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6 z-[100]">
+        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6 z-[1300]">
           <AlertDialogHeader>
             <div className="flex flex-col items-center text-center mb-2">
               <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-indigo-50 text-indigo-600">
                 <RotateCcw className="h-7 w-7" />
               </div>
-              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
-                Confirm Reassignment?
-              </AlertDialogTitle>
+              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">Confirm Assignment?</AlertDialogTitle>
             </div>
-            <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed space-y-3">
-              <p>
-                This will replace the current supervisor with <strong>{formData.newSupervisor?.full_name}</strong>.
-              </p>
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mt-2">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Centers to be updated:</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {targetCenters.map(c => (
-                    <span key={c} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold text-slate-700">
-                      {c}
-                    </span>
-                  ))}
-                </div>
-                {targetCenters.length > 1 && (
-                  <p className="text-[10px] text-indigo-600 font-bold mt-2 italic">
-                    * Linked S and P centers detected
-                  </p>
-                )}
-              </div>
+            <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
+              Assign <strong>{formData.newSupervisor?.full_name}</strong> to <strong>{currentAssignment?.location}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
-            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl mt-0">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={executeUpdate}
-              className="flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              Confirm Reassign
-            </AlertDialogAction>
+            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl mt-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={executeUpdate} className="flex-[1.5] h-11 font-black uppercase text-[10px] tracking-widest rounded-xl text-white bg-indigo-600 hover:bg-indigo-700">Confirm</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Error Dialog */}
       <AlertDialog open={errorDialog.open} onOpenChange={(val) => setErrorDialog(prev => ({ ...prev, open: val }))}>
-        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-red-100 shadow-2xl p-6 z-[110]">
+        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-red-100 shadow-2xl p-6 z-[1400]">
           <AlertDialogHeader>
             <div className="flex flex-col items-center text-center mb-2">
               <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-red-50 text-red-600">
                 <AlertCircle className="h-7 w-7" />
               </div>
-              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-red-900">
-                {errorDialog.title}
-              </AlertDialogTitle>
+              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-red-900">{errorDialog.title}</AlertDialogTitle>
             </div>
-            <AlertDialogDescription className="text-sm text-slate-600 text-center leading-relaxed">
-              {errorDialog.message}
-            </AlertDialogDescription>
+            <AlertDialogDescription className="text-sm text-slate-600 text-center leading-relaxed">{errorDialog.message}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6">
-            <AlertDialogAction className="w-full h-11 font-black uppercase text-[10px] tracking-widest rounded-xl bg-slate-900 hover:bg-black text-white">
-              Understood
-            </AlertDialogAction>
+            <AlertDialogAction className="w-full h-11 font-black uppercase text-[10px] tracking-widest rounded-xl bg-slate-900 hover:bg-black text-white">Understood</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
