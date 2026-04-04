@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, UserPlus, Save, Mail, Lock, User } from "lucide-react";
+import { Loader2, UserPlus, Save, Mail, Lock, User, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,9 +34,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 
 const userSchema = z.object({
+  id: z.string().optional(),
   email: z.string().email("Invalid email address"),
   username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal('')),
   first_name: z.string().min(2, "First name is required"),
   last_name: z.string().min(2, "Last name is required"),
   role_id: z.string().min(1, "Please select a role"),
@@ -48,11 +49,13 @@ interface UserFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  user?: any;
 }
 
-const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, onSuccess }) => {
+const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, onSuccess, user }) => {
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
+  const isEditing = !!user;
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
@@ -69,16 +72,28 @@ const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, onSuccess }) =>
   useEffect(() => {
     if (open) {
       fetchRoles();
-      form.reset({
-        email: "",
-        username: "",
-        password: "",
-        first_name: "",
-        last_name: "",
-        role_id: "",
-      });
+      if (user) {
+        form.reset({
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          role_id: user.role_id,
+          password: "",
+        });
+      } else {
+        form.reset({
+          email: "",
+          username: "",
+          password: "",
+          first_name: "",
+          last_name: "",
+          role_id: "",
+        });
+      }
     }
-  }, [open, form]);
+  }, [open, user, form]);
 
   const fetchRoles = async () => {
     try {
@@ -93,28 +108,21 @@ const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, onSuccess }) =>
   const onSubmit = async (values: UserFormValues) => {
     setLoading(true);
     try {
-      // Invoke the Edge Function
+      const action = isEditing ? 'UPDATE_USER' : 'CREATE_USER';
+      const payload = isEditing ? { ...values, userId: user.id } : values;
+
       const { data, error } = await supabase.functions.invoke('manage-users', {
-        body: { action: 'CREATE_USER', userData: values }
+        body: { action, userData: payload }
       });
 
-      // Handle invocation errors (network, 404, etc)
-      if (error) {
-        console.error("Function invocation error:", error);
-        throw new Error(error.message || "Failed to connect to the user management service.");
-      }
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      // Handle logic errors returned by the function
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      showSuccess("User created successfully");
+      showSuccess(isEditing ? "User updated successfully" : "User created successfully");
       onSuccess();
       onOpenChange(false);
     } catch (err: any) {
-      console.error("Form submission error:", err);
-      showError(err.message || "An unexpected error occurred while creating the user.");
+      showError(err.message);
     } finally {
       setLoading(false);
     }
@@ -125,11 +133,11 @@ const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, onSuccess }) =>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-primary" />
-            Register New User
+            {isEditing ? <Edit className="h-5 w-5 text-primary" /> : <UserPlus className="h-5 w-5 text-primary" />}
+            {isEditing ? "Edit User Details" : "Register New User"}
           </DialogTitle>
           <DialogDescription>
-            Create a new system account and assign a role.
+            {isEditing ? "Update the user's profile and system role." : "Create a new system account and assign a role."}
           </DialogDescription>
         </DialogHeader>
 
@@ -190,13 +198,9 @@ const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, onSuccess }) =>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {roles.length > 0 ? (
-                          roles.map(role => (
-                            <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="none" disabled>No roles available</SelectItem>
-                        )}
+                        {roles.map(role => (
+                          <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -222,29 +226,31 @@ const UserForm: React.FC<UserFormProps> = ({ open, onOpenChange, onSuccess }) =>
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-bold uppercase">Initial Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input className="pl-9" type="password" placeholder="••••••••" {...field} />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!isEditing && (
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase">Initial Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Input className="pl-9" type="password" placeholder="••••••••" {...field} />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <DialogFooter className="pt-4">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={loading} className="bg-black hover:bg-gray-800">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Create User</>}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> {isEditing ? "Update User" : "Create User"}</>}
               </Button>
             </DialogFooter>
           </form>

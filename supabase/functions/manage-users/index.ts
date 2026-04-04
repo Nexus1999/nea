@@ -22,37 +22,16 @@ serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     const { action, userData } = await req.json();
 
-    console.log(`Action: ${action}`, userData);
-
     if (action === 'CREATE_USER') {
       const { email, password, username, first_name, last_name, role_id } = userData;
-
-      // 1. Create user in auth.users
-      // We pass all metadata so the DB trigger can access it
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
-        user_metadata: { 
-          username, 
-          first_name, 
-          last_name,
-          role_id 
-        }
+        user_metadata: { username, first_name, last_name, role_id }
       });
+      if (authError) throw authError;
 
-      if (authError) {
-        console.error('Auth creation error details:', JSON.stringify(authError, null, 2));
-        throw authError;
-      }
-
-      if (!authUser.user) {
-        throw new Error('User creation failed: No user returned from Auth');
-      }
-
-      console.log(`User created in Auth: ${authUser.user.id}. Updating profile...`);
-
-      // 2. Update the profile manually as a backup
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
         .upsert({
@@ -64,19 +43,65 @@ serve(async (req) => {
           email,
           updated_at: new Date().toISOString()
         });
-
-      if (profileError) {
-        console.error('Profile update error:', profileError);
-        // We don't delete the user here because the trigger might have actually worked
-        // and this manual update might just be a conflict.
-      }
+      if (profileError) throw profileError;
 
       return new Response(JSON.stringify({ success: true, user: authUser.user }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // ... rest of the actions (DELETE_USER, UPDATE_PASSWORD) remain the same
+    if (action === 'UPDATE_USER') {
+      const { userId, username, first_name, last_name, role_id, email } = userData;
+      
+      // Update Auth metadata
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        email,
+        user_metadata: { username, first_name, last_name, role_id }
+      });
+      if (authError) throw authError;
+
+      // Update Profile
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update({ username, first_name, last_name, role_id, email, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (profileError) throw profileError;
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'BLOCK_USER') {
+      const { userId } = userData;
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        ban_duration: 'none' // This is how you "block" in Supabase Auth
+      });
+      // Alternatively, we can use a custom 'is_blocked' column in profiles
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update({ is_blocked: true })
+        .eq('id', userId);
+      if (profileError) throw profileError;
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'ACTIVATE_USER') {
+      const { userId } = userData;
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update({ is_blocked: false })
+        .eq('id', userId);
+      if (profileError) throw profileError;
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (action === 'DELETE_USER') {
       const { userId } = userData;
       const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -94,7 +119,6 @@ serve(async (req) => {
     throw new Error('Invalid action');
 
   } catch (error: any) {
-    console.error('Function error:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
