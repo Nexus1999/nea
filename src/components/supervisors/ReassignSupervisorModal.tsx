@@ -171,8 +171,15 @@ const ReassignSupervisorModal = ({
       if (error) throw error;
 
       showSuccess('Supervisor reassigned successfully');
-      onAssignmentUpdated();
+      
+      // Close modal first then refresh
       onClose();
+      
+      // Small delay to ensure DB consistency before refresh
+      setTimeout(() => {
+        onAssignmentUpdated();
+      }, 500);
+      
     } catch (err: any) {
       showError(err.message || 'Failed to process assignment');
     } finally {

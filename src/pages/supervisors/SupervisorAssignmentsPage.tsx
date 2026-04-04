@@ -202,6 +202,7 @@ const SupervisorAssignmentsPage = () => {
         );
         return {
           id: `center-${c.center_number}`,
+          center_no: c.center_number,
           region: c.region?.trim() || 'N/A',
           district: c.district?.trim() || 'N/A',
           location: `${c.center_number} - ${abbreviateSchoolName(c.center_name || '')}`,
@@ -223,6 +224,7 @@ const SupervisorAssignmentsPage = () => {
         .filter(a => a.center_no === 'RESERVE')
         .map((r) => ({
           id: `reserve-${r.assignment_id}`,
+          center_no: 'RESERVE',
           region: r.region?.trim() || 'N/A',
           district: r.district?.trim() || 'N/A',
           location: `RESERVE`,
