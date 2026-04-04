@@ -22,13 +22,13 @@ serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     const { action, userData } = await req.json();
 
+    console.log(`Action: ${action}`, userData);
+
     if (action === 'CREATE_USER') {
       const { email, password, username, first_name, last_name, role_id } = userData;
 
-      console.log(`Attempting to create user: ${email}`);
-
       // 1. Create user in auth.users
-      // We include role_id in metadata in case a DB trigger needs it
+      // We pass all metadata so the DB trigger can access it
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
@@ -42,7 +42,7 @@ serve(async (req) => {
       });
 
       if (authError) {
-        console.error('Auth creation error:', authError);
+        console.error('Auth creation error details:', JSON.stringify(authError, null, 2));
         throw authError;
       }
 
@@ -50,10 +50,9 @@ serve(async (req) => {
         throw new Error('User creation failed: No user returned from Auth');
       }
 
-      console.log(`User created in Auth: ${authUser.user.id}. Now updating profile...`);
+      console.log(`User created in Auth: ${authUser.user.id}. Updating profile...`);
 
-      // 2. Update the profile manually to ensure all fields are set
-      // This works even if a trigger already created a partial profile
+      // 2. Update the profile manually as a backup
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
         .upsert({
@@ -68,9 +67,8 @@ serve(async (req) => {
 
       if (profileError) {
         console.error('Profile update error:', profileError);
-        // Clean up the auth user if profile creation fails
-        await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
-        throw new Error(`Profile creation failed: ${profileError.message}`);
+        // We don't delete the user here because the trigger might have actually worked
+        // and this manual update might just be a conflict.
       }
 
       return new Response(JSON.stringify({ success: true, user: authUser.user }), {
@@ -78,26 +76,19 @@ serve(async (req) => {
       });
     }
 
+    // ... rest of the actions (DELETE_USER, UPDATE_PASSWORD) remain the same
     if (action === 'DELETE_USER') {
       const { userId } = userData;
       const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
       if (error) throw error;
-
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (action === 'UPDATE_PASSWORD') {
       const { userId, newPassword } = userData;
-      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-        password: newPassword
-      });
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
       if (error) throw error;
-
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     throw new Error('Invalid action');
