@@ -171,7 +171,7 @@ const ReassignSupervisorModal = ({
         .eq('supervision_id', supervisionId)
         .eq('supervisor_name', formData.newSupervisor.full_name);
 
-      if (currentConflicts?.length) {
+      if (currentConflicts && currentConflicts.length > 0) {
         setErrorDialog({
           open: true,
           title: 'Already Assigned',
@@ -182,21 +182,22 @@ const ReassignSupervisorModal = ({
       }
 
       // 2. Check for simultaneous exams (ACSEE <-> UALIMU)
-      const isACSEE = examCode === 'ACSEE';
-      const isUalimu = UALIMU_CODES.includes(examCode);
+      const normalizedCode = examCode?.toUpperCase();
+      const isACSEE = normalizedCode === 'ACSEE';
+      const isUalimu = UALIMU_CODES.includes(normalizedCode);
 
       if (isACSEE || isUalimu) {
         const targetCodes = isACSEE ? UALIMU_CODES : ['ACSEE'];
+        const yearNum = Number(examYear);
         
         // Find other supervisions for the same year with target codes
         const { data: otherSupervisions } = await supabase
           .from('supervisions')
           .select('id, mastersummaries!inner(Year, Code)')
-          .eq('is_latest', 1)
-          .eq('mastersummaries.Year', examYear)
+          .eq('mastersummaries.Year', yearNum)
           .in('mastersummaries.Code', targetCodes);
 
-        if (otherSupervisions?.length) {
+        if (otherSupervisions && otherSupervisions.length > 0) {
           const otherIds = otherSupervisions.map(s => s.id);
           const { data: simultaneousConflicts } = await supabase
             .from('supervisorassignments')
@@ -204,7 +205,7 @@ const ReassignSupervisorModal = ({
             .in('supervision_id', otherIds)
             .eq('supervisor_name', formData.newSupervisor.full_name);
 
-          if (simultaneousConflicts?.length) {
+          if (simultaneousConflicts && simultaneousConflicts.length > 0) {
             const otherExamType = isACSEE ? 'UALIMU' : 'ACSEE';
             setErrorDialog({
               open: true,
