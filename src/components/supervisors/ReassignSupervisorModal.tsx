@@ -118,7 +118,7 @@ const ReassignSupervisorModal = ({
 
     setLoading(true);
     try {
-      // Check if already assigned to this supervision
+      // Check if already assigned to this supervision using correct column assignment_id
       const { data: conflicts } = await supabase
         .from('supervisorassignments')
         .select('assignment_id')
@@ -194,7 +194,7 @@ const ReassignSupervisorModal = ({
         onClose={onClose}
         fullWidth
         maxWidth="sm"
-        sx={{ zIndex: 1200 }}
+        sx={{ zIndex: 40 }} // Lowered z-index to stay below AlertDialog (z-50)
         PaperProps={{
           sx: { borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.12)' },
         }}

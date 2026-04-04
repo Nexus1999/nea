@@ -512,7 +512,7 @@ const SupervisorAssignmentsPage = () => {
       </Card>
 
       <AlertDialog open={dialogConfig.open} onOpenChange={(val) => setDialogConfig({ ...dialogConfig, open: val })}>
-        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6">
+        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6 z-[100]">
           <AlertDialogHeader>
             <div className="flex flex-col items-center text-center mb-2">
               <div className={cn(
