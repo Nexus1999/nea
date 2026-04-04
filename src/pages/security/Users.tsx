@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  PlusCircle, Search, Edit, Trash2, UserPlus, 
-  Shield, Mail, MoreVertical, CheckCircle2, XCircle 
+  Search, Edit, Trash2, UserPlus, 
+  Shield, Mail, CheckCircle2, XCircle, Lock, Ban
 } from "lucide-react";
 import {
   Table,
@@ -19,13 +19,19 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
+import { showStyledSwal } from '@/utils/alerts';
 import Spinner from "@/components/Spinner";
+import UserForm from "@/components/security/UserForm";
+import ChangePasswordModal from "@/components/security/ChangePasswordModal";
 import { cn } from "@/lib/utils";
 
 const Users = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -40,9 +46,12 @@ const Users = () => {
           id,
           username,
           email,
+          first_name,
+          last_name,
           role_id,
           roles (name)
-        `);
+        `)
+        .order('username');
 
       if (error) throw error;
       setUsers(data || []);
@@ -53,9 +62,44 @@ const Users = () => {
     }
   };
 
+  const handleDeleteUser = async (user: any) => {
+    const result = await showStyledSwal({
+      title: 'Delete User?',
+      html: `Are you sure you want to delete <b>${user.username}</b>? This will permanently remove their access.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, delete account',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#d32f2f',
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const { data, error } = await supabase.functions.invoke('manage-users', {
+          body: { action: 'DELETE_USER', userData: { userId: user.id } }
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        showSuccess("User account deleted");
+        fetchUsers();
+      } catch (err: any) {
+        showError(err.message);
+      }
+    }
+  };
+
+  const handleResetPassword = (user: any) => {
+    setSelectedUser(user);
+    setIsPasswordModalOpen(true);
+  };
+
   const filteredUsers = users.filter(u => 
     u.username?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
+    u.first_name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.last_name?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -65,7 +109,7 @@ const Users = () => {
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">User Management</h2>
           <p className="text-muted-foreground mt-1">Manage system users and their access levels.</p>
         </div>
-        <Button className="bg-black hover:bg-gray-800 text-white gap-2">
+        <Button onClick={() => setIsFormOpen(true)} className="bg-black hover:bg-gray-800 text-white gap-2 h-11 rounded-xl px-6">
           <UserPlus className="h-4 w-4" />
           Add New User
         </Button>
@@ -94,6 +138,7 @@ const Users = () => {
                 <TableHeader className="bg-slate-50">
                   <TableRow>
                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">User</TableHead>
+                    <TableHead className="font-bold text-[10px] uppercase tracking-widest">Full Name</TableHead>
                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Role</TableHead>
                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Status</TableHead>
                     <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest">Actions</TableHead>
@@ -102,7 +147,7 @@ const Users = () => {
                 <TableBody>
                   {filteredUsers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-10 text-gray-500">
+                      <TableCell colSpan={5} className="text-center py-10 text-gray-500">
                         No users found.
                       </TableCell>
                     </TableRow>
@@ -122,6 +167,9 @@ const Users = () => {
                             </div>
                           </div>
                         </TableCell>
+                        <TableCell className="text-sm font-medium text-slate-700">
+                          {user.first_name} {user.last_name}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 font-bold text-[10px] uppercase tracking-wider">
                             <Shield className="h-3 w-3 mr-1" />
@@ -135,11 +183,23 @@ const Users = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50">
-                              <Edit className="h-4 w-4" />
+                          <div className="flex justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-orange-600 hover:bg-orange-50"
+                              title="Reset Password"
+                              onClick={() => handleResetPassword(user)}
+                            >
+                              <Lock className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-red-600 hover:bg-red-50"
+                              title="Delete User"
+                              onClick={() => handleDeleteUser(user)}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -153,6 +213,18 @@ const Users = () => {
           )}
         </CardContent>
       </Card>
+
+      <UserForm 
+        open={isFormOpen} 
+        onOpenChange={setIsFormOpen} 
+        onSuccess={fetchUsers} 
+      />
+
+      <ChangePasswordModal 
+        open={isPasswordModalOpen} 
+        onOpenChange={setIsPasswordModalOpen} 
+        user={selectedUser} 
+      />
     </div>
   );
 };
