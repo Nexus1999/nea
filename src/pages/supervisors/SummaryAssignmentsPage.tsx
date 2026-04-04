@@ -43,14 +43,7 @@ interface RegionGroup {
   centers: SummaryStats;
   supervisors: SummaryStats;
   fullyAssigned: boolean;
-  districts: Record<string, { 
-    centers: SummaryStats; 
-    supervisors: SummaryStats; 
-    fullyAssigned: boolean; 
-    poolAvailable: number;
-    processedCenterIds?: Set<string>;
-    assignedCenterIds?: Set<string>;
-  }>;
+  districts: Record<string, { centers: SummaryStats; supervisors: SummaryStats; fullyAssigned: boolean; poolAvailable: number }>;
 }
 
 const SummaryCard = ({ title, stats, icon: Icon, colorClass, gradient }: any) => {
@@ -137,7 +130,6 @@ const SummaryAssignmentsPage = () => {
       
       const code = supervision.mastersummaries.Code;
       const isUalimu = UALIMU_CODES.includes(code);
-      const isSecondary = ["FTNA", "CSEE", "ACSEE"].includes(code);
 
       setExamInfo({ 
         code: isUalimu ? 'UALIMU' : code, 
@@ -165,6 +157,7 @@ const SummaryAssignmentsPage = () => {
           .in('mid', mids)
           .eq('is_latest', 1);
         
+        // Group by center and sum max streams
         const centerMap = new Map();
         ualimuCenters?.forEach(c => {
           const key = c.center_number;
@@ -231,30 +224,20 @@ const SummaryAssignmentsPage = () => {
             centers: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
             supervisors: { required: 0, assigned: 0, missing: 0, progress: 0, fullyAssigned: false },
             fullyAssigned: false,
-            poolAvailable: poolMap[`${rName}|${dName}`] || 0,
-            processedCenterIds: new Set(),
-            assignedCenterIds: new Set()
+            poolAvailable: poolMap[`${rName}|${dName}`] || 0
           };
         }
 
         regionMap[rName].centers.required++;
         regionMap[rName].districts[dName].centers.required++;
 
+        // Calculate supervisor requirement for this center
+        let streams = 0;
         if (isUalimu) {
-          const streams = Math.ceil((c.totalStudents || 0) / 40);
+          streams = Math.ceil((c.totalStudents || 0) / 40);
           const supsNeeded = Math.ceil(streams / 10);
           regionMap[rName].supervisors.required += supsNeeded;
           regionMap[rName].districts[dName].supervisors.required += supsNeeded;
-        } else if (isSecondary) {
-          const numericId = c.center_number.replace(/^[SP]/, '');
-          if (!regionMap[rName].districts[dName].processedCenterIds?.has(numericId)) {
-            regionMap[rName].districts[dName].processedCenterIds?.add(numericId);
-            regionMap[rName].supervisors.required++;
-            regionMap[rName].districts[dName].supervisors.required++;
-          }
-        } else {
-          regionMap[rName].supervisors.required++;
-          regionMap[rName].districts[dName].supervisors.required++;
         }
       });
 
@@ -262,27 +245,14 @@ const SummaryAssignmentsPage = () => {
         const rName = a.region || "Other";
         const dName = a.district || "General";
         if (regionMap[rName] && regionMap[rName].districts[dName]) {
-          if (a.center_no === 'RESERVE') {
-            regionMap[rName].supervisors.assigned++;
-            regionMap[rName].districts[dName].supervisors.assigned++;
-          } else {
+          regionMap[rName].supervisors.assigned++;
+          regionMap[rName].districts[dName].supervisors.assigned++;
+          regionMap[rName].districts[dName].poolAvailable = Math.max(0, regionMap[rName].districts[dName].poolAvailable - 1);
+
+          if (a.center_no !== 'RESERVE') {
             regionMap[rName].centers.assigned++;
             regionMap[rName].districts[dName].centers.assigned++;
-            
-            if (isSecondary) {
-              const numericId = a.center_no.replace(/^[SP]/, '');
-              if (!regionMap[rName].districts[dName].assignedCenterIds?.has(numericId)) {
-                regionMap[rName].districts[dName].assignedCenterIds?.add(numericId);
-                regionMap[rName].supervisors.assigned++;
-                regionMap[rName].districts[dName].supervisors.assigned++;
-              }
-            } else if (!isUalimu) {
-              regionMap[rName].supervisors.assigned++;
-              regionMap[rName].districts[dName].supervisors.assigned++;
-            }
           }
-          
-          regionMap[rName].districts[dName].poolAvailable = Math.max(0, regionMap[rName].districts[dName].poolAvailable - 1);
         }
       });
 
@@ -293,7 +263,7 @@ const SummaryAssignmentsPage = () => {
       Object.values(regionMap).forEach(r => {
         if (!isUalimu) {
           const districtCount = Object.keys(r.districts).length;
-          r.supervisors.required += (districtCount * 5);
+          r.supervisors.required = r.centers.required + (districtCount * 5);
         }
         
         r.centers.missing = Math.max(0, r.centers.required - r.centers.assigned);
@@ -310,7 +280,7 @@ const SummaryAssignmentsPage = () => {
         Object.values(r.districts).forEach(d => {
           totalDistricts++;
           if (!isUalimu) {
-            d.supervisors.required += 5;
+            d.supervisors.required = d.centers.required + 5;
           }
           d.centers.missing = Math.max(0, d.centers.required - d.centers.assigned);
           d.centers.progress = d.centers.required > 0 ? Math.round((d.centers.assigned / d.centers.required) * 100) : 0;
