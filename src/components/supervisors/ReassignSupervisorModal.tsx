@@ -191,9 +191,8 @@ const ReassignSupervisorModal = ({
         // Find other supervisions for the same year with target codes
         const { data: otherSupervisions } = await supabase
           .from('supervisions')
-          .select('id')
+          .select('id, mastersummaries!inner(Year, Code)')
           .eq('is_latest', 1)
-          .innerJoin('mastersummaries', 'mid', 'id')
           .eq('mastersummaries.Year', examYear)
           .in('mastersummaries.Code', targetCodes);
 
@@ -220,6 +219,7 @@ const ReassignSupervisorModal = ({
 
       setIsConfirmOpen(true);
     } catch (err) {
+      console.error("Validation error:", err);
       showError("Validation failed");
     } finally {
       setLoading(false);
