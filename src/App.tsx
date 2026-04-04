@@ -31,6 +31,13 @@ import MasterSummaryOverviewPage from "./pages/mastersummaries/MasterSummaryOver
 import Subjects from "./pages/settings/Subjects";
 import Examinations from "./pages/settings/Examinations";
 
+// Security Module Pages
+import SecurityOverview from "./pages/security/SecurityOverview";
+import Users from "./pages/security/Users";
+import Roles from "./pages/security/Roles";
+import Permissions from "./pages/security/Permissions";
+import AuditLogs from "./pages/security/AuditLogs";
+
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -89,6 +96,13 @@ const App = () => (
               <Route path="miscellaneous/jobs/assignments/:id" element={<JobAssignments />} />
               <Route path="miscellaneous/jobs/assign/:id" element={<AssignTeachers />} />
               <Route path="miscellaneous/jobs/teachers-management" element={<PrimaryTeachersManagementPage />} />
+
+              {/* Security Routes */}
+              <Route path="security" element={<SecurityOverview />} />
+              <Route path="security/users" element={<Users />} />
+              <Route path="security/roles" element={<Roles />} />
+              <Route path="security/permissions" element={<Permissions />} />
+              <Route path="security/audit-logs" element={<AuditLogs />} />
 
                {/* Settings Routes */}
               <Route path="settings/subjects" element={<Subjects />} />
