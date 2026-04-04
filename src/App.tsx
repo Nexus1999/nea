@@ -30,6 +30,8 @@ import SpecialNeedDetailsPage from "./pages/mastersummaries/SpecialNeedDetailsPa
 import MasterSummaryOverviewPage from "./pages/mastersummaries/MasterSummaryOverviewPage";
 import Subjects from "./pages/settings/Subjects";
 import Examinations from "./pages/settings/Examinations";
+import Regions from "./pages/settings/Regions";
+import Districts from "./pages/settings/Districts";
 
 // Security Module Pages
 import SecurityOverview from "./pages/security/SecurityOverview";
@@ -107,6 +109,8 @@ const App = () => (
                {/* Settings Routes */}
               <Route path="settings/subjects" element={<Subjects />} />
               <Route path="settings/examinations" element={<Examinations />} />
+              <Route path="settings/regions" element={<Regions />} />
+              <Route path="settings/districts" element={<Districts />} />
 
               {/* Add more routes as needed */}
               <Route path="*" element={<div className="p-4">Page under construction</div>} />
