@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialMount = useRef(true);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
     console.log(`AuthProvider: Logging out. Reason: ${reason}`);
@@ -55,8 +56,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const checkInactivity = useCallback(() => {
     const lastActivity = localStorage.getItem('neas_last_activity');
-    const currentSession = supabase.auth.getSession(); // Get fresh session state
-    
     if (lastActivity) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
@@ -67,13 +66,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [logout]);
 
   const fetchUserData = useCallback(async (userId: string) => {
-    console.log(`AuthProvider: Fetching profile for user ${userId}`);
+    console.log(`AuthProvider: Fetching profile for user ${userId}...`);
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('username, first_name, last_name, role_id, roles(name)')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('AuthProvider: Error fetching profile:', error);
@@ -81,7 +80,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (data) {
-        console.log('AuthProvider: Profile data received:', data.username);
+        console.log('AuthProvider: Profile data received for:', data.username);
         setUsername(data.username);
         // @ts-ignore
         const roleName = data.roles?.name || 'User';
@@ -95,6 +94,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }));
 
         return data;
+      } else {
+        console.warn('AuthProvider: No profile found for user ID:', userId);
       }
     } catch (err) {
       console.error('AuthProvider: Unexpected error in fetchUserData:', err);
@@ -103,58 +104,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    console.log("AuthProvider: Initializing...");
-    
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
-      if (error) {
-        console.error("AuthProvider: Session fetch error:", error);
-      }
-      
-      console.log("AuthProvider: Initial session check complete. Session exists:", !!initialSession);
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      
-      if (initialSession?.user) {
-        fetchUserData(initialSession.user.id);
-        updateActivity();
-      }
-      
-      setLoading(false);
-    });
+    if (!isInitialMount.current) return;
+    isInitialMount.current = false;
 
-    // Listen for auth changes - Empty dependency array ensures this only runs once
+    console.log("AuthProvider: Initializing auth listener...");
+
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log(`AuthProvider: Auth state changed: ${event}`);
+      console.log(`AuthProvider: Auth event: ${event}`);
       
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
-      if (event === 'SIGNED_IN' && currentSession?.user) {
-        const profile = await fetchUserData(currentSession.user.id);
+      if (currentSession?.user) {
         updateActivity();
         
-        const logId = await startUserSessionLog({
-          userId: currentSession.user.id,
-          username: profile?.username || currentSession.user.email || 'Unknown',
-          action: 'LOGIN',
-          status: 'SUCCESS',
-          sessionId: currentSession.access_token.substring(0, 20)
+        // Fetch profile data but don't let it block the UI if it's slow
+        fetchUserData(currentSession.user.id).then(async (profile) => {
+          if (event === 'SIGNED_IN') {
+            const logId = await startUserSessionLog({
+              userId: currentSession.user.id,
+              username: profile?.username || currentSession.user.email || 'Unknown',
+              action: 'LOGIN',
+              status: 'SUCCESS',
+              sessionId: currentSession.access_token.substring(0, 20)
+            });
+            if (logId) localStorage.setItem('neas_current_log_id', logId);
+          }
         });
-        if (logId) localStorage.setItem('neas_current_log_id', logId);
       } else if (event === 'SIGNED_OUT') {
         setUserRole(null);
         setUsername(null);
       }
       
+      // Always set loading to false once we have the initial session state
       setLoading(false);
+      console.log("AuthProvider: Loading state cleared");
     });
 
     return () => {
       console.log("AuthProvider: Cleaning up subscription");
       subscription.unsubscribe();
     };
-  }, [fetchUserData, updateActivity]); // These are now stable via useCallback
+  }, [fetchUserData, updateActivity]);
 
   useEffect(() => {
     if (session) {
