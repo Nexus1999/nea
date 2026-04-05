@@ -79,25 +79,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const updateActivity = useCallback(() => {
-    if (session) {
-      localStorage.setItem('neas_last_activity', Date.now().toString());
-    }
-  }, [session]);
+    localStorage.setItem('neas_last_activity', Date.now().toString());
+  }, []);
 
   const checkInactivity = useCallback(() => {
     const lastActivity = localStorage.getItem('neas_last_activity');
-    if (lastActivity && session) {
+    const currentSession = supabase.auth.getSession(); // Check actual session state
+    
+    if (lastActivity) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
         logout('TIMEOUT');
       }
     }
-  }, [session, logout]);
+  }, [logout]);
 
   useEffect(() => {
     let mounted = true;
 
-    // Sequence the initialization to avoid concurrent auth lock requests
     const initAuth = async () => {
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
@@ -129,7 +128,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const profile = await fetchUserData(currentSession.user.id);
         updateActivity();
         
-        // Only log if this isn't the initial session load (to avoid duplicate logs)
         if (!isInitialMount.current) {
           const logId = await startUserSessionLog({
             userId: currentSession.user.id,
@@ -152,17 +150,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchUserData, updateActivity]);
+  }, [fetchUserData, updateActivity]); // updateActivity is now stable
 
   useEffect(() => {
     if (session) {
       const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-      events.forEach(event => window.addEventListener(event, updateActivity));
+      const handleActivity = () => updateActivity();
+      
+      events.forEach(event => window.addEventListener(event, handleActivity));
       window.addEventListener('online', checkInactivity);
       checkIntervalRef.current = setInterval(checkInactivity, CHECK_INTERVAL);
 
       return () => {
-        events.forEach(event => window.removeEventListener(event, updateActivity));
+        events.forEach(event => window.removeEventListener(event, handleActivity));
         window.removeEventListener('online', checkInactivity);
         if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
       };
