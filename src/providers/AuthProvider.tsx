@@ -28,10 +28,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const isInitialMount = useRef(true);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
-    console.log(`AuthProvider: Logging out. Reason: ${reason}`);
+    console.log(`AuthProvider: Initiating ${reason} sequence...`);
+    
     const logId = localStorage.getItem('neas_current_log_id');
     if (logId) {
+      // We await this to ensure the log is updated before the session is destroyed
       await endUserSessionLog(logId, reason);
+      localStorage.removeItem('neas_current_log_id');
     }
 
     await supabase.auth.signOut();
@@ -42,7 +45,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     localStorage.removeItem('neas_user_data');
     localStorage.removeItem('neas_last_activity');
-    localStorage.removeItem('neas_current_log_id');
 
     setSession(null);
     setUser(null);
@@ -59,14 +61,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (lastActivity) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
-        console.log("AuthProvider: Inactivity limit reached");
+        console.log("AuthProvider: Inactivity detected, logging out...");
         logout('TIMEOUT');
       }
     }
   }, [logout]);
 
   const fetchUserData = useCallback(async (userId: string) => {
-    console.log(`AuthProvider: Fetching profile for user ${userId}...`);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -74,13 +75,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('id', userId)
         .maybeSingle();
       
-      if (error) {
-        console.error('AuthProvider: Error fetching profile:', error);
-        return null;
-      }
+      if (error) throw error;
 
       if (data) {
-        console.log('AuthProvider: Profile data received for:', data.username);
         setUsername(data.username);
         // @ts-ignore
         const roleName = data.roles?.name || 'User';
@@ -94,11 +91,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }));
 
         return data;
-      } else {
-        console.warn('AuthProvider: No profile found for user ID:', userId);
       }
     } catch (err) {
-      console.error('AuthProvider: Unexpected error in fetchUserData:', err);
+      console.error('AuthProvider: Profile fetch error:', err);
     }
     return null;
   }, []);
@@ -107,11 +102,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!isInitialMount.current) return;
     isInitialMount.current = false;
 
-    console.log("AuthProvider: Initializing auth listener...");
-
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log(`AuthProvider: Auth event: ${event}`);
+      console.log(`AuthProvider: Auth Event -> ${event}`);
       
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
@@ -119,33 +111,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (currentSession?.user) {
         updateActivity();
         
-        // Fetch profile data but don't let it block the UI if it's slow
-        fetchUserData(currentSession.user.id).then(async (profile) => {
-          if (event === 'SIGNED_IN') {
-            const logId = await startUserSessionLog({
-              userId: currentSession.user.id,
-              username: profile?.username || currentSession.user.email || 'Unknown',
-              action: 'LOGIN',
-              status: 'SUCCESS',
-              sessionId: currentSession.access_token.substring(0, 20)
-            });
-            if (logId) localStorage.setItem('neas_current_log_id', logId);
-          }
-        });
-      } else if (event === 'SIGNED_OUT') {
-        setUserRole(null);
-        setUsername(null);
+        const profile = await fetchUserData(currentSession.user.id);
+        
+        if (event === 'SIGNED_IN') {
+          const logId = await startUserSessionLog({
+            userId: currentSession.user.id,
+            username: profile?.username || currentSession.user.email || 'Unknown',
+            action: 'LOGIN',
+            status: 'SUCCESS',
+            sessionId: currentSession.access_token.substring(0, 20)
+          });
+          if (logId) localStorage.setItem('neas_current_log_id', logId);
+        }
       }
       
-      // Always set loading to false once we have the initial session state
       setLoading(false);
-      console.log("AuthProvider: Loading state cleared");
     });
 
-    return () => {
-      console.log("AuthProvider: Cleaning up subscription");
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, [fetchUserData, updateActivity]);
 
   useEffect(() => {
