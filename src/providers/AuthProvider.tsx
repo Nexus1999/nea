@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
-import { showSuccess } from '@/utils/toast';
 import { startUserSessionLog, endUserSessionLog } from '@/utils/sessionLogger';
 
 interface AuthContextType {
@@ -28,6 +27,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
+    console.log(`AuthProvider: Logging out. Reason: ${reason}`);
     const logId = localStorage.getItem('neas_current_log_id');
     if (logId) {
       await endUserSessionLog(logId, reason);
@@ -35,7 +35,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     await supabase.auth.signOut();
     
-    // Clear local storage but keep the expired flag if it was a timeout
     if (reason === 'TIMEOUT') {
       localStorage.setItem('neas_session_expired', 'true');
     }
@@ -61,71 +60,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (lastActivity && session) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
+        console.log("AuthProvider: Inactivity limit reached");
         logout('TIMEOUT');
       }
     }
   }, [session, logout]);
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserData(session.user.id);
-        updateActivity();
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await fetchUserData(session.user.id);
-        updateActivity();
-        
-        // Start logging
-        const logId = await startUserSessionLog({
-          userId: session.user.id,
-          username: profile?.username || session.user.email || 'Unknown',
-          action: 'LOGIN',
-          status: 'SUCCESS',
-          sessionId: session.access_token.substring(0, 20) // Use part of token as session identifier
-        });
-        if (logId) localStorage.setItem('neas_current_log_id', logId);
-      } else if (event === 'SIGNED_OUT') {
-        setUserRole(null);
-        setUsername(null);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [updateActivity]);
-
-  // Inactivity Timer Logic
-  useEffect(() => {
-    if (session) {
-      const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-      events.forEach(event => window.addEventListener(event, updateActivity));
-      
-      // Handle returning online
-      window.addEventListener('online', checkInactivity);
-
-      checkIntervalRef.current = setInterval(checkInactivity, CHECK_INTERVAL);
-
-      return () => {
-        events.forEach(event => window.removeEventListener(event, updateActivity));
-        window.removeEventListener('online', checkInactivity);
-        if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
-      };
-    }
-  }, [session, updateActivity, checkInactivity]);
-
   const fetchUserData = async (userId: string) => {
+    console.log(`AuthProvider: Fetching profile for user ${userId}`);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -133,13 +75,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('id', userId)
         .single();
       
-      if (data && !error) {
+      if (error) {
+        console.error('AuthProvider: Error fetching profile:', error);
+        return null;
+      }
+
+      if (data) {
+        console.log('AuthProvider: Profile data received:', data.username);
         setUsername(data.username);
         // @ts-ignore
         const roleName = data.roles?.name || 'User';
         setUserRole(roleName);
 
-        // Store user details in local storage for persistence
         localStorage.setItem('neas_user_data', JSON.stringify({
           username: data.username,
           first_name: data.first_name,
@@ -150,10 +97,80 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return data;
       }
     } catch (err) {
-      console.error('Error fetching user data:', err);
+      console.error('AuthProvider: Unexpected error in fetchUserData:', err);
     }
     return null;
   };
+
+  useEffect(() => {
+    console.log("AuthProvider: Initializing...");
+    
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
+      if (error) {
+        console.error("AuthProvider: Session fetch error:", error);
+      }
+      
+      console.log("AuthProvider: Initial session check complete. Session exists:", !!initialSession);
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+      
+      if (initialSession?.user) {
+        fetchUserData(initialSession.user.id);
+        updateActivity();
+      }
+      
+      setLoading(false);
+      console.log("AuthProvider: Loading set to false (initial)");
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log(`AuthProvider: Auth state changed: ${event}`);
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      
+      if (event === 'SIGNED_IN' && currentSession?.user) {
+        const profile = await fetchUserData(currentSession.user.id);
+        updateActivity();
+        
+        const logId = await startUserSessionLog({
+          userId: currentSession.user.id,
+          username: profile?.username || currentSession.user.email || 'Unknown',
+          action: 'LOGIN',
+          status: 'SUCCESS',
+          sessionId: currentSession.access_token.substring(0, 20)
+        });
+        if (logId) localStorage.setItem('neas_current_log_id', logId);
+      } else if (event === 'SIGNED_OUT') {
+        setUserRole(null);
+        setUsername(null);
+      }
+      
+      setLoading(false);
+      console.log("AuthProvider: Loading set to false (auth change)");
+    });
+
+    return () => {
+      console.log("AuthProvider: Cleaning up subscription");
+      subscription.unsubscribe();
+    };
+  }, [updateActivity]);
+
+  useEffect(() => {
+    if (session) {
+      const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+      events.forEach(event => window.addEventListener(event, updateActivity));
+      window.addEventListener('online', checkInactivity);
+      checkIntervalRef.current = setInterval(checkInactivity, CHECK_INTERVAL);
+
+      return () => {
+        events.forEach(event => window.removeEventListener(event, updateActivity));
+        window.removeEventListener('online', checkInactivity);
+        if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+      };
+    }
+  }, [session, updateActivity, checkInactivity]);
 
   return (
     <AuthContext.Provider value={{ session, user, loading, userRole, username, logout }}>
