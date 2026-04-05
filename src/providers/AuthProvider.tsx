@@ -28,31 +28,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const processedSessionId = useRef<string | null>(null);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
+    console.log(`AuthProvider: Initiating ${reason} sequence...`);
+    
     const logId = localStorage.getItem('neas_current_log_id');
     const startTime = localStorage.getItem('neas_current_log_start');
     
-    // Clear state immediately
-    setSession(null);
-    setUser(null);
-    setUserRole(null);
-    setUsername(null);
-    processedSessionId.current = null;
-    
+    // 1. Update the session log in the database FIRST
+    // We MUST await this before signing out, otherwise the auth context is lost
     if (logId && startTime) {
-      // Don't await this to keep logout snappy, but it will run
-      endUserSessionLog(logId, startTime, reason);
+      try {
+        await endUserSessionLog(logId, startTime, reason);
+        console.log("AuthProvider: Session log updated successfully");
+      } catch (err) {
+        console.error("AuthProvider: Failed to update session log during logout:", err);
+      }
       localStorage.removeItem('neas_current_log_id');
       localStorage.removeItem('neas_current_log_start');
     }
 
+    // 2. Perform the actual sign out
     await supabase.auth.signOut();
     
+    // 3. Clear local storage and state
     if (reason === 'TIMEOUT') {
       localStorage.setItem('neas_session_expired', 'true');
     }
     
     localStorage.removeItem('neas_user_data');
     localStorage.removeItem('neas_last_activity');
+
+    setSession(null);
+    setUser(null);
+    setUserRole(null);
+    setUsername(null);
+    processedSessionId.current = null;
   }, []);
 
   const updateActivity = useCallback(() => {
@@ -105,19 +114,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log(`AuthProvider: Event -> ${event}`);
-      
       if (currentSession) {
         setSession(currentSession);
         setUser(currentSession.user);
         updateActivity();
         
-        // Only process login logging once per session token
         const sessionId = currentSession.access_token.substring(0, 20);
         if (event === 'SIGNED_IN' && processedSessionId.current !== sessionId) {
           processedSessionId.current = sessionId;
           
-          // Fetch profile and log in background - DON'T block the UI
           fetchUserData(currentSession.user.id).then(profile => {
             startUserSessionLog({
               userId: currentSession.user.id,
