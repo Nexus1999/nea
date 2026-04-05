@@ -24,7 +24,10 @@ export const createSession = async (userId: string) => {
         .eq('is_active', true)
         .maybeSingle();
       
-      if (existingSession) return existingToken;
+      if (existingSession) {
+        console.log("SessionTracker: Reusing existing active session");
+        return existingToken;
+      }
     }
 
     const sessionToken = generateToken();
@@ -54,6 +57,7 @@ export const createSession = async (userId: string) => {
     if (error) throw error;
 
     localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
+    console.log("SessionTracker: New session created");
     return sessionToken;
   } catch (err) {
     console.error("SessionTracker: Failed to create session:", err);
@@ -94,6 +98,7 @@ export const closeSession = async () => {
 
     if (error) throw error;
     localStorage.removeItem(SESSION_TOKEN_KEY);
+    console.log("SessionTracker: Session closed successfully");
   } catch (err) {
     console.error("SessionTracker: Failed to close session:", err);
   }
@@ -105,11 +110,7 @@ export const initSessionLifecycle = () => {
   const handleUnload = () => {
     const token = getStoredToken();
     if (token) {
-      // Use beacon or sync request for best effort on close
-      const now = new Date().toISOString();
-      const body = JSON.stringify({ last_seen: now });
-      // Note: Supabase client doesn't support beacon directly, 
-      // but we can try a standard update if the browser allows it.
+      // Best effort update on close
       updateSessionHeartbeat();
     }
   };

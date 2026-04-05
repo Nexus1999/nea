@@ -12,7 +12,6 @@ import NectaLogo from '@/components/NectaLogo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { showError, showSuccess } from '@/utils/toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { generateSessionId } from '@/utils/sessionLogger';
 
 const Login = () => {
   const { session, loading: authLoading } = useAuth();
@@ -54,21 +53,12 @@ const Login = () => {
       if (profileError) throw profileError;
       if (!profile) throw new Error("Username not found. Please check your credentials.");
 
-      // Generate custom session ID and set pending flag
-      const customSessionId = generateSessionId();
-      localStorage.setItem('neas_custom_session_id', customSessionId);
-      localStorage.setItem('neas_pending_log', 'true');
-
       const { error } = await supabase.auth.signInWithPassword({
         email: profile.email,
         password: password,
       });
 
-      if (error) {
-        localStorage.removeItem('neas_pending_log');
-        localStorage.removeItem('neas_custom_session_id');
-        throw error;
-      }
+      if (error) throw error;
       
       showSuccess(`Welcome back, ${username}!`);
     } catch (error: any) {
