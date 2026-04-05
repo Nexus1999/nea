@@ -50,23 +50,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const updateActivity = useCallback(() => {
-    if (session) {
-      localStorage.setItem('neas_last_activity', Date.now().toString());
-    }
-  }, [session]);
+    localStorage.setItem('neas_last_activity', Date.now().toString());
+  }, []);
 
   const checkInactivity = useCallback(() => {
     const lastActivity = localStorage.getItem('neas_last_activity');
-    if (lastActivity && session) {
+    const currentSession = supabase.auth.getSession(); // Get fresh session state
+    
+    if (lastActivity) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
         console.log("AuthProvider: Inactivity limit reached");
         logout('TIMEOUT');
       }
     }
-  }, [session, logout]);
+  }, [logout]);
 
-  const fetchUserData = async (userId: string) => {
+  const fetchUserData = useCallback(async (userId: string) => {
     console.log(`AuthProvider: Fetching profile for user ${userId}`);
     try {
       const { data, error } = await supabase
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error('AuthProvider: Unexpected error in fetchUserData:', err);
     }
     return null;
-  };
+  }, []);
 
   useEffect(() => {
     console.log("AuthProvider: Initializing...");
@@ -121,12 +121,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       setLoading(false);
-      console.log("AuthProvider: Loading set to false (initial)");
     });
 
-    // Listen for auth changes
+    // Listen for auth changes - Empty dependency array ensures this only runs once
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       console.log(`AuthProvider: Auth state changed: ${event}`);
+      
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
@@ -148,24 +148,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       setLoading(false);
-      console.log("AuthProvider: Loading set to false (auth change)");
     });
 
     return () => {
       console.log("AuthProvider: Cleaning up subscription");
       subscription.unsubscribe();
     };
-  }, [updateActivity]);
+  }, [fetchUserData, updateActivity]); // These are now stable via useCallback
 
   useEffect(() => {
     if (session) {
       const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-      events.forEach(event => window.addEventListener(event, updateActivity));
+      const handleActivity = () => updateActivity();
+      
+      events.forEach(event => window.addEventListener(event, handleActivity));
       window.addEventListener('online', checkInactivity);
       checkIntervalRef.current = setInterval(checkInactivity, CHECK_INTERVAL);
 
       return () => {
-        events.forEach(event => window.removeEventListener(event, updateActivity));
+        events.forEach(event => window.removeEventListener(event, handleActivity));
         window.removeEventListener('online', checkInactivity);
         if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
       };
