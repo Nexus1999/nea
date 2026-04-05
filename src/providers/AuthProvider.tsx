@@ -15,7 +15,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutes
-const CHECK_INTERVAL = 10000; // 10 seconds for more frequent checks
+const CHECK_INTERVAL = 10000; // 10 seconds
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -28,18 +28,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const isLoggingIn = useRef(false);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
-    console.log(`AuthProvider: Manual trigger for ${reason}`);
+    console.log(`AuthProvider: Initiating ${reason} sequence...`);
     
     const logId = localStorage.getItem('neas_active_log_id');
     const startTime = localStorage.getItem('neas_active_log_start');
     
-    // 1. CRITICAL: Update the database BEFORE anything else
+    // 1. Update the database record while the session is still technically active
     if (logId && startTime) {
-      console.log(`AuthProvider: Closing log ${logId}...`);
       await endUserSessionLog(logId, startTime, reason);
     }
 
-    // 2. Clear all custom session tracking
+    // 2. Clear all local tracking data
     localStorage.removeItem('neas_active_log_id');
     localStorage.removeItem('neas_active_log_start');
     localStorage.removeItem('neas_last_activity');
@@ -49,7 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.setItem('neas_session_expired', 'true');
     }
 
-    // 3. Finally, sign out from Supabase
+    // 3. Sign out from Supabase
     await supabase.auth.signOut();
     
     // 4. Reset local state
@@ -57,6 +56,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
     setUserRole(null);
     setUsername(null);
+    
+    // Force a redirect to login
+    window.location.href = '/login';
   }, []);
 
   const updateActivity = useCallback(() => {
@@ -68,7 +70,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (lastActivity && session) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
-        console.log("AuthProvider: Inactivity limit reached");
         logout('TIMEOUT');
       }
     }
@@ -95,7 +96,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return null;
   }, []);
 
-  // Custom effect to handle log creation only when a new login is detected
   useEffect(() => {
     const handleNewSessionLog = async () => {
       if (!session || isLoggingIn.current) return;
@@ -105,8 +105,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (isPending && !hasActiveLog) {
         isLoggingIn.current = true;
-        console.log("AuthProvider: Creating new session log record...");
-        
         const profile = await fetchUserData(session.user.id);
         const logData = await startUserSessionLog({
           userId: session.user.id,
@@ -129,7 +127,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [session, fetchUserData]);
 
   useEffect(() => {
-    // Initial session check
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       if (initialSession) {
         setSession(initialSession);
@@ -140,7 +137,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     });
 
-    // Auth state listener - only for state management, not logging
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (currentSession) {
         setSession(currentSession);
@@ -149,8 +145,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         setSession(null);
         setUser(null);
-        setUserRole(null);
-        setUsername(null);
       }
       setLoading(false);
     });

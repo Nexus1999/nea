@@ -80,7 +80,6 @@ export const endUserSessionLog = async (logId: string, startTimeStr: string, act
     const startTime = new Date(startTimeStr);
     const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
 
-    // We use a direct update call and await it strictly
     const { error } = await supabase
       .from('user_logs')
       .update({
@@ -92,7 +91,7 @@ export const endUserSessionLog = async (logId: string, startTimeStr: string, act
       .eq('id', logId);
 
     if (error) throw error;
-    console.log(`SessionLogger: Successfully closed log ${logId} with ${action}`);
+    console.log(`SessionLogger: Successfully updated log ${logId} to ${action}`);
     return true;
   } catch (err) {
     console.error("SessionLogger: Failed to update log record:", err);

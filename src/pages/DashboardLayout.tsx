@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useLocation, useNavigate, Link, Outlet, useParams } from "react-router-dom";
+import { useLocation, useNavigate, Link, Outlet } from "react-router-dom";
 import {
   Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags, Shield, FileText, Settings,
-  Menu, Bell, User, ChevronDown, LogOut, X, Users, LayoutDashboard, ChevronRight,
-  Globe, MapPin, BookOpen, GraduationCap, Accessibility, GitBranch, UserCheck, PlusCircle, Eye
+  Menu, Bell, User, ChevronDown, LogOut, X, Users, LayoutDashboard,
+  Globe, MapPin, BookOpen, GraduationCap
 } from "lucide-react";
  
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -13,16 +13,8 @@ import { showStyledSwal } from '../utils/alerts';
 import { useAuth } from "@/providers/AuthProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import NectaLogo from "@/components/NectaLogo";
-import { SpecialNeedType } from "@/types/mastersummaries";
 import Spinner from "@/components/Spinner";
 import DynamicBreadcrumbs from "@/components/DynamicBreadcrumbs";
-
-const specialNeedFullNames: Record<SpecialNeedType, string> = {
-  HI: 'Hearing Impairment',
-  BR: 'Braille',
-  LV: 'Low Vision',
-  PI: 'Physical Impairment',
-};
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: Home, key: 'Dashboard' },
@@ -49,10 +41,8 @@ const navItems = [
     icon: Tags,
     key: 'Miscellaneous',
     subItems: [
-      {
-        path: '/dashboard/miscellaneous/overview',label: 'OverView',icon: LayoutDashboard,key: 'MiscellaneousOverview',},
-       {path: '/dashboard/miscellaneous/jobs',label: 'Teachers Inventory',icon: Users,key: 'MiscellaneousTeachers',
-      },
+      { path: '/dashboard/miscellaneous/overview', label: 'OverView', icon: LayoutDashboard, key: 'MiscellaneousOverview' },
+      { path: '/dashboard/miscellaneous/jobs', label: 'Teachers Inventory', icon: Users, key: 'MiscellaneousTeachers' },
     ],
   },
   {
@@ -84,8 +74,6 @@ const navItems = [
   { path: '/dashboard/profile', label: 'Profile', icon: User, key: 'Profile' },
 ];
 
- 
-
 const DashboardLayout = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
@@ -99,7 +87,6 @@ const DashboardLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { session, user, loading, userRole, logout } = useAuth();
-  const params = useParams();
 
   useEffect(() => {
     setIsSecuritySubMenuOpen(location.pathname.startsWith('/dashboard/security'));
@@ -109,15 +96,18 @@ const DashboardLayout = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!loading && !session) {
+    // Only redirect if we are not loading and there is no session
+    // and we are not currently on the login page
+    if (!loading && !session && location.pathname !== '/login') {
       navigate("/login", { replace: true });
     }
-  }, [session, loading, navigate]);
+  }, [session, loading, navigate, location.pathname]);
 
   const handleLogout = async () => {
     try {
+      // The logout function in AuthProvider now handles the full sequence
+      // including database updates and final navigation.
       await logout();
-      navigate("/login", { replace: true });
     } catch (error) {
       console.error("Logout failed:", error);
       showStyledSwal({
@@ -137,17 +127,6 @@ const DashboardLayout = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const isDynamicId = (segment: string): boolean => {
-    if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(segment)) return true;
-    if (/^\d+$/.test(segment)) return true;
-    if (segment.length > 20) return true;
-    return false;
-  };
-
- 
-
-  const filteredNavItems = navItems.filter(item => true);
 
   if (loading) {
     return (
@@ -206,7 +185,7 @@ const DashboardLayout = () => {
           </div>
 
           <nav className="flex-1 p-4 space-y-2">
-            {filteredNavItems.map((item) => {
+            {navItems.map((item) => {
               const isActive = location.pathname === item.path || (item.subItems && location.pathname.startsWith(item.path));
               
               if (item.subItems) {
@@ -365,12 +344,11 @@ const DashboardLayout = () => {
         </header>
 
         <div className="flex-1 p-6 overflow-auto">
-           
           <div className="flex justify-end mb-4 px-2">
-          <div className="max-w-[75%] md:max-w-none">
-            <DynamicBreadcrumbs />
+            <div className="max-w-[75%] md:max-w-none">
+              <DynamicBreadcrumbs />
+            </div>
           </div>
-        </div>
           <Outlet />
         </div>
       </div>
