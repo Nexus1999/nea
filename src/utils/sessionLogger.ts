@@ -69,7 +69,7 @@ export const startUserSessionLog = async (params: UserLogParams) => {
       .single();
 
     if (error) throw error;
-    console.log(`SessionLogger: Started log for session ${params.sessionId}`);
+    console.log(`SessionLogger: Started log record ${data.id}`);
     return { id: data.id, startTime };
   } catch (err) {
     console.error("SessionLogger: Failed to start log:", err);
@@ -77,9 +77,9 @@ export const startUserSessionLog = async (params: UserLogParams) => {
   }
 };
 
-export const endUserSessionLog = async (sessionId: string, startTimeStr: string, action: 'LOGOUT' | 'TIMEOUT') => {
-  if (!sessionId) {
-    console.warn("SessionLogger: No sessionId provided to endUserSessionLog");
+export const endUserSessionLog = async (logId: string, startTimeStr: string, action: 'LOGOUT' | 'TIMEOUT') => {
+  if (!logId) {
+    console.warn("SessionLogger: No logId provided to endUserSessionLog");
     return false;
   }
 
@@ -88,7 +88,7 @@ export const endUserSessionLog = async (sessionId: string, startTimeStr: string,
     const startTime = new Date(startTimeStr);
     const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
 
-    console.log(`SessionLogger: Updating session ${sessionId} with action ${action}...`);
+    console.log(`SessionLogger: Finalizing log record ${logId} with action ${action}...`);
 
     const { data, error } = await supabase
       .from('user_logs')
@@ -98,17 +98,17 @@ export const endUserSessionLog = async (sessionId: string, startTimeStr: string,
         session_duration: durationSeconds,
         status: 'COMPLETED'
       })
-      .eq('session_id', sessionId)
+      .eq('id', logId)
       .select();
 
     if (error) throw error;
     
     if (!data || data.length === 0) {
-      console.warn(`SessionLogger: No log record found for session_id: ${sessionId}`);
+      console.warn(`SessionLogger: Record ${logId} not found in database during update`);
       return false;
     }
 
-    console.log(`SessionLogger: Successfully updated session ${sessionId}`);
+    console.log(`SessionLogger: Successfully finalized log record ${logId}`);
     return true;
   } catch (err) {
     console.error("SessionLogger: Failed to update log record:", err);

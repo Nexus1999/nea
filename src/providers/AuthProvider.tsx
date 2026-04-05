@@ -34,22 +34,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     console.log(`AuthProvider: Initiating ${reason} sequence...`);
     
-    const sessionId = localStorage.getItem('neas_custom_session_id');
+    const logId = localStorage.getItem('neas_active_log_id');
     const startTime = localStorage.getItem('neas_active_log_start');
     
-    // 1. Update the database log record FIRST while the session is still active
-    if (sessionId && startTime) {
+    // 1. Update the database log record FIRST using the primary key ID
+    if (logId && startTime) {
       try {
-        console.log(`AuthProvider: Attempting to end log for session: ${sessionId}`);
-        const success = await endUserSessionLog(sessionId, startTime, reason);
+        const success = await endUserSessionLog(logId, startTime, reason);
         if (!success) {
-          console.warn('AuthProvider: Database log update failed or returned no rows');
+          console.warn('AuthProvider: Database log update failed');
         }
       } catch (err) {
         console.error('AuthProvider: Error during endUserSessionLog:', err);
       }
-    } else {
-      console.warn('AuthProvider: Missing sessionId or startTime in localStorage', { sessionId, startTime });
     }
 
     // 2. Clear all custom localStorage items
@@ -77,9 +74,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUsername(null);
     
     // 5. Small delay to ensure network requests are finished before redirect
-    console.log('AuthProvider: Finalizing logout...');
     await new Promise(resolve => setTimeout(resolve, 500));
-    
     window.location.href = '/login';
   }, []);
 
