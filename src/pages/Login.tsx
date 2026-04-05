@@ -53,15 +53,20 @@ const Login = () => {
       if (profileError) throw profileError;
       if (!profile) throw new Error("Username not found. Please check your credentials.");
 
+      // Set the pending flag BEFORE signing in
+      localStorage.setItem('neas_pending_log', 'true');
+
       const { error } = await supabase.auth.signInWithPassword({
         email: profile.email,
         password: password,
       });
 
-      if (error) throw error;
+      if (error) {
+        localStorage.removeItem('neas_pending_log');
+        throw error;
+      }
       
       showSuccess(`Welcome back, ${username}!`);
-      // Navigation is handled by the useEffect watching the session
     } catch (error: any) {
       showError(error.message || "Invalid username or password");
       setLoading(false);

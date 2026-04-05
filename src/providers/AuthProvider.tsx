@@ -15,7 +15,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutes
-const CHECK_INTERVAL = 30000; // 30 seconds
+const CHECK_INTERVAL = 10000; // 10 seconds for more frequent checks
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -25,36 +25,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isProcessingAuth = useRef(false);
+  const isLoggingIn = useRef(false);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
-    console.log(`AuthProvider: Logging out due to ${reason}`);
+    console.log(`AuthProvider: Manual trigger for ${reason}`);
     
-    const logId = localStorage.getItem('neas_current_log_id');
-    const startTime = localStorage.getItem('neas_current_log_start');
+    const logId = localStorage.getItem('neas_active_log_id');
+    const startTime = localStorage.getItem('neas_active_log_start');
     
-    // 1. Update the existing log record with end time and duration
+    // 1. CRITICAL: Update the database BEFORE anything else
     if (logId && startTime) {
-      try {
-        await endUserSessionLog(logId, startTime, reason);
-      } catch (err) {
-        console.error("AuthProvider: Error updating log during logout:", err);
-      }
+      console.log(`AuthProvider: Closing log ${logId}...`);
+      await endUserSessionLog(logId, startTime, reason);
     }
 
-    // 2. Clear local storage tracking
-    localStorage.removeItem('neas_current_log_id');
-    localStorage.removeItem('neas_current_log_start');
+    // 2. Clear all custom session tracking
+    localStorage.removeItem('neas_active_log_id');
+    localStorage.removeItem('neas_active_log_start');
     localStorage.removeItem('neas_last_activity');
+    localStorage.removeItem('neas_pending_log');
     
     if (reason === 'TIMEOUT') {
       localStorage.setItem('neas_session_expired', 'true');
     }
 
-    // 3. Sign out from Supabase
+    // 3. Finally, sign out from Supabase
     await supabase.auth.signOut();
     
-    // 4. Reset state
+    // 4. Reset local state
     setSession(null);
     setUser(null);
     setUserRole(null);
@@ -67,13 +65,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const checkInactivity = useCallback(() => {
     const lastActivity = localStorage.getItem('neas_last_activity');
-    if (lastActivity) {
+    if (lastActivity && session) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
+        console.log("AuthProvider: Inactivity limit reached");
         logout('TIMEOUT');
       }
     }
-  }, [logout]);
+  }, [logout, session]);
 
   const fetchUserData = useCallback(async (userId: string) => {
     try {
@@ -96,6 +95,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return null;
   }, []);
 
+  // Custom effect to handle log creation only when a new login is detected
+  useEffect(() => {
+    const handleNewSessionLog = async () => {
+      if (!session || isLoggingIn.current) return;
+      
+      const hasActiveLog = localStorage.getItem('neas_active_log_id');
+      const isPending = localStorage.getItem('neas_pending_log') === 'true';
+
+      if (isPending && !hasActiveLog) {
+        isLoggingIn.current = true;
+        console.log("AuthProvider: Creating new session log record...");
+        
+        const profile = await fetchUserData(session.user.id);
+        const logData = await startUserSessionLog({
+          userId: session.user.id,
+          username: profile?.username || session.user.email || 'Unknown',
+          action: 'LOGIN',
+          status: 'SUCCESS',
+          sessionId: session.access_token.substring(0, 15)
+        });
+
+        if (logData) {
+          localStorage.setItem('neas_active_log_id', logData.id);
+          localStorage.setItem('neas_active_log_start', logData.startTime);
+          localStorage.removeItem('neas_pending_log');
+        }
+        isLoggingIn.current = false;
+      }
+    };
+
+    handleNewSessionLog();
+  }, [session, fetchUserData]);
+
   useEffect(() => {
     // Initial session check
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
@@ -108,33 +140,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     });
 
-    // Auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    // Auth state listener - only for state management, not logging
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (currentSession) {
         setSession(currentSession);
         setUser(currentSession.user);
         updateActivity();
-        
-        // Only create a log if we don't have one for this specific session
-        const currentLogId = localStorage.getItem('neas_current_log_id');
-        if (event === 'SIGNED_IN' && !currentLogId && !isProcessingAuth.current) {
-          isProcessingAuth.current = true;
-          
-          const profile = await fetchUserData(currentSession.user.id);
-          const logData = await startUserSessionLog({
-            userId: currentSession.user.id,
-            username: profile?.username || currentSession.user.email || 'Unknown',
-            action: 'LOGIN',
-            status: 'SUCCESS',
-            sessionId: currentSession.access_token.substring(0, 20)
-          });
-
-          if (logData) {
-            localStorage.setItem('neas_current_log_id', logData.id);
-            localStorage.setItem('neas_current_log_start', logData.startTime);
-          }
-          isProcessingAuth.current = false;
-        }
       } else {
         setSession(null);
         setUser(null);

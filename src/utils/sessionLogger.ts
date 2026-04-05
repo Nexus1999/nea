@@ -43,7 +43,7 @@ export const startUserSessionLog = async (params: UserLogParams) => {
       const ipData = await ipRes.json();
       ipAddress = ipData.ip;
     } catch (e) {
-      console.warn("Could not fetch IP address, continuing...");
+      console.warn("Could not fetch IP address");
     }
 
     const { data, error } = await supabase
@@ -73,13 +73,14 @@ export const startUserSessionLog = async (params: UserLogParams) => {
 };
 
 export const endUserSessionLog = async (logId: string, startTimeStr: string, action: 'LOGOUT' | 'TIMEOUT') => {
-  if (!logId) return;
+  if (!logId) return false;
 
   try {
     const endTime = new Date();
     const startTime = new Date(startTimeStr);
     const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
 
+    // We use a direct update call and await it strictly
     const { error } = await supabase
       .from('user_logs')
       .update({
@@ -91,8 +92,10 @@ export const endUserSessionLog = async (logId: string, startTimeStr: string, act
       .eq('id', logId);
 
     if (error) throw error;
-    console.log(`SessionLogger: Log ${logId} updated successfully with ${action}`);
+    console.log(`SessionLogger: Successfully closed log ${logId} with ${action}`);
+    return true;
   } catch (err) {
     console.error("SessionLogger: Failed to update log record:", err);
+    return false;
   }
 };
