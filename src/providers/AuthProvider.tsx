@@ -26,17 +26,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isLoggingIn = useRef(false);
+  const isLoggingOut = useRef(false);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
+    if (isLoggingOut.current) return;
+    isLoggingOut.current = true;
+
     console.log(`AuthProvider: Initiating ${reason} sequence...`);
     
     const logId = localStorage.getItem('neas_active_log_id');
     const startTime = localStorage.getItem('neas_active_log_start');
     
+    // 1. Update the database log record FIRST while the session is still active
     if (logId && startTime) {
-      await endUserSessionLog(logId, startTime, reason);
+      try {
+        const success = await endUserSessionLog(logId, startTime, reason);
+        if (!success) {
+          console.warn('AuthProvider: Database log update returned false');
+        }
+      } catch (err) {
+        console.error('AuthProvider: Error during endUserSessionLog:', err);
+      }
     }
 
+    // 2. Clear all custom localStorage items
     localStorage.removeItem('neas_active_log_id');
     localStorage.removeItem('neas_active_log_start');
     localStorage.removeItem('neas_last_activity');
@@ -47,13 +60,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.setItem('neas_session_expired', 'true');
     }
 
-    await supabase.auth.signOut();
+    // 3. Sign out from Supabase
+    try {
+      await supabase.auth.signOut();
+    } catch (signOutErr) {
+      console.error('AuthProvider: Supabase signOut error:', signOutErr);
+    }
     
+    // 4. Clear React state
     setSession(null);
     setUser(null);
     setUserRole(null);
     setUsername(null);
     
+    // 5. Final redirect
+    console.log('AuthProvider: Logout sequence complete. Redirecting...');
     window.location.href = '/login';
   }, []);
 
@@ -63,7 +84,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const checkInactivity = useCallback(() => {
     const lastActivity = localStorage.getItem('neas_last_activity');
-    if (lastActivity && session) {
+    if (lastActivity && session && !isLoggingOut.current) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
         logout('TIMEOUT');
@@ -94,7 +115,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const handleNewSessionLog = async () => {
-      if (!session || isLoggingIn.current) return;
+      if (!session || isLoggingIn.current || isLoggingOut.current) return;
       
       const hasActiveLog = localStorage.getItem('neas_active_log_id');
       const isPending = localStorage.getItem('neas_pending_log') === 'true';
@@ -139,7 +160,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(currentSession);
         setUser(currentSession.user);
         updateActivity();
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         setSession(null);
         setUser(null);
       }

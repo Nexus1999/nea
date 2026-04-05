@@ -7,7 +7,7 @@ export interface UserLogParams {
   username: string;
   action: 'LOGIN' | 'LOGOUT' | 'TIMEOUT';
   status: string;
-  sessionId: string; // Now mandatory and custom
+  sessionId: string;
 }
 
 export const generateSessionId = () => {
@@ -69,6 +69,7 @@ export const startUserSessionLog = async (params: UserLogParams) => {
       .single();
 
     if (error) throw error;
+    console.log(`SessionLogger: Started log ${data.id} for session ${params.sessionId}`);
     return { id: data.id, startTime };
   } catch (err) {
     console.error("SessionLogger: Failed to start log:", err);
@@ -77,12 +78,17 @@ export const startUserSessionLog = async (params: UserLogParams) => {
 };
 
 export const endUserSessionLog = async (logId: string, startTimeStr: string, action: 'LOGOUT' | 'TIMEOUT') => {
-  if (!logId) return false;
+  if (!logId) {
+    console.warn("SessionLogger: No logId provided to endUserSessionLog");
+    return false;
+  }
 
   try {
     const endTime = new Date();
     const startTime = new Date(startTimeStr);
     const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+
+    console.log(`SessionLogger: Updating log ${logId} with action ${action}...`);
 
     const { error } = await supabase
       .from('user_logs')
@@ -95,6 +101,7 @@ export const endUserSessionLog = async (logId: string, startTimeStr: string, act
       .eq('id', logId);
 
     if (error) throw error;
+    
     console.log(`SessionLogger: Successfully updated log ${logId} to ${action}`);
     return true;
   } catch (err) {
