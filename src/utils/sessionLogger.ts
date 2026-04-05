@@ -47,7 +47,7 @@ export const startUserSessionLog = async (params: UserLogParams) => {
       const ipData = await ipRes.json();
       ipAddress = ipData.ip;
     } catch (e) {
-      console.warn("Could not fetch IP address");
+      console.warn("SessionLogger: Could not fetch IP address");
     }
 
     const { data, error } = await supabase
@@ -69,7 +69,7 @@ export const startUserSessionLog = async (params: UserLogParams) => {
       .single();
 
     if (error) throw error;
-    console.log(`SessionLogger: Started log ${data.id} for session ${params.sessionId}`);
+    console.log(`SessionLogger: Started log for session ${params.sessionId}`);
     return { id: data.id, startTime };
   } catch (err) {
     console.error("SessionLogger: Failed to start log:", err);
@@ -77,9 +77,9 @@ export const startUserSessionLog = async (params: UserLogParams) => {
   }
 };
 
-export const endUserSessionLog = async (logId: string, startTimeStr: string, action: 'LOGOUT' | 'TIMEOUT') => {
-  if (!logId) {
-    console.warn("SessionLogger: No logId provided to endUserSessionLog");
+export const endUserSessionLog = async (sessionId: string, startTimeStr: string, action: 'LOGOUT' | 'TIMEOUT') => {
+  if (!sessionId) {
+    console.warn("SessionLogger: No sessionId provided to endUserSessionLog");
     return false;
   }
 
@@ -88,9 +88,9 @@ export const endUserSessionLog = async (logId: string, startTimeStr: string, act
     const startTime = new Date(startTimeStr);
     const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
 
-    console.log(`SessionLogger: Updating log ${logId} with action ${action}...`);
+    console.log(`SessionLogger: Updating session ${sessionId} with action ${action}...`);
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('user_logs')
       .update({
         action: action,
@@ -98,11 +98,17 @@ export const endUserSessionLog = async (logId: string, startTimeStr: string, act
         session_duration: durationSeconds,
         status: 'COMPLETED'
       })
-      .eq('id', logId);
+      .eq('session_id', sessionId)
+      .select();
 
     if (error) throw error;
     
-    console.log(`SessionLogger: Successfully updated log ${logId} to ${action}`);
+    if (!data || data.length === 0) {
+      console.warn(`SessionLogger: No log record found for session_id: ${sessionId}`);
+      return false;
+    }
+
+    console.log(`SessionLogger: Successfully updated session ${sessionId}`);
     return true;
   } catch (err) {
     console.error("SessionLogger: Failed to update log record:", err);
