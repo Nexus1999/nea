@@ -8,10 +8,11 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { User, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { User, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import NectaLogo from '@/components/NectaLogo';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { showError, showSuccess } from '@/utils/toast';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Login = () => {
   const { session, loading: authLoading } = useAuth();
@@ -19,9 +20,17 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     document.title = "Log In | NEAS";
+    
+    // Check if we just got logged out due to inactivity
+    const expired = localStorage.getItem('neas_session_expired');
+    if (expired === 'true') {
+      setSessionExpired(true);
+      localStorage.removeItem('neas_session_expired');
+    }
   }, []);
 
   useEffect(() => {
@@ -35,6 +44,7 @@ const Login = () => {
     if (!username || !password) return;
     
     setLoading(true);
+    setSessionExpired(false);
 
     try {
       const { data: profile, error: profileError } = await supabase
@@ -72,22 +82,38 @@ const Login = () => {
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-100 rounded-full blur-[120px] opacity-50" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-100 rounded-full blur-[120px] opacity-50" />
       
-
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="w-full max-w-[440px] px-4 z-10"
       >
-         
+        <AnimatePresence>
+          {sessionExpired && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              className="overflow-hidden"
+            >
+              <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800 rounded-2xl shadow-lg shadow-red-100">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertTitle className="font-black uppercase text-[10px] tracking-widest">Session Expired</AlertTitle>
+                <AlertDescription className="text-xs font-medium">
+                  You have been logged out due to inactivity. Please log in again to continue.
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
           <CardHeader className="pt-10 pb-2 px-8 text-center">
-           <h1 className="text-lg font-bold tracking-tight text-gray-900">
-            EXAMINATIONS ADMINISTRATION
-          </h1>
+            <h1 className="text-lg font-bold tracking-tight text-gray-900">
+              EXAMINATIONS ADMINISTRATION
+            </h1>
 
-             <div className="flex justify-center mb-6 mt-4">
+            <div className="flex justify-center mb-6 mt-4">
               <motion.div 
                 initial={{ scale: 0.8 }}
                 animate={{ scale: 1 }}
