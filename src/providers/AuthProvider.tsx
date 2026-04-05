@@ -25,20 +25,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isLoggingIn = useRef(false);
+  const processedSessionId = useRef<string | null>(null);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
     const logId = localStorage.getItem('neas_current_log_id');
     const startTime = localStorage.getItem('neas_current_log_start');
     
-    // Clear local state immediately for UI responsiveness
+    // Clear state immediately
     setSession(null);
     setUser(null);
     setUserRole(null);
     setUsername(null);
+    processedSessionId.current = null;
     
     if (logId && startTime) {
-      await endUserSessionLog(logId, startTime, reason);
+      // Don't await this to keep logout snappy, but it will run
+      endUserSessionLog(logId, startTime, reason);
       localStorage.removeItem('neas_current_log_id');
       localStorage.removeItem('neas_current_log_start');
     }
@@ -90,57 +92,56 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    // 1. Initial Session Check
-    const init = async () => {
-      const { data: { session: initialSession } } = await supabase.auth.getSession();
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       if (initialSession) {
         setSession(initialSession);
         setUser(initialSession.user);
-        await fetchUserData(initialSession.user.id);
+        fetchUserData(initialSession.user.id);
         updateActivity();
       }
       setLoading(false);
-    };
-    init();
+    });
 
-    // 2. Auth State Listener
+    // Auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       console.log(`AuthProvider: Event -> ${event}`);
       
-      if (event === 'SIGNED_IN' && currentSession && !isLoggingIn.current) {
-        isLoggingIn.current = true;
-        setLoading(true);
-        
+      if (currentSession) {
         setSession(currentSession);
         setUser(currentSession.user);
         updateActivity();
         
-        const profile = await fetchUserData(currentSession.user.id);
-        const logData = await startUserSessionLog({
-          userId: currentSession.user.id,
-          username: profile?.username || currentSession.user.email || 'Unknown',
-          action: 'LOGIN',
-          status: 'SUCCESS',
-          sessionId: currentSession.access_token.substring(0, 20)
-        });
-
-        if (logData) {
-          localStorage.setItem('neas_current_log_id', logData.id);
-          localStorage.setItem('neas_current_log_start', logData.startTime);
+        // Only process login logging once per session token
+        const sessionId = currentSession.access_token.substring(0, 20);
+        if (event === 'SIGNED_IN' && processedSessionId.current !== sessionId) {
+          processedSessionId.current = sessionId;
+          
+          // Fetch profile and log in background - DON'T block the UI
+          fetchUserData(currentSession.user.id).then(profile => {
+            startUserSessionLog({
+              userId: currentSession.user.id,
+              username: profile?.username || currentSession.user.email || 'Unknown',
+              action: 'LOGIN',
+              status: 'SUCCESS',
+              sessionId: sessionId
+            }).then(logData => {
+              if (logData) {
+                localStorage.setItem('neas_current_log_id', logData.id);
+                localStorage.setItem('neas_current_log_start', logData.startTime);
+              }
+            });
+          });
         }
-        
-        setLoading(false);
-        isLoggingIn.current = false;
-      } else if (event === 'SIGNED_OUT') {
+      } else {
         setSession(null);
         setUser(null);
         setUserRole(null);
         setUsername(null);
-        setLoading(false);
-      } else if (event === 'TOKEN_REFRESHED') {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
+        processedSessionId.current = null;
       }
+      
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
