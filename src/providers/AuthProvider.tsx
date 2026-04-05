@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
-import { showSuccess } from '@/utils/toast';
 import { startUserSessionLog, endUserSessionLog } from '@/utils/sessionLogger';
 
 interface AuthContextType {
@@ -26,6 +25,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialMount = useRef(true);
+
+  const fetchUserData = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username, first_name, last_name, role_id, roles(name)')
+        .eq('id', userId)
+        .single();
+      
+      if (data && !error) {
+        setUsername(data.username);
+        // @ts-ignore
+        const roleName = data.roles?.name || 'User';
+        setUserRole(roleName);
+
+        localStorage.setItem('neas_user_data', JSON.stringify({
+          username: data.username,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          role: roleName
+        }));
+
+        return data;
+      }
+    } catch (err) {
+      console.error('Error fetching user data:', err);
+    }
+    return null;
+  }, []);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
     const logId = localStorage.getItem('neas_current_log_id');
@@ -35,7 +64,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     await supabase.auth.signOut();
     
-    // Clear local storage but keep the expired flag if it was a timeout
     if (reason === 'TIMEOUT') {
       localStorage.setItem('neas_session_expired', 'true');
     }
@@ -67,54 +95,70 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [session, logout]);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserData(session.user.id);
-        updateActivity();
-      }
-      setLoading(false);
-    });
+    let mounted = true;
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Sequence the initialization to avoid concurrent auth lock requests
+    const initAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+
+        if (initialSession) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          await fetchUserData(initialSession.user.id);
+          updateActivity();
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      if (!mounted) return;
+
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
       
-      if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await fetchUserData(session.user.id);
+      if (event === 'SIGNED_IN' && currentSession?.user) {
+        const profile = await fetchUserData(currentSession.user.id);
         updateActivity();
         
-        // Start logging
-        const logId = await startUserSessionLog({
-          userId: session.user.id,
-          username: profile?.username || session.user.email || 'Unknown',
-          action: 'LOGIN',
-          status: 'SUCCESS',
-          sessionId: session.access_token.substring(0, 20) // Use part of token as session identifier
-        });
-        if (logId) localStorage.setItem('neas_current_log_id', logId);
+        // Only log if this isn't the initial session load (to avoid duplicate logs)
+        if (!isInitialMount.current) {
+          const logId = await startUserSessionLog({
+            userId: currentSession.user.id,
+            username: profile?.username || currentSession.user.email || 'Unknown',
+            action: 'LOGIN',
+            status: 'SUCCESS',
+            sessionId: currentSession.access_token.substring(0, 20)
+          });
+          if (logId) localStorage.setItem('neas_current_log_id', logId);
+        }
       } else if (event === 'SIGNED_OUT') {
         setUserRole(null);
         setUsername(null);
       }
-      setLoading(false);
+      
+      isInitialMount.current = false;
     });
 
-    return () => subscription.unsubscribe();
-  }, [updateActivity]);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchUserData, updateActivity]);
 
-  // Inactivity Timer Logic
   useEffect(() => {
     if (session) {
       const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
       events.forEach(event => window.addEventListener(event, updateActivity));
-      
-      // Handle returning online
       window.addEventListener('online', checkInactivity);
-
       checkIntervalRef.current = setInterval(checkInactivity, CHECK_INTERVAL);
 
       return () => {
@@ -124,36 +168,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       };
     }
   }, [session, updateActivity, checkInactivity]);
-
-  const fetchUserData = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('username, first_name, last_name, role_id, roles(name)')
-        .eq('id', userId)
-        .single();
-      
-      if (data && !error) {
-        setUsername(data.username);
-        // @ts-ignore
-        const roleName = data.roles?.name || 'User';
-        setUserRole(roleName);
-
-        // Store user details in local storage for persistence
-        localStorage.setItem('neas_user_data', JSON.stringify({
-          username: data.username,
-          first_name: data.first_name,
-          last_name: data.last_name,
-          role: roleName
-        }));
-
-        return data;
-      }
-    } catch (err) {
-      console.error('Error fetching user data:', err);
-    }
-    return null;
-  };
 
   return (
     <AuthContext.Provider value={{ session, user, loading, userRole, username, logout }}>
