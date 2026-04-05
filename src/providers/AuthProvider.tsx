@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
-import { startUserSessionLog, endUserSessionLog } from '@/utils/sessionLogger';
+import { createSession, closeSession, initSessionLifecycle } from '@/utils/sessionTracker';
 
 interface AuthContextType {
   session: Session | null;
@@ -25,7 +25,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isLoggingIn = useRef(false);
   const isLoggingOut = useRef(false);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
@@ -34,28 +33,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     console.log(`AuthProvider: Initiating ${reason} sequence...`);
     
-    const logId = localStorage.getItem('neas_active_log_id');
-    const startTime = localStorage.getItem('neas_active_log_start');
-    
-    // 1. Update the database log record FIRST using the primary key ID
-    if (logId && startTime) {
-      try {
-        const success = await endUserSessionLog(logId, startTime, reason);
-        if (!success) {
-          console.warn('AuthProvider: Database log update failed');
-        }
-      } catch (err) {
-        console.error('AuthProvider: Error during endUserSessionLog:', err);
-      }
-    }
+    // 1. Close the session in the database
+    await closeSession();
 
-    // 2. Clear all custom localStorage items
-    localStorage.removeItem('neas_active_log_id');
-    localStorage.removeItem('neas_active_log_start');
+    // 2. Clear local storage flags
     localStorage.removeItem('neas_last_activity');
-    localStorage.removeItem('neas_pending_log');
-    localStorage.removeItem('neas_custom_session_id');
-    
     if (reason === 'TIMEOUT') {
       localStorage.setItem('neas_session_expired', 'true');
     }
@@ -73,8 +55,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUserRole(null);
     setUsername(null);
     
-    // 5. Small delay to ensure network requests are finished before redirect
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // 5. Redirect
     window.location.href = '/login';
   }, []);
 
@@ -114,35 +95,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    const handleNewSessionLog = async () => {
-      if (!session || isLoggingIn.current || isLoggingOut.current) return;
-      
-      const hasActiveLog = localStorage.getItem('neas_active_log_id');
-      const isPending = localStorage.getItem('neas_pending_log') === 'true';
-      const customSessionId = localStorage.getItem('neas_custom_session_id');
-
-      if (isPending && !hasActiveLog && customSessionId) {
-        isLoggingIn.current = true;
-        const profile = await fetchUserData(session.user.id);
-        const logData = await startUserSessionLog({
-          userId: session.user.id,
-          username: profile?.username || session.user.email || 'Unknown',
-          action: 'LOGIN',
-          status: 'SUCCESS',
-          sessionId: customSessionId
-        });
-
-        if (logData) {
-          localStorage.setItem('neas_active_log_id', logData.id);
-          localStorage.setItem('neas_active_log_start', logData.startTime);
-          localStorage.removeItem('neas_pending_log');
-        }
-        isLoggingIn.current = false;
-      }
-    };
-
-    handleNewSessionLog();
-  }, [session, fetchUserData]);
+    if (session && !isLoggingOut.current) {
+      createSession(session.user.id);
+      const cleanupLifecycle = initSessionLifecycle();
+      return cleanupLifecycle;
+    }
+  }, [session]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
