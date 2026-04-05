@@ -7,8 +7,12 @@ export interface UserLogParams {
   username: string;
   action: 'LOGIN' | 'LOGOUT' | 'TIMEOUT';
   status: string;
-  sessionId?: string;
+  sessionId: string; // Now mandatory and custom
 }
+
+export const generateSessionId = () => {
+  return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+};
 
 const getDeviceInfo = () => {
   const ua = navigator.userAgent;
@@ -59,7 +63,7 @@ export const startUserSessionLog = async (params: UserLogParams) => {
         device,
         user_agent: userAgent,
         ip_address: ipAddress,
-        session_id: params.sessionId || null
+        session_id: params.sessionId
       })
       .select('id')
       .single();

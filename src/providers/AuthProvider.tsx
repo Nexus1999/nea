@@ -33,31 +33,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const logId = localStorage.getItem('neas_active_log_id');
     const startTime = localStorage.getItem('neas_active_log_start');
     
-    // 1. Update the database record while the session is still technically active
     if (logId && startTime) {
       await endUserSessionLog(logId, startTime, reason);
     }
 
-    // 2. Clear all local tracking data
     localStorage.removeItem('neas_active_log_id');
     localStorage.removeItem('neas_active_log_start');
     localStorage.removeItem('neas_last_activity');
     localStorage.removeItem('neas_pending_log');
+    localStorage.removeItem('neas_custom_session_id');
     
     if (reason === 'TIMEOUT') {
       localStorage.setItem('neas_session_expired', 'true');
     }
 
-    // 3. Sign out from Supabase
     await supabase.auth.signOut();
     
-    // 4. Reset local state
     setSession(null);
     setUser(null);
     setUserRole(null);
     setUsername(null);
     
-    // Force a redirect to login
     window.location.href = '/login';
   }, []);
 
@@ -102,8 +98,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       const hasActiveLog = localStorage.getItem('neas_active_log_id');
       const isPending = localStorage.getItem('neas_pending_log') === 'true';
+      const customSessionId = localStorage.getItem('neas_custom_session_id');
 
-      if (isPending && !hasActiveLog) {
+      if (isPending && !hasActiveLog && customSessionId) {
         isLoggingIn.current = true;
         const profile = await fetchUserData(session.user.id);
         const logData = await startUserSessionLog({
@@ -111,7 +108,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           username: profile?.username || session.user.email || 'Unknown',
           action: 'LOGIN',
           status: 'SUCCESS',
-          sessionId: session.access_token.substring(0, 15)
+          sessionId: customSessionId
         });
 
         if (logData) {
