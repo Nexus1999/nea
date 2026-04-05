@@ -37,13 +37,13 @@ export const startUserSessionLog = async (params: UserLogParams) => {
     const { browser, os, device, userAgent } = getDeviceInfo();
     const startTime = new Date().toISOString();
     
-    let ipAddress = "Client-side";
+    let ipAddress = "Unknown";
     try {
-      const ipRes = await fetch('https://api.ipify.org?format=json');
+      const ipRes = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(2000) });
       const ipData = await ipRes.json();
       ipAddress = ipData.ip;
     } catch (e) {
-      console.warn("Could not fetch IP address");
+      console.warn("Could not fetch IP address, continuing...");
     }
 
     const { data, error } = await supabase
@@ -65,11 +65,9 @@ export const startUserSessionLog = async (params: UserLogParams) => {
       .single();
 
     if (error) throw error;
-    
-    // Return both ID and start time to avoid a fetch later
     return { id: data.id, startTime };
   } catch (err) {
-    console.error("Failed to start user log:", err);
+    console.error("SessionLogger: Failed to start log:", err);
     return null;
   }
 };
@@ -93,8 +91,8 @@ export const endUserSessionLog = async (logId: string, startTimeStr: string, act
       .eq('id', logId);
 
     if (error) throw error;
-    console.log(`Session log ${logId} updated successfully with action: ${action}`);
+    console.log(`SessionLogger: Log ${logId} updated (${action})`);
   } catch (err) {
-    console.error("Failed to end user log:", err);
+    console.error("SessionLogger: Failed to end log:", err);
   }
 };

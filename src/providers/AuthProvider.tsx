@@ -25,15 +25,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isLoggingIn = useRef(false);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
-    console.log(`AuthProvider: Initiating ${reason} sequence...`);
-    
     const logId = localStorage.getItem('neas_current_log_id');
     const startTime = localStorage.getItem('neas_current_log_start');
     
+    // Clear local state immediately for UI responsiveness
+    setSession(null);
+    setUser(null);
+    setUserRole(null);
+    setUsername(null);
+    
     if (logId && startTime) {
-      // We MUST await this before signing out to ensure the log is saved
       await endUserSessionLog(logId, startTime, reason);
       localStorage.removeItem('neas_current_log_id');
       localStorage.removeItem('neas_current_log_start');
@@ -47,11 +51,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     localStorage.removeItem('neas_user_data');
     localStorage.removeItem('neas_last_activity');
-
-    setSession(null);
-    setUser(null);
-    setUserRole(null);
-    setUsername(null);
   }, []);
 
   const updateActivity = useCallback(() => {
@@ -72,25 +71,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, first_name, last_name, role_id, roles(name)')
+        .select('username, first_name, last_name, roles(name)')
         .eq('id', userId)
         .maybeSingle();
       
       if (error) throw error;
-
       if (data) {
         setUsername(data.username);
         // @ts-ignore
         const roleName = data.roles?.name || 'User';
         setUserRole(roleName);
-
-        localStorage.setItem('neas_user_data', JSON.stringify({
-          username: data.username,
-          first_name: data.first_name,
-          last_name: data.last_name,
-          role: roleName
-        }));
-
         return data;
       }
     } catch (err) {
@@ -100,27 +90,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    // Initialize session
-    const initAuth = async () => {
+    // 1. Initial Session Check
+    const init = async () => {
       const { data: { session: initialSession } } = await supabase.auth.getSession();
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      
-      if (initialSession?.user) {
+      if (initialSession) {
+        setSession(initialSession);
+        setUser(initialSession.user);
         await fetchUserData(initialSession.user.id);
         updateActivity();
       }
       setLoading(false);
     };
+    init();
 
-    initAuth();
-
+    // 2. Auth State Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log(`AuthProvider: Auth Event -> ${event}`);
+      console.log(`AuthProvider: Event -> ${event}`);
       
-      // If we're signing in, keep loading true until we have the profile and log started
-      if (event === 'SIGNED_IN' && currentSession?.user) {
+      if (event === 'SIGNED_IN' && currentSession && !isLoggingIn.current) {
+        isLoggingIn.current = true;
         setLoading(true);
+        
         setSession(currentSession);
         setUser(currentSession.user);
         updateActivity();
@@ -140,19 +130,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
         
         setLoading(false);
+        isLoggingIn.current = false;
       } else if (event === 'SIGNED_OUT') {
         setSession(null);
         setUser(null);
         setUserRole(null);
         setUsername(null);
         setLoading(false);
-      } else {
+      } else if (event === 'TOKEN_REFRESHED') {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
-        if (currentSession?.user) {
-          fetchUserData(currentSession.user.id);
-        }
-        setLoading(false);
       }
     });
 
@@ -163,14 +150,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (session) {
       const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
       const handleActivity = () => updateActivity();
-      
-      events.forEach(event => window.addEventListener(event, handleActivity));
-      window.addEventListener('online', checkInactivity);
+      events.forEach(e => window.addEventListener(e, handleActivity));
       checkIntervalRef.current = setInterval(checkInactivity, CHECK_INTERVAL);
-
       return () => {
-        events.forEach(event => window.removeEventListener(event, handleActivity));
-        window.removeEventListener('online', checkInactivity);
+        events.forEach(e => window.removeEventListener(e, handleActivity));
         if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
       };
     }
@@ -185,8 +168,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };

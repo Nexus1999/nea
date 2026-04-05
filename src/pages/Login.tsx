@@ -5,7 +5,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { User, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
@@ -24,8 +23,6 @@ const Login = () => {
 
   useEffect(() => {
     document.title = "Log In | NEAS";
-    
-    // Check if we just got logged out due to inactivity
     const expired = localStorage.getItem('neas_session_expired');
     if (expired === 'true') {
       setSessionExpired(true);
@@ -35,13 +32,13 @@ const Login = () => {
 
   useEffect(() => {
     if (!authLoading && session) {
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     }
   }, [session, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) return;
+    if (!username || !password || loading) return;
     
     setLoading(true);
     setSessionExpired(false);
@@ -54,10 +51,7 @@ const Login = () => {
         .maybeSingle();
 
       if (profileError) throw profileError;
-      
-      if (!profile) {
-        throw new Error("Username not found. Please check your credentials.");
-      }
+      if (!profile) throw new Error("Username not found. Please check your credentials.");
 
       const { error } = await supabase.auth.signInWithPassword({
         email: profile.email,
@@ -67,10 +61,9 @@ const Login = () => {
       if (error) throw error;
       
       showSuccess(`Welcome back, ${username}!`);
-      navigate('/dashboard');
+      // Navigation is handled by the useEffect watching the session
     } catch (error: any) {
       showError(error.message || "Invalid username or password");
-    } finally {
       setLoading(false);
     }
   };
@@ -112,7 +105,6 @@ const Login = () => {
             <h1 className="text-lg font-bold tracking-tight text-gray-900">
               EXAMINATIONS ADMINISTRATION
             </h1>
-
             <div className="flex justify-center mb-6 mt-4">
               <motion.div 
                 initial={{ scale: 0.8 }}
@@ -179,7 +171,6 @@ const Login = () => {
                 )}
               </Button>
             </form>
-
             <div className="mt-8 text-center">
               <p className="text-sm text-gray-500">
                 Don't have an account? <button className="font-bold text-red-600 hover:underline">Contact Admin</button>
@@ -187,7 +178,6 @@ const Login = () => {
             </div>
           </CardContent>
         </Card>
-
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">
             © NECTA • All Rights Reserved
