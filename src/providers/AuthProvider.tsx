@@ -25,15 +25,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialMount = useRef(true);
+  const isInitialized = useRef(false);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
     console.log(`AuthProvider: Initiating ${reason} sequence...`);
     
     const logId = localStorage.getItem('neas_current_log_id');
     if (logId) {
-      // We await this to ensure the log is updated before the session is destroyed
-      await endUserSessionLog(logId, reason);
+      // Update log in background
+      endUserSessionLog(logId, reason).catch(err => console.error("Logout log error:", err));
       localStorage.removeItem('neas_current_log_id');
     }
 
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (lastActivity) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
-        console.log("AuthProvider: Inactivity detected, logging out...");
+        console.log("AuthProvider: Inactivity detected");
         logout('TIMEOUT');
       }
     }
@@ -99,8 +99,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!isInitialMount.current) return;
-    isInitialMount.current = false;
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
+    // Get initial session immediately
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+      
+      if (initialSession?.user) {
+        fetchUserData(initialSession.user.id);
+        updateActivity();
+      }
+      setLoading(false);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       console.log(`AuthProvider: Auth Event -> ${event}`);
@@ -111,18 +123,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (currentSession?.user) {
         updateActivity();
         
-        const profile = await fetchUserData(currentSession.user.id);
-        
+        // Handle profile and logging in background to avoid blocking UI
         if (event === 'SIGNED_IN') {
-          const logId = await startUserSessionLog({
-            userId: currentSession.user.id,
-            username: profile?.username || currentSession.user.email || 'Unknown',
-            action: 'LOGIN',
-            status: 'SUCCESS',
-            sessionId: currentSession.access_token.substring(0, 20)
+          fetchUserData(currentSession.user.id).then(profile => {
+            startUserSessionLog({
+              userId: currentSession.user.id,
+              username: profile?.username || currentSession.user.email || 'Unknown',
+              action: 'LOGIN',
+              status: 'SUCCESS',
+              sessionId: currentSession.access_token.substring(0, 20)
+            }).then(logId => {
+              if (logId) localStorage.setItem('neas_current_log_id', logId);
+            });
           });
-          if (logId) localStorage.setItem('neas_current_log_id', logId);
+        } else {
+          fetchUserData(currentSession.user.id);
         }
+      } else {
+        setUserRole(null);
+        setUsername(null);
       }
       
       setLoading(false);
