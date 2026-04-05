@@ -25,7 +25,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialized = useRef(false);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
     console.log(`AuthProvider: Initiating ${reason} sequence...`);
@@ -34,8 +33,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const startTime = localStorage.getItem('neas_current_log_start');
     
     if (logId && startTime) {
-      // We MUST await this before signing out, otherwise RLS might block the update
-      // or the session might be destroyed before the request finishes.
+      // We MUST await this before signing out to ensure the log is saved
       await endUserSessionLog(logId, startTime, reason);
       localStorage.removeItem('neas_current_log_id');
       localStorage.removeItem('neas_current_log_start');
@@ -65,7 +63,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (lastActivity) {
       const elapsed = Date.now() - parseInt(lastActivity);
       if (elapsed >= INACTIVITY_LIMIT) {
-        console.log("AuthProvider: Inactivity detected");
         logout('TIMEOUT');
       }
     }
@@ -103,53 +100,60 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (isInitialized.current) return;
-    isInitialized.current = true;
-
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+    // Initialize session
+    const initAuth = async () => {
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       
       if (initialSession?.user) {
-        fetchUserData(initialSession.user.id);
+        await fetchUserData(initialSession.user.id);
         updateActivity();
       }
       setLoading(false);
-    });
+    };
+
+    initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       console.log(`AuthProvider: Auth Event -> ${event}`);
       
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      if (currentSession?.user) {
+      // If we're signing in, keep loading true until we have the profile and log started
+      if (event === 'SIGNED_IN' && currentSession?.user) {
+        setLoading(true);
+        setSession(currentSession);
+        setUser(currentSession.user);
         updateActivity();
         
-        if (event === 'SIGNED_IN') {
-          fetchUserData(currentSession.user.id).then(profile => {
-            startUserSessionLog({
-              userId: currentSession.user.id,
-              username: profile?.username || currentSession.user.email || 'Unknown',
-              action: 'LOGIN',
-              status: 'SUCCESS',
-              sessionId: currentSession.access_token.substring(0, 20)
-            }).then(logData => {
-              if (logData) {
-                localStorage.setItem('neas_current_log_id', logData.id);
-                localStorage.setItem('neas_current_log_start', logData.startTime);
-              }
-            });
-          });
-        } else {
-          fetchUserData(currentSession.user.id);
+        const profile = await fetchUserData(currentSession.user.id);
+        const logData = await startUserSessionLog({
+          userId: currentSession.user.id,
+          username: profile?.username || currentSession.user.email || 'Unknown',
+          action: 'LOGIN',
+          status: 'SUCCESS',
+          sessionId: currentSession.access_token.substring(0, 20)
+        });
+
+        if (logData) {
+          localStorage.setItem('neas_current_log_id', logData.id);
+          localStorage.setItem('neas_current_log_start', logData.startTime);
         }
-      } else {
+        
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
         setUserRole(null);
         setUsername(null);
+        setLoading(false);
+      } else {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        if (currentSession?.user) {
+          fetchUserData(currentSession.user.id);
+        }
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
