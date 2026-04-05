@@ -25,43 +25,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const processedSessionId = useRef<string | null>(null);
+  const isProcessingAuth = useRef(false);
 
   const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
-    console.log(`AuthProvider: Initiating ${reason} sequence...`);
+    console.log(`AuthProvider: Logging out due to ${reason}`);
     
     const logId = localStorage.getItem('neas_current_log_id');
     const startTime = localStorage.getItem('neas_current_log_start');
     
-    // 1. Update the session log in the database FIRST
-    // We MUST await this before signing out, otherwise the auth context is lost
+    // 1. Update the existing log record with end time and duration
     if (logId && startTime) {
       try {
         await endUserSessionLog(logId, startTime, reason);
-        console.log("AuthProvider: Session log updated successfully");
       } catch (err) {
-        console.error("AuthProvider: Failed to update session log during logout:", err);
+        console.error("AuthProvider: Error updating log during logout:", err);
       }
-      localStorage.removeItem('neas_current_log_id');
-      localStorage.removeItem('neas_current_log_start');
     }
 
-    // 2. Perform the actual sign out
-    await supabase.auth.signOut();
+    // 2. Clear local storage tracking
+    localStorage.removeItem('neas_current_log_id');
+    localStorage.removeItem('neas_current_log_start');
+    localStorage.removeItem('neas_last_activity');
     
-    // 3. Clear local storage and state
     if (reason === 'TIMEOUT') {
       localStorage.setItem('neas_session_expired', 'true');
     }
-    
-    localStorage.removeItem('neas_user_data');
-    localStorage.removeItem('neas_last_activity');
 
+    // 3. Sign out from Supabase
+    await supabase.auth.signOut();
+    
+    // 4. Reset state
     setSession(null);
     setUser(null);
     setUserRole(null);
     setUsername(null);
-    processedSessionId.current = null;
   }, []);
 
   const updateActivity = useCallback(() => {
@@ -82,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, first_name, last_name, roles(name)')
+        .select('username, roles(name)')
         .eq('id', userId)
         .maybeSingle();
       
@@ -90,8 +87,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (data) {
         setUsername(data.username);
         // @ts-ignore
-        const roleName = data.roles?.name || 'User';
-        setUserRole(roleName);
+        setUserRole(data.roles?.name || 'User');
         return data;
       }
     } catch (err) {
@@ -119,33 +115,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(currentSession.user);
         updateActivity();
         
-        const sessionId = currentSession.access_token.substring(0, 20);
-        if (event === 'SIGNED_IN' && processedSessionId.current !== sessionId) {
-          processedSessionId.current = sessionId;
+        // Only create a log if we don't have one for this specific session
+        const currentLogId = localStorage.getItem('neas_current_log_id');
+        if (event === 'SIGNED_IN' && !currentLogId && !isProcessingAuth.current) {
+          isProcessingAuth.current = true;
           
-          fetchUserData(currentSession.user.id).then(profile => {
-            startUserSessionLog({
-              userId: currentSession.user.id,
-              username: profile?.username || currentSession.user.email || 'Unknown',
-              action: 'LOGIN',
-              status: 'SUCCESS',
-              sessionId: sessionId
-            }).then(logData => {
-              if (logData) {
-                localStorage.setItem('neas_current_log_id', logData.id);
-                localStorage.setItem('neas_current_log_start', logData.startTime);
-              }
-            });
+          const profile = await fetchUserData(currentSession.user.id);
+          const logData = await startUserSessionLog({
+            userId: currentSession.user.id,
+            username: profile?.username || currentSession.user.email || 'Unknown',
+            action: 'LOGIN',
+            status: 'SUCCESS',
+            sessionId: currentSession.access_token.substring(0, 20)
           });
+
+          if (logData) {
+            localStorage.setItem('neas_current_log_id', logData.id);
+            localStorage.setItem('neas_current_log_start', logData.startTime);
+          }
+          isProcessingAuth.current = false;
         }
       } else {
         setSession(null);
         setUser(null);
         setUserRole(null);
         setUsername(null);
-        processedSessionId.current = null;
       }
-      
       setLoading(false);
     });
 

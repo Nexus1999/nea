@@ -51,9 +51,9 @@ export const startUserSessionLog = async (params: UserLogParams) => {
       .insert({
         user_id: params.userId,
         username: params.username,
-        action: params.action,
+        action: 'LOGIN',
         session_start: startTime,
-        status: params.status,
+        status: 'ACTIVE',
         browser,
         os,
         device,
@@ -73,7 +73,7 @@ export const startUserSessionLog = async (params: UserLogParams) => {
 };
 
 export const endUserSessionLog = async (logId: string, startTimeStr: string, action: 'LOGOUT' | 'TIMEOUT') => {
-  if (!logId || !startTimeStr) return;
+  if (!logId) return;
 
   try {
     const endTime = new Date();
@@ -91,8 +91,8 @@ export const endUserSessionLog = async (logId: string, startTimeStr: string, act
       .eq('id', logId);
 
     if (error) throw error;
-    console.log(`SessionLogger: Log ${logId} updated (${action})`);
+    console.log(`SessionLogger: Log ${logId} updated successfully with ${action}`);
   } catch (err) {
-    console.error("SessionLogger: Failed to end log:", err);
+    console.error("SessionLogger: Failed to update log record:", err);
   }
 };
