@@ -31,10 +31,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     console.log(`AuthProvider: Initiating ${reason} sequence...`);
     
     const logId = localStorage.getItem('neas_current_log_id');
-    if (logId) {
-      // Update log in background
-      endUserSessionLog(logId, reason).catch(err => console.error("Logout log error:", err));
+    const startTime = localStorage.getItem('neas_current_log_start');
+    
+    if (logId && startTime) {
+      // We MUST await this before signing out, otherwise RLS might block the update
+      // or the session might be destroyed before the request finishes.
+      await endUserSessionLog(logId, startTime, reason);
       localStorage.removeItem('neas_current_log_id');
+      localStorage.removeItem('neas_current_log_start');
     }
 
     await supabase.auth.signOut();
@@ -102,7 +106,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (isInitialized.current) return;
     isInitialized.current = true;
 
-    // Get initial session immediately
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
@@ -123,7 +126,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (currentSession?.user) {
         updateActivity();
         
-        // Handle profile and logging in background to avoid blocking UI
         if (event === 'SIGNED_IN') {
           fetchUserData(currentSession.user.id).then(profile => {
             startUserSessionLog({
@@ -132,8 +134,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               action: 'LOGIN',
               status: 'SUCCESS',
               sessionId: currentSession.access_token.substring(0, 20)
-            }).then(logId => {
-              if (logId) localStorage.setItem('neas_current_log_id', logId);
+            }).then(logData => {
+              if (logData) {
+                localStorage.setItem('neas_current_log_id', logData.id);
+                localStorage.setItem('neas_current_log_start', logData.startTime);
+              }
             });
           });
         } else {

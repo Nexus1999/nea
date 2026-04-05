@@ -10,9 +10,6 @@ export interface UserLogParams {
   sessionId?: string;
 }
 
-/**
- * Captures device and browser information from the user agent string.
- */
 const getDeviceInfo = () => {
   const ua = navigator.userAgent;
   let browser = "Unknown Browser";
@@ -35,14 +32,11 @@ const getDeviceInfo = () => {
   return { browser, os, device, userAgent: ua };
 };
 
-/**
- * Records a session event in the user_logs table.
- */
 export const startUserSessionLog = async (params: UserLogParams) => {
   try {
     const { browser, os, device, userAgent } = getDeviceInfo();
+    const startTime = new Date().toISOString();
     
-    // Attempt to get IP (optional, might be blocked by adblockers)
     let ipAddress = "Client-side";
     try {
       const ipRes = await fetch('https://api.ipify.org?format=json');
@@ -58,7 +52,7 @@ export const startUserSessionLog = async (params: UserLogParams) => {
         user_id: params.userId,
         username: params.username,
         action: params.action,
-        session_start: new Date().toISOString(),
+        session_start: startTime,
         status: params.status,
         browser,
         os,
@@ -71,33 +65,24 @@ export const startUserSessionLog = async (params: UserLogParams) => {
       .single();
 
     if (error) throw error;
-    return data.id;
+    
+    // Return both ID and start time to avoid a fetch later
+    return { id: data.id, startTime };
   } catch (err) {
     console.error("Failed to start user log:", err);
     return null;
   }
 };
 
-/**
- * Updates an existing session log with end time and duration.
- */
-export const endUserSessionLog = async (logId: string, action: 'LOGOUT' | 'TIMEOUT') => {
-  if (!logId) return;
+export const endUserSessionLog = async (logId: string, startTimeStr: string, action: 'LOGOUT' | 'TIMEOUT') => {
+  if (!logId || !startTimeStr) return;
 
   try {
-    const { data: log } = await supabase
-      .from('user_logs')
-      .select('session_start')
-      .eq('id', logId)
-      .single();
-
-    if (!log) return;
-
     const endTime = new Date();
-    const startTime = new Date(log.session_start);
+    const startTime = new Date(startTimeStr);
     const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
 
-    await supabase
+    const { error } = await supabase
       .from('user_logs')
       .update({
         action: action,
@@ -106,6 +91,9 @@ export const endUserSessionLog = async (logId: string, action: 'LOGOUT' | 'TIMEO
         status: 'COMPLETED'
       })
       .eq('id', logId);
+
+    if (error) throw error;
+    console.log(`Session log ${logId} updated successfully with action: ${action}`);
   } catch (err) {
     console.error("Failed to end user log:", err);
   }
