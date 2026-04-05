@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 import { showSuccess } from '@/utils/toast';
+import { startUserSessionLog, endUserSessionLog } from '@/utils/sessionLogger';
 
 interface AuthContextType {
   session: Session | null;
@@ -9,12 +10,13 @@ interface AuthContextType {
   loading: boolean;
   userRole: string | null;
   username: string | null;
-  logout: () => Promise<void>;
+  logout: (reason?: 'LOGOUT' | 'TIMEOUT') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutes
+const CHECK_INTERVAL = 30000; // 30 seconds
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -22,23 +24,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (reason: 'LOGOUT' | 'TIMEOUT' = 'LOGOUT') => {
+    const logId = localStorage.getItem('neas_current_log_id');
+    if (logId) {
+      await endUserSessionLog(logId, reason);
+    }
+
     await supabase.auth.signOut();
+    
+    // Clear local storage but keep the expired flag if it was a timeout
+    if (reason === 'TIMEOUT') {
+      localStorage.setItem('neas_session_expired', 'true');
+    }
+    
+    localStorage.removeItem('neas_user_data');
+    localStorage.removeItem('neas_last_activity');
+    localStorage.removeItem('neas_current_log_id');
+
     setSession(null);
     setUser(null);
     setUserRole(null);
     setUsername(null);
   }, []);
 
-  const resetTimer = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  const updateActivity = useCallback(() => {
     if (session) {
-      timeoutRef.current = setTimeout(() => {
-        logout();
-        showSuccess("Logged out due to inactivity");
-      }, INACTIVITY_LIMIT);
+      localStorage.setItem('neas_last_activity', Date.now().toString());
+    }
+  }, [session]);
+
+  const checkInactivity = useCallback(() => {
+    const lastActivity = localStorage.getItem('neas_last_activity');
+    if (lastActivity && session) {
+      const elapsed = Date.now() - parseInt(lastActivity);
+      if (elapsed >= INACTIVITY_LIMIT) {
+        logout('TIMEOUT');
+      }
     }
   }, [session, logout]);
 
@@ -47,17 +71,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchUserData(session.user.id);
+      if (session?.user) {
+        fetchUserData(session.user.id);
+        updateActivity();
+      }
       setLoading(false);
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserData(session.user.id);
-      } else {
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        const profile = await fetchUserData(session.user.id);
+        updateActivity();
+        
+        // Start logging
+        const logId = await startUserSessionLog({
+          userId: session.user.id,
+          username: profile?.username || session.user.email || 'Unknown',
+          action: 'LOGIN',
+          status: 'SUCCESS',
+          sessionId: session.access_token.substring(0, 20) // Use part of token as session identifier
+        });
+        if (logId) localStorage.setItem('neas_current_log_id', logId);
+      } else if (event === 'SIGNED_OUT') {
         setUserRole(null);
         setUsername(null);
       }
@@ -65,37 +104,55 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [updateActivity]);
 
+  // Inactivity Timer Logic
   useEffect(() => {
     if (session) {
-      const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-      events.forEach(event => window.addEventListener(event, resetTimer));
-      resetTimer();
+      const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+      events.forEach(event => window.addEventListener(event, updateActivity));
+      
+      // Handle returning online
+      window.addEventListener('online', checkInactivity);
+
+      checkIntervalRef.current = setInterval(checkInactivity, CHECK_INTERVAL);
 
       return () => {
-        events.forEach(event => window.removeEventListener(event, resetTimer));
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        events.forEach(event => window.removeEventListener(event, updateActivity));
+        window.removeEventListener('online', checkInactivity);
+        if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
       };
     }
-  }, [session, resetTimer]);
+  }, [session, updateActivity, checkInactivity]);
 
   const fetchUserData = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, roles(name)')
+        .select('username, first_name, last_name, role_id, roles(name)')
         .eq('id', userId)
         .single();
       
       if (data && !error) {
         setUsername(data.username);
         // @ts-ignore
-        setUserRole(data.roles?.name || 'User');
+        const roleName = data.roles?.name || 'User';
+        setUserRole(roleName);
+
+        // Store user details in local storage for persistence
+        localStorage.setItem('neas_user_data', JSON.stringify({
+          username: data.username,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          role: roleName
+        }));
+
+        return data;
       }
     } catch (err) {
       console.error('Error fetching user data:', err);
     }
+    return null;
   };
 
   return (
