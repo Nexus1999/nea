@@ -21,29 +21,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
 import PaginationControls from "@/components/ui/pagination-controls";
+import { logDataChange } from "@/utils/auditLogger";
 
 const AssignTeachersPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   
-  // UI States
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedTeachers, setSelectedTeachers] = useState<any[]>([]);
 
-  // Data States
   const [jobInfo, setJobInfo] = useState<any>(null);
   const [allRegions, setAllRegions] = useState<any[]>([]);
   const [allDistricts, setAllDistricts] = useState<any[]>([]);
   const [teacherGeoCodes, setTeacherGeoCodes] = useState<any[]>([]);
   
-  // Table States
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   
-  // Criteria State
   const [criteria, setCriteria] = useState({
     totalRequired: 0,
     regionCode: 'all',
@@ -111,7 +108,6 @@ const AssignTeachersPage = () => {
       .sort((a, b) => a.district_name.localeCompare(b.district_name));
   }, [allDistricts, teacherGeoCodes, criteria.regionCode]);
 
-  // Filtered and paginated data for table
   const filteredTeachers = useMemo(() => {
     if (!searchTerm) return selectedTeachers;
     const search = searchTerm.toLowerCase();
@@ -132,7 +128,6 @@ const AssignTeachersPage = () => {
   const runSelectionAlgorithm = async () => {
     setIsProcessing(true);
     try {
-      // 1. Check for existing assignments for this job
       const { data: existing } = await supabase.from('teacher_assignments').select('id').eq('job_id', id);
       if (existing && existing.length > 0) {
         const confirmClear = window.confirm(`There are already ${existing.length} teachers assigned to this job. Do you want to delete them and create a new selection?`);
@@ -141,9 +136,15 @@ const AssignTeachersPage = () => {
           return;
         }
         await supabase.from('teacher_assignments').delete().eq('job_id', id);
+        
+        await logDataChange({
+          table_name: 'teacher_assignments',
+          record_id: id!,
+          action_type: 'DELETE',
+          old_data: { action: 'CLEAR_FOR_AUTO_ASSIGN', job_id: id }
+        });
       }
 
-      // 2. Get ALL assignments across all jobs with workstation info
       const { data: allAssignments } = await supabase
         .from('teacher_assignments')
         .select(`
@@ -152,7 +153,6 @@ const AssignTeachersPage = () => {
           primaryteachers!inner(workstation)
         `);
 
-      // 3. Build workstation usage map for OTHER jobs
       const workstationJobMap = new Map<string, Set<string>>();
       const teacherAssignmentMap = new Map<number, Set<string>>();
       
@@ -176,7 +176,6 @@ const AssignTeachersPage = () => {
         }
       });
 
-      // 4. Fetch all active teachers in target scope
       let query = supabase.from('primaryteachers').select('*').eq('status', 'active');
       if (criteria.regionCode !== 'all') query = query.eq('region_code', criteria.regionCode);
       if (criteria.districtNumber !== 'all') query = query.eq('district_number', criteria.districtNumber);
@@ -184,7 +183,6 @@ const AssignTeachersPage = () => {
       const { data: pool, error: poolErr } = await query;
       if (poolErr) throw poolErr;
 
-      // 5. Categorize teachers by workstation priority
       const categorizeTeacher = (teacher: any) => {
         const workstation = teacher.workstation;
         const teacherId = teacher.id;
@@ -195,7 +193,6 @@ const AssignTeachersPage = () => {
         return 4;
       };
 
-      // 6. Group by Districts for Pro-Rata distribution
       const targetDistricts = criteria.districtNumber === 'all' 
         ? [...new Set(pool.map(p => p.district_number))] 
         : [parseInt(criteria.districtNumber)];
@@ -281,6 +278,18 @@ const AssignTeachersPage = () => {
 
       const { error } = await supabase.from('teacher_assignments').insert(assignments);
       if (error) throw error;
+
+      await logDataChange({
+        table_name: 'teacher_assignments',
+        record_id: id!,
+        action_type: 'INSERT',
+        new_data: {
+          action: 'AUTO_ASSIGN_COMPLETE',
+          job_id: id,
+          teacher_count: assignments.length,
+          criteria: criteria
+        }
+      });
 
       showSuccess(`Successfully assigned ${selectedTeachers.length} teachers.`);
       navigate(`/dashboard/miscellaneous/jobs/assignments/${id}`);
@@ -442,7 +451,7 @@ const AssignTeachersPage = () => {
                         className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-indigo-600" 
                         value={criteria.maleQuota} 
                         onChange={(e) => handleQuotaChange('male', parseInt(e.target.value))} 
-                      />
+                    />
                     </div>
                     <div className="space-y-3">
                       <div className="flex justify-between items-baseline">

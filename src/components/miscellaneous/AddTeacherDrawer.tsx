@@ -21,6 +21,7 @@ import { UserPlus, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { logDataChange } from "@/utils/auditLogger";
 
 interface AddTeacherDrawerProps {
   isOpen: boolean;
@@ -146,7 +147,7 @@ const AddTeacherDrawer = ({ isOpen, onClose, onRefresh }: AddTeacherDrawerProps)
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('primaryteachers').insert([{
+      const payload = {
         teacher_name: formData.teacher_name.toUpperCase(),
         sex: formData.sex,
         check_number: formData.check_number,
@@ -158,9 +159,18 @@ const AddTeacherDrawer = ({ isOpen, onClose, onRefresh }: AddTeacherDrawerProps)
         experience_base_year: parseInt(formData.experience_base_year),
         index_no: formData.index_no || null,
         csee_year: formData.csee_year ? parseInt(formData.csee_year) : null
-      }]);
+      };
+
+      const { data, error } = await supabase.from('primaryteachers').insert([payload]).select().single();
 
       if (error) throw error;
+
+      await logDataChange({
+        table_name: 'primaryteachers',
+        record_id: data.id,
+        action_type: 'INSERT',
+        new_data: payload
+      });
 
       toast.success('Teacher Registered Successfully');
       onRefresh();

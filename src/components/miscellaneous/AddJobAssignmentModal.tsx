@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+import { logDataChange } from "@/utils/auditLogger";
 
 const assignmentSchema = z.object({
   name: z.string().min(2, "Assignment name is required"),
@@ -50,11 +51,18 @@ export const AddJobAssignmentModal = ({ open, onOpenChange, onSuccess }: any) =>
 
   const onSubmit = async (values: z.infer<typeof assignmentSchema>) => {
     setLoading(true);
-    const { error } = await supabase.from("jobassignments").insert([values]);
+    const { data, error } = await supabase.from("jobassignments").insert([values]).select().single();
 
     if (error) {
       showError(error.message);
     } else {
+      await logDataChange({
+        table_name: 'jobassignments',
+        record_id: data.id,
+        action_type: 'INSERT',
+        new_data: values
+      });
+      
       showSuccess("Assignment created successfully");
       onSuccess(); 
       onOpenChange(false);

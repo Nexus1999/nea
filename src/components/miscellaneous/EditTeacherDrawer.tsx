@@ -21,6 +21,7 @@ import { Edit, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { logDataChange } from "@/utils/auditLogger";
 
 interface EditTeacherDrawerProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ const EditTeacherDrawer = ({ isOpen, onClose, onRefresh, teacherId }: EditTeache
   const [districts, setDistricts] = useState<any[]>([]);
   const [shake, setShake] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [originalData, setOriginalData] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     teacher_name: '',
@@ -120,6 +122,7 @@ const EditTeacherDrawer = ({ isOpen, onClose, onRefresh, teacherId }: EditTeache
       if (error) throw error;
 
       if (teacher) {
+        setOriginalData(teacher);
         setFormData({
           teacher_name: teacher.teacher_name,
           sex: teacher.sex,
@@ -167,24 +170,34 @@ const EditTeacherDrawer = ({ isOpen, onClose, onRefresh, teacherId }: EditTeache
 
     setLoading(true);
     try {
+      const payload = {
+        teacher_name: formData.teacher_name.toUpperCase(),
+        sex: formData.sex,
+        check_number: formData.check_number,
+        phone: formData.phone.replace(/\s/g, ''),
+        region_code: parseInt(formData.region_code),
+        district_number: parseInt(formData.district_number),
+        workstation: formData.workstation,
+        experience_years_base: parseInt(formData.experience_years_base),
+        experience_base_year: parseInt(formData.experience_base_year),
+        index_no: formData.index_no || null,
+        csee_year: formData.csee_year ? parseInt(formData.csee_year) : null
+      };
+
       const { error } = await supabase
         .from('primaryteachers')
-        .update({
-          teacher_name: formData.teacher_name.toUpperCase(),
-          sex: formData.sex,
-          check_number: formData.check_number,
-          phone: formData.phone.replace(/\s/g, ''),
-          region_code: parseInt(formData.region_code),
-          district_number: parseInt(formData.district_number),
-          workstation: formData.workstation,
-          experience_years_base: parseInt(formData.experience_years_base),
-          experience_base_year: parseInt(formData.experience_base_year),
-          index_no: formData.index_no || null,
-          csee_year: formData.csee_year ? parseInt(formData.csee_year) : null
-        })
+        .update(payload)
         .eq('id', teacherId);
 
       if (error) throw error;
+
+      await logDataChange({
+        table_name: 'primaryteachers',
+        record_id: teacherId!,
+        action_type: 'UPDATE',
+        old_data: originalData,
+        new_data: payload
+      });
 
       toast.success('Teacher Updated Successfully');
       onRefresh();

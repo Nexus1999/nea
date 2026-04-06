@@ -22,6 +22,7 @@ import Spinner from "@/components/Spinner";
 import ReassignTeacherModal from "@/components/miscellaneous/ReassignTeacherModal";
 import { AssignmentExportModal } from "@/components/miscellaneous/AssignmentExportModal";
 import { cn } from "@/lib/utils"
+import { logDataChange } from "@/utils/auditLogger";
 
 const JobAssignmentsPage = () => {
   const { id } = useParams();
@@ -131,7 +132,6 @@ const JobAssignmentsPage = () => {
     showSuccess("Portal Link copied! Share this with teachers.");
   };
 
-  // Logic to check assignments before navigating to Auto-Assign
   const handleAutoAssignCheck = () => {
     const hasExistingAssignments = assignments.some(a => !a.isPlaceholder);
     if (hasExistingAssignments) {
@@ -151,6 +151,13 @@ const JobAssignmentsPage = () => {
 
       if (error) throw error;
       
+      await logDataChange({
+        table_name: 'teacher_assignments',
+        record_id: id!,
+        action_type: 'DELETE',
+        old_data: { action: 'MANUAL_RESET', job_id: id, job_name: jobDetails.name }
+      });
+
       showSuccess("All assignments have been cleared");
       
       const wasAssigning = dialogConfig.type === 'assign';

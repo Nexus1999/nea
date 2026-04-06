@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+import { logDataChange } from "@/utils/auditLogger";
 
 const assignmentSchema = z.object({
   name: z.string().min(2, "Assignment name is required"),
@@ -65,6 +66,14 @@ export const EditJobAssignmentModal = ({ open, onOpenChange, onSuccess, assignme
     if (error) {
       showError(error.message);
     } else {
+      await logDataChange({
+        table_name: 'jobassignments',
+        record_id: assignment.id,
+        action_type: 'UPDATE',
+        old_data: assignment,
+        new_data: values
+      });
+
       showSuccess("Assignment updated successfully");
       onSuccess(); 
       onOpenChange(false);

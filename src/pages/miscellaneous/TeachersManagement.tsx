@@ -26,6 +26,7 @@ import { showStyledSwal } from '@/utils/alerts';
 import { cn } from "@/lib/utils";
 import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
+import { logDataChange } from "@/utils/auditLogger";
 
 // Components
 import AddTeacherDrawer from "@/components/miscellaneous/AddTeacherDrawer";
@@ -113,6 +114,13 @@ const PrimaryTeachersManagementPage = () => {
         const { error } = await supabase.from('primaryteachers').delete().neq('id', 0);
         if (error) showError(error.message);
         else {
+          await logDataChange({
+            table_name: 'primaryteachers',
+            record_id: 'ALL',
+            action_type: 'DELETE',
+            old_data: { action: 'DELETE_ALL_TEACHERS' }
+          });
+          
           showSuccess("All teacher records cleared.");
           fetchTeachers();
         }
@@ -135,6 +143,13 @@ const PrimaryTeachersManagementPage = () => {
         const { error } = await supabase.from('primaryteachers').delete().eq('id', record.id);
         if (error) showError(error.message);
         else {
+          await logDataChange({
+            table_name: 'primaryteachers',
+            record_id: record.id,
+            action_type: 'DELETE',
+            old_data: record
+          });
+          
           showSuccess("Teacher deleted successfully");
           fetchTeachers();
         }

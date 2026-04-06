@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { cn } from "@/lib/utils"; // assuming you have this from shadcn
+import { cn } from "@/lib/utils";
+import { logDataChange } from "@/utils/auditLogger";
 
 const filter = createFilterOptions({
   limit: 50,
@@ -141,7 +142,6 @@ const ReassignTeacherModal = ({
 
     setLoading(true);
     try {
-      // 1. Already assigned to this exact job
       const { data: stationConflicts } = await supabase
         .from('teacher_assignments')
         .select('id')
@@ -154,7 +154,6 @@ const ReassignTeacherModal = ({
         return;
       }
 
-      // 2. Other 2026 assignments → show confirmation
       const { data: yearlyJobs } = await supabase
         .from('teacher_assignments')
         .select('job_id, jobassignments!inner(name)')
@@ -191,13 +190,25 @@ const ReassignTeacherModal = ({
       };
 
       let error;
+      let actionType: 'INSERT' | 'UPDATE' = 'UPDATE';
 
       if (currentTeacher?.isNew) {
-        ({ error } = await supabase.from('teacher_assignments').insert({
+        actionType = 'INSERT';
+        const { data, error: insertError } = await supabase.from('teacher_assignments').insert({
           ...payload,
           job_id: jobId,
           assignment_year: 2026,
-        }));
+        }).select().single();
+        error = insertError;
+        
+        if (!error) {
+          await logDataChange({
+            table_name: 'teacher_assignments',
+            record_id: data.id,
+            action_type: 'INSERT',
+            new_data: { ...payload, job_id: jobId }
+          });
+        }
       } else {
         const assignmentId = currentTeacher?.assignmentId;
         if (!assignmentId) throw new Error("Missing Assignment ID");
@@ -206,6 +217,16 @@ const ReassignTeacherModal = ({
           .from('teacher_assignments')
           .update(payload)
           .eq('id', assignmentId));
+          
+        if (!error) {
+          await logDataChange({
+            table_name: 'teacher_assignments',
+            record_id: assignmentId,
+            action_type: 'UPDATE',
+            old_data: currentTeacher,
+            new_data: payload
+          });
+        }
       }
 
       if (error) throw error;
@@ -401,7 +422,6 @@ const ReassignTeacherModal = ({
         </DialogActions>
       </Dialog>
 
-      {/* Conflict Confirmation Dialog */}
       <AlertDialog
         open={dialogConfig.open}
         onOpenChange={(open) => setDialogConfig((prev) => ({ ...prev, open }))}

@@ -23,6 +23,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
+import { logDataChange } from "@/utils/auditLogger";
 
 interface ImportTeachersModalProps {
   open: boolean;
@@ -94,7 +95,6 @@ export const ImportTeachersModal = ({ open, onOpenChange, onSuccess }: ImportTea
           addLog('info', `Found ${jsonData.length} records. Validating...`);
           setProgress(30);
 
-          // Basic validation and formatting
           const formattedData = jsonData.map((row: any, index) => {
             if (!row.teacher_name || !row.check_number || !row.region_code || !row.district_number) {
               throw new Error(`Row ${index + 2}: Missing required fields (name, check number, region, or district).`);
@@ -118,7 +118,6 @@ export const ImportTeachersModal = ({ open, onOpenChange, onSuccess }: ImportTea
           setProgress(50);
           addLog('info', 'Uploading to database...');
 
-          // Bulk insert in chunks of 100 to avoid payload limits
           const chunkSize = 100;
           for (let i = 0; i < formattedData.length; i += chunkSize) {
             const chunk = formattedData.slice(i, i + chunkSize);
@@ -132,6 +131,16 @@ export const ImportTeachersModal = ({ open, onOpenChange, onSuccess }: ImportTea
             const currentProgress = 50 + Math.round(((i + chunk.length) / formattedData.length) * 50);
             setProgress(currentProgress);
           }
+
+          await logDataChange({
+            table_name: 'primaryteachers',
+            record_id: 'BULK_IMPORT',
+            action_type: 'IMPORT',
+            new_data: {
+              filename: file.name,
+              record_count: formattedData.length
+            }
+          });
 
           addLog('success', `Successfully imported ${formattedData.length} teachers.`);
           showSuccess(`Imported ${formattedData.length} records successfully.`);

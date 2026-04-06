@@ -5,8 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  PlusCircle, Edit, Trash2, ArrowUpDown, Users, Briefcase, 
-  FileText, UserPlus, Download 
+  PlusCircle, Edit, Trash2, ArrowUpDown, Users, Briefcase, FileText, UserPlus, Download 
 } from "lucide-react";
 import {
   Table,
@@ -25,6 +24,7 @@ import Spinner from "@/components/Spinner";
 import { AddJobAssignmentModal } from "@/components/miscellaneous/AddJobAssignmentModal";
 import { EditJobAssignmentModal } from "@/components/miscellaneous/EditJobAssignmentModal";
 import { cn } from "@/lib/utils";
+import { logDataChange } from "@/utils/auditLogger";
 
 interface JobAssignment {
   id: string;
@@ -95,25 +95,19 @@ const PrimaryTeacherAssignments = () => {
 
         if (error) showError(error.message);
         else {
+          await logDataChange({
+            table_name: 'jobassignments',
+            record_id: record.id,
+            action_type: 'DELETE',
+            old_data: record
+          });
+          
           showSuccess("Assignment deleted");
           fetchAssignments();
         }
         setLoading(false);
       }
     });
-  };
-
-  const handleExportCSV = (item: JobAssignment) => {
-    const headers = ["Name", "Section", "Total Required", "Start Date", "End Date", "Status"];
-    const row = [item.name, item.section, item.total_required, item.start_date, item.end_date, item.status];
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + row.join(",");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${item.name}_assignment.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const handleSort = (columnId: keyof JobAssignment) => {
@@ -236,8 +230,6 @@ const PrimaryTeacherAssignments = () => {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-
-                          
 
                           <Button 
                             variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-red-50"
