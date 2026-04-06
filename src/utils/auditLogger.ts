@@ -12,6 +12,7 @@ export const logDataChange = async (params: {
   old_data?: any;
   new_data?: any;
 }) => {
+  // Try to get username from local storage
   const stored = localStorage.getItem('neas_user_profile');
   let username = 'system';
   
@@ -21,6 +22,12 @@ export const logDataChange = async (params: {
       username = parsed.username || 'system';
     } catch (e) {
       console.error('AuditLogger: Failed to parse user profile');
+    }
+  } else {
+    // Fallback: Try to get the current session user if local storage is empty
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.email) {
+      username = session.user.email;
     }
   }
 
@@ -34,17 +41,13 @@ export const logDataChange = async (params: {
     changed_at: new Date().toISOString()
   };
 
-  console.log(`AuditLogger: Attempting to log ${params.action_type} on ${params.table_name}...`, logEntry);
-
   const { error } = await supabase
     .from('datachange_logs')
     .insert([logEntry]);
 
   if (error) {
-    console.error(`AuditLogger Error [${params.action_type}]:`, error.message, error.details);
-    // If you see a "invalid input syntax for type uuid" error here, 
-    // it means you need to change the record_id column to TEXT in your database.
+    console.error(`AuditLogger Error [${params.action_type}]:`, error.message);
   } else {
-    console.log(`AuditLogger: Successfully logged ${params.action_type} for record ${params.record_id}`);
+    console.log(`AuditLogger: Successfully logged ${params.action_type} for ${params.table_name}`);
   }
 };
