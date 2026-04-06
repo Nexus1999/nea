@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+import { logDataChange } from "@/utils/auditLogger";
 
 const roleSchema = z.object({
   id: z.string().optional(),
@@ -76,13 +77,31 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
           })
           .eq("id", role.id);
         if (error) throw error;
+
+        await logDataChange({
+          table_name: 'roles',
+          record_id: role.id!,
+          action_type: 'UPDATE',
+          old_data: role,
+          new_data: values
+        });
+
         showSuccess("Role updated successfully");
       } else {
-        const { error } = await supabase.from("roles").insert({
+        const { data, error } = await supabase.from("roles").insert({
           name: values.name.toUpperCase(),
           description: values.description,
-        });
+        }).select('id').single();
+        
         if (error) throw error;
+
+        await logDataChange({
+          table_name: 'roles',
+          record_id: data.id,
+          action_type: 'INSERT',
+          new_data: values
+        });
+
         showSuccess("Role created successfully");
       }
       onSuccess();

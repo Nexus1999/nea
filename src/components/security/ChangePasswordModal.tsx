@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Loader2, Lock, Save, ShieldCheck, ShieldAlert, Shield } from "lucide-react";
+import { Loader2, Lock, Save, ShieldCheck, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { cn } from "@/lib/utils";
+import { logDataChange } from "@/utils/auditLogger";
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -77,6 +78,13 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ open, onOpenC
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
+      await logDataChange({
+        table_name: 'auth.users',
+        record_id: user.id,
+        action_type: 'UPDATE',
+        new_data: { action: 'PASSWORD_RESET', username: user.username }
+      });
+
       showSuccess(`Password for ${user.username} updated successfully`);
       onOpenChange(false);
       setNewPassword("");
@@ -110,7 +118,6 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ open, onOpenC
               onChange={(e) => setNewPassword(e.target.value)}
             />
             
-            {/* Password Meter */}
             <div className="space-y-1.5 pt-1">
               <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
                 <span className="text-slate-500">Strength: {getStrengthText()}</span>

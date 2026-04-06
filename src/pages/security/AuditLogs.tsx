@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  Search, Download, Filter, 
-  User, Clock, Database, Activity, RefreshCw
+  Search, Download, Clock, Database, User, RefreshCw, Eye
 } from "lucide-react";
 import {
   Table,
@@ -21,11 +20,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const AuditLogs = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedLog, setSelectedLog] = useState<any>(null);
 
   useEffect(() => {
     fetchLogs();
@@ -36,17 +42,14 @@ const AuditLogs = () => {
     try {
       const { data, error } = await supabase
         .from('datachange_logs')
-        .select(`
-          *,
-          profiles:changed_by (username, first_name, last_name)
-        `)
+        .select('*')
         .order('changed_at', { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (error) throw error;
       setLogs(data || []);
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching logs:", err);
     } finally {
       setLoading(false);
     }
@@ -57,6 +60,7 @@ const AuditLogs = () => {
       case 'INSERT': return "bg-emerald-50 text-emerald-700 border-emerald-100";
       case 'UPDATE': return "bg-blue-50 text-blue-700 border-blue-100";
       case 'DELETE': return "bg-red-50 text-red-700 border-red-100";
+      case 'IMPORT': return "bg-purple-50 text-purple-700 border-purple-100";
       default: return "bg-slate-50 text-slate-700 border-slate-100";
     }
   };
@@ -64,7 +68,7 @@ const AuditLogs = () => {
   const filteredLogs = logs.filter(log => 
     log.table_name.toLowerCase().includes(search.toLowerCase()) ||
     log.action_type.toLowerCase().includes(search.toLowerCase()) ||
-    log.profiles?.username?.toLowerCase().includes(search.toLowerCase())
+    log.changed_by?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -78,10 +82,6 @@ const AuditLogs = () => {
           <Button variant="outline" onClick={fetchLogs} className="rounded-xl h-11">
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
             Refresh
-          </Button>
-          <Button variant="outline" className="border-slate-200 gap-2 h-11 rounded-xl">
-            <Download className="h-4 w-4" />
-            Export
           </Button>
         </div>
       </div>
@@ -111,12 +111,13 @@ const AuditLogs = () => {
                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Action</TableHead>
                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Table</TableHead>
                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Record ID</TableHead>
+                    <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest">Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredLogs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-10 text-gray-500">No logs found.</TableCell>
+                      <TableCell colSpan={6} className="text-center py-10 text-gray-500">No logs found.</TableCell>
                     </TableRow>
                   ) : (
                     filteredLogs.map((log) => (
@@ -130,7 +131,7 @@ const AuditLogs = () => {
                         <TableCell>
                           <div className="flex items-center gap-2 font-bold text-gray-900">
                             <User className="h-3 w-3 text-slate-400" />
-                            {log.profiles?.username || 'System'}
+                            {log.changed_by || 'System'}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -147,6 +148,11 @@ const AuditLogs = () => {
                         <TableCell className="text-[10px] font-mono text-slate-400">
                           {log.record_id}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedLog(log)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -156,6 +162,44 @@ const AuditLogs = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Log Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="font-bold text-slate-500 uppercase text-[10px]">Table</p>
+                <p className="font-mono">{selectedLog?.table_name}</p>
+              </div>
+              <div>
+                <p className="font-bold text-slate-500 uppercase text-[10px]">Action</p>
+                <p className="font-mono">{selectedLog?.action_type}</p>
+              </div>
+            </div>
+            
+            {selectedLog?.old_data && (
+              <div className="space-y-2">
+                <p className="font-bold text-slate-500 uppercase text-[10px]">Old Data</p>
+                <pre className="p-3 bg-slate-50 rounded-lg text-xs overflow-x-auto">
+                  {JSON.stringify(selectedLog.old_data, null, 2)}
+                </pre>
+              </div>
+            )}
+            
+            {selectedLog?.new_data && (
+              <div className="space-y-2">
+                <p className="font-bold text-slate-500 uppercase text-[10px]">New Data</p>
+                <pre className="p-3 bg-slate-50 rounded-lg text-xs overflow-x-auto">
+                  {JSON.stringify(selectedLog.new_data, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
