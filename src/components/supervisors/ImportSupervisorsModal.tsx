@@ -182,7 +182,10 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
         const toInsert: any[] = [];
         const localErrors: any[] = [];
         const year_imported = new Date().getFullYear().toString().slice(0, LIMITS.year_imported);
-        const added_by = (localStorage.getItem('username') || 'system').slice(0, LIMITS.added_by);
+        
+        // Correctly get username from stored profile
+        const stored = localStorage.getItem('neas_user_profile');
+        const added_by = (stored ? JSON.parse(stored).username : 'system').slice(0, LIMITS.added_by);
 
         const processedRows = [];
         for (let i = 0; i < sanitizedData.length; i++) {
