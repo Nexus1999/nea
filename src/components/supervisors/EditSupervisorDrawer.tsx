@@ -17,9 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserPlus, Save, Loader2, Edit3 } from "lucide-react";
+import { Save, Loader2, Edit3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logDataChange } from "@/utils/auditLogger";
 
 interface EditSupervisorDrawerProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
   const [districts, setDistricts] = useState<any[]>([]);
   const [shake, setShake] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [oldData, setOldData] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -52,7 +54,6 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
     csee_year: ''
   });
 
-  // Load data when drawer opens
   useEffect(() => {
     if (isOpen && supervisorId) {
       loadSupervisorData();
@@ -63,6 +64,7 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
         center_type: '', index_no: '', csee_year: ''
       });
       setErrors({});
+      setOldData(null);
     }
   }, [isOpen, supervisorId]);
 
@@ -80,7 +82,7 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
 
       if (error) throw error;
       if (sup) {
-        setFormData({
+        const currentData = {
           first_name: sup.first_name || '',
           middle_name: sup.middle_name || '',
           last_name: sup.last_name || '',
@@ -94,9 +96,10 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
           center_type: sup.center_type || '',
           index_no: sup.index_no || '',
           csee_year: sup.csee_year || ''
-        });
+        };
+        setFormData(currentData);
+        setOldData(currentData);
 
-        // Load districts for existing region
         if (sup.region && regionData) {
           const selectedRegion = regionData.find(r => r.region_name === sup.region);
           if (selectedRegion) {
@@ -116,18 +119,13 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
     }
   };
 
-  // --- MASK LOGIC (Original) ---
   const applyPhoneMask = (input: string) => {
     let raw = input.replace(/\D/g, '');
     if (raw.length > 12) raw = raw.slice(0, 12);
     let formatted = '+255 ';
-    if (raw.length > 3) {
-      formatted += raw.slice(3, 6) + ' ';
-      if (raw.length > 6) {
-        formatted += raw.slice(6, 9) + ' ';
-        if (raw.length > 9) formatted += raw.slice(9, 12);
-      }
-    }
+    if (raw.length > 3) formatted += raw.slice(3, 6) + ' ';
+    if (raw.length > 6) formatted += raw.slice(6, 9) + ' ';
+    if (raw.length > 9) formatted += raw.slice(9, 12);
     return formatted.trim();
   };
 
@@ -170,12 +168,10 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
     if (!formData.district) newErrors.district = "Required";
     if (!/^S\d{4}$/.test(formData.center_no)) newErrors.center_no = "Format: S0101";
     if (!formData.center_type) newErrors.center_type = "Required";
-
     if (formData.index_no || formData.csee_year) {
       if (!formData.index_no) newErrors.index_no = "Required with Year";
       if (!formData.csee_year) newErrors.csee_year = "Required with Index";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -185,10 +181,7 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
     setErrors(prev => ({ ...prev, region: '', district: '' }));
     const selectedRegion = regions.find(r => r.region_name === regionName);
     if (selectedRegion) {
-      const { data } = await supabase
-        .from('districts')
-        .select('*')
-        .eq('region_number', selectedRegion.region_code);
+      const { data } = await supabase.from('districts').select('*').eq('region_number', selectedRegion.region_code);
       if (data) setDistricts(data);
     }
   };
@@ -220,6 +213,15 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
 
       if (error) throw error;
 
+      // Log the update
+      await logDataChange({
+        table_name: 'supervisors',
+        record_id: supervisorId!,
+        action_type: 'UPDATE',
+        old_data: oldData,
+        new_data: formData
+      });
+
       toast.success('Supervisor details updated');
       onRefresh();
       onClose();
@@ -247,7 +249,6 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
           <div className="flex-1 flex items-center justify-center"><Loader2 className="animate-spin h-6 w-6 text-slate-400" /></div>
         ) : (
           <form onSubmit={handleSubmit} className={`flex-1 px-8 py-4 space-y-3 overflow-y-auto transition-transform ${shake ? 'animate-shake' : ''}`}>
-            
             <div className="grid grid-cols-3 gap-x-4 gap-y-2">
               <div className="space-y-1">
                 <Label className={`text-xs ${errors.first_name ? "text-red-500" : ""}`}>First Name *</Label>
@@ -293,9 +294,7 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
                 <Label className={`text-xs ${errors.region ? "text-red-500" : ""}`}>Region *</Label>
                 <Select onValueChange={handleRegionChange} value={formData.region}>
                   <SelectTrigger className={`h-8 ${errors.region ? "border-red-500" : ""}`}><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    {regions.map(r => <SelectItem key={r.id} value={r.region_name}>{r.region_name}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{regions.map(r => <SelectItem key={r.id} value={r.region_name}>{r.region_name}</SelectItem>)}</SelectContent>
                 </Select>
                 {errors.region && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.region}</p>}
               </div>
@@ -303,9 +302,7 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
                 <Label className={`text-xs ${errors.district ? "text-red-500" : ""}`}>District *</Label>
                 <Select disabled={!formData.region} onValueChange={val => setFormData({...formData, district: val})} value={formData.district}>
                   <SelectTrigger className={`h-8 ${errors.district ? "border-red-500" : ""}`}><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    {districts.map(d => <SelectItem key={d.id} value={d.district_name}>{d.district_name}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{districts.map(d => <SelectItem key={d.id} value={d.district_name}>{d.district_name}</SelectItem>)}</SelectContent>
                 </Select>
                 {errors.district && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.district}</p>}
               </div>
@@ -314,15 +311,11 @@ const EditSupervisorDrawer = ({ isOpen, onClose, onRefresh, supervisorId }: Edit
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-3 mt-1">
               <div className="space-y-1">
                 <Label className={`text-xs ${errors.center_no ? "text-red-500" : ""}`}>Center Number *</Label>
-                <Input 
-                  className={`h-8 uppercase font-mono ${errors.center_no ? "border-red-500" : ""}`}
-                  value={formData.center_no} 
-                  onChange={e => {
-                    let val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                    if (val.length > 0 && val[0] !== 'S') val = 'S' + val.replace(/\D/g, '');
-                    setFormData({...formData, center_no: val.slice(0, 5)});
-                  }} 
-                />
+                <Input className={`h-8 uppercase font-mono ${errors.center_no ? "border-red-500" : ""}`} value={formData.center_no} onChange={e => {
+                  let val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                  if (val.length > 0 && val[0] !== 'S') val = 'S' + val.replace(/\D/g, '');
+                  setFormData({...formData, center_no: val.slice(0, 5)});
+                }} />
                 {errors.center_no && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.center_no}</p>}
               </div>
               <div className="space-y-1">

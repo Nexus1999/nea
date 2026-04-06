@@ -15,48 +15,30 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { logDataChange } from "@/utils/auditLogger";
 
-// --- Configuration Constants ---
 const REQUIRED_HEADERS = ['region', 'district', 'first_name', 'last_name', 'center_no'];
 const OPTIONAL_HEADERS = ['middle_name', 'nin', 'cheque_no', 'tsc_no', 'index_no', 'csee_year', 'phone', 'notes'];
 const ALL_HEADERS = [...REQUIRED_HEADERS, ...OPTIONAL_HEADERS];
-const CHUNK_SIZE = 50; // Smaller chunks for better error isolation
+const CHUNK_SIZE = 50;
 
-// --- Schema Limits (Matching your DB definition) ---
 const LIMITS = {
-  region: 100,
-  district: 100,
-  first_name: 100,
-  middle_name: 100,
-  last_name: 100,
-  nin: 50,
-  cheque_no: 50,
-  tsc_no: 50,
-  index_no: 50,
-  csee_year: 10,
-  center_no: 50,
-  phone: 50,
-  year_imported: 10,
-  added_by: 100
+  region: 100, district: 100, first_name: 100, middle_name: 100, last_name: 100,
+  nin: 50, cheque_no: 50, tsc_no: 50, index_no: 50, csee_year: 10,
+  center_no: 50, phone: 50, year_imported: 10, added_by: 100
 };
-
-// --- Sanitization Utilities ---
 
 const sanitizePhone = (phoneInput: any) => {
   if (!phoneInput) return null;
   let phone = String(phoneInput).trim().replace(/\D/g, '');
   if (phone.startsWith('255')) phone = phone.slice(3);
   if (phone.startsWith('0')) phone = phone.slice(1);
-  
-  if (phone.length === 9 && (phone.startsWith('7') || phone.startsWith('6'))) {
-    return `0${phone}`;
-  }
+  if (phone.length === 9 && (phone.startsWith('7') || phone.startsWith('6'))) return `0${phone}`;
   return phone.slice(0, LIMITS.phone);
 };
 
 const sanitizeYear = (yearInput: any) => {
   if (!yearInput) return null;
-  // Excel often imports 2023 as "2023.0"
   let year = String(yearInput).trim().split('.')[0];
   return year.slice(0, LIMITS.csee_year);
 };
@@ -66,7 +48,6 @@ const sanitizeCenterNo = (centerInput: any) => {
   let center = String(centerInput).trim().toUpperCase().replace(/O/g, '0').replace(/\./g, '');
   const match = center.match(/^([SP])(\d+)$/i);
   if (!match) return center.slice(0, LIMITS.center_no);
-  
   const prefix = match[1];
   const digits = match[2].padStart(4, '0');
   return `${prefix}${digits}`.slice(0, LIMITS.center_no);
@@ -74,22 +55,13 @@ const sanitizeCenterNo = (centerInput: any) => {
 
 const sanitizeIndexNo = (indexInput: any) => {
   if (!indexInput) return null;
-  let index = String(indexInput)
-    .trim()
-    .toUpperCase()
-    .replace(/O/g, '0')
-    .replace(/\./g, '')
-    .replace(/[\s\/]+/g, '-');
-
+  let index = String(indexInput).trim().toUpperCase().replace(/O/g, '0').replace(/\./g, '').replace(/[\s\/]+/g, '-');
   const match = index.match(/^([SP])(.*)$/i);
   if (!match) return index.slice(0, LIMITS.index_no);
-
   const prefix = match[1];
   let parts = match[2].split('-').filter(p => p);
-  
   if (parts[0]) parts[0] = parts[0].length === 3 ? parts[0].padStart(4, '0') : parts[0];
   if (parts[1]) parts[1] = parts[1].length === 3 ? parts[1].padStart(4, '0') : parts[1];
-  
   return (parts[1] ? `${prefix}${parts[0]}-${parts[1]}` : `${prefix}${parts[0]}`).slice(0, LIMITS.index_no);
 };
 
@@ -99,13 +71,7 @@ const validateLength = (val: any, max: number) => {
 };
 
 const importSchema = z.object({
-  file: z.any()
-    .refine((files) => files?.length > 0, "Select a file")
-    .refine((files) => {
-      if (!files?.[0]) return false;
-      const ext = files[0].name.split('.').pop()?.toLowerCase();
-      return ext === 'xlsx' || ext === 'csv';
-    }, "Only .xlsx and .csv allowed")
+  file: z.any().refine((files) => files?.length > 0, "Select a file")
 });
 
 export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open: boolean, onOpenChange: (o: boolean) => void, onSuccess: () => void }) => {
@@ -114,20 +80,11 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
   const [headerError, setHeaderError] = useState<string | null>(null);
   const [errorFile, setErrorFile] = useState<{data: any[], name: string} | null>(null);
 
-  const form = useForm<z.infer<typeof importSchema>>({
-    resolver: zodResolver(importSchema)
-  });
-
+  const form = useForm<z.infer<typeof importSchema>>({ resolver: zodResolver(importSchema) });
   const fileSelected = form.watch("file");
 
   useEffect(() => {
-    if (!open) {
-      form.reset();
-      setHeaderError(null);
-      setErrorFile(null);
-      setProgress(0);
-      setLoading(false);
-    }
+    if (!open) { form.reset(); setHeaderError(null); setErrorFile(null); setProgress(0); setLoading(false); }
   }, [open, form]);
 
   const downloadTemplate = () => {
@@ -201,51 +158,24 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
         const workbook = XLSX.read(e.target?.result, { type: 'array' });
         const rawData: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "" });
 
-        if (!rawData.length) {
-          setHeaderError("File is empty");
-          setLoading(false);
-          return;
-        }
+        if (!rawData.length) { setHeaderError("File is empty"); setLoading(false); return; }
 
         const headers = Object.keys(rawData[0]).map(h => h.trim().toLowerCase());
         const missing = REQUIRED_HEADERS.filter(h => !headers.includes(h));
-        if (missing.length) {
-          setHeaderError(`Missing required columns: ${missing.join(", ")}`);
-          setLoading(false);
-          return;
-        }
+        if (missing.length) { setHeaderError(`Missing required columns: ${missing.join(", ")}`); setLoading(false); return; }
 
-        const sanitizedData = rawData.map(row => ({
-            ...row,
-            sanitizedCenter: sanitizeCenterNo(row.center_no)
-        }));
-
+        const sanitizedData = rawData.map(row => ({ ...row, sanitizedCenter: sanitizeCenterNo(row.center_no) }));
         const uniqueCenterNos = [...new Set(sanitizedData.map(row => row.sanitizedCenter).filter(Boolean))];
         setProgress(5);
 
         const centerCache = new Map();
-        
-        const { data: secSchools } = await supabase
-          .from('secondaryschools')
-          .select('center_no, region, district, center_type')
-          .in('center_no', uniqueCenterNos)
-          .eq('status', 'active');
-        
-        secSchools?.forEach(center => {
-          centerCache.set(center.center_no, center);
-        });
+        const { data: secSchools } = await supabase.from('secondaryschools').select('center_no, region, district, center_type').in('center_no', uniqueCenterNos).eq('status', 'active');
+        secSchools?.forEach(center => centerCache.set(center.center_no, center));
 
         const notFoundCenters = uniqueCenterNos.filter(cn => !centerCache.has(cn));
         if (notFoundCenters.length > 0) {
-          const { data: tcSchools } = await supabase
-            .from('teacherscolleges')
-            .select('center_no, region, district')
-            .in('center_no', notFoundCenters)
-            .eq('status', 'active');
-          
-          tcSchools?.forEach(center => {
-            centerCache.set(center.center_no, { ...center, center_type: 'public' });
-          });
+          const { data: tcSchools } = await supabase.from('teacherscolleges').select('center_no, region, district').in('center_no', notFoundCenters).eq('status', 'active');
+          tcSchools?.forEach(center => centerCache.set(center.center_no, { ...center, center_type: 'public' }));
         }
         setProgress(15);
 
@@ -258,30 +188,16 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
         for (let i = 0; i < sanitizedData.length; i++) {
           const rowData = sanitizedData[i];
           const { sanitizedCenter } = rowData;
-
-          if (i % 10 === 0) {
-            setProgress(15 + Math.round((i / sanitizedData.length) * 20));
-          }
+          if (i % 10 === 0) setProgress(15 + Math.round((i / sanitizedData.length) * 20));
 
           const hasMissing = REQUIRED_HEADERS.some(h => !String(rowData[h] || "").trim());
-          if (hasMissing) {
-            localErrors.push({ ...rowData, error_message: "Missing required fields" });
-            continue;
-          }
+          if (hasMissing) { localErrors.push({ ...rowData, error_message: "Missing required fields" }); continue; }
 
           const centerInfo = centerCache.get(sanitizedCenter);
+          if (!centerInfo) { localErrors.push({ ...rowData, error_message: `Center ${sanitizedCenter} not found/inactive` }); continue; }
 
-          if (!centerInfo) {
-            localErrors.push({ ...rowData, error_message: `Center ${sanitizedCenter} not found/inactive` });
-            continue;
-          }
-
-          // STRICT PUBLIC CHECK
           const type = centerInfo.center_type?.toLowerCase() || 'public';
-          if (type !== 'public') {
-            localErrors.push({ ...rowData, error_message: `Center ${sanitizedCenter} is ${type} (Only Public allowed)` });
-            continue;
-          }
+          if (type !== 'public') { localErrors.push({ ...rowData, error_message: `Center ${sanitizedCenter} is ${type} (Only Public allowed)` }); continue; }
 
           const dbRegion = centerInfo.region.trim().toLowerCase();
           const dbDistrict = centerInfo.district.trim().toLowerCase();
@@ -289,10 +205,7 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
           const rowDistrict = rowData.district.trim().toLowerCase();
           
           if (dbRegion !== rowRegion || dbDistrict !== rowDistrict) {
-            localErrors.push({ 
-              ...rowData, 
-              error_message: `Location mismatch: Excel has ${rowData.region}/${rowData.district} but DB has ${centerInfo.region}/${centerInfo.district}` 
-            });
+            localErrors.push({ ...rowData, error_message: `Location mismatch: Excel has ${rowData.region}/${rowData.district} but DB has ${centerInfo.region}/${centerInfo.district}` });
             continue;
           }
 
@@ -300,7 +213,6 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
           const sanitizedIndex = sanitizeIndexNo(rowData.index_no);
           const cseeYear = sanitizeYear(rowData.csee_year);
 
-          // STRICT SCHEMA LENGTH VALIDATION
           const lengthErrors = [];
           if (!validateLength(rowData.first_name, LIMITS.first_name)) lengthErrors.push(`First name too long`);
           if (!validateLength(rowData.middle_name, LIMITS.middle_name)) lengthErrors.push(`Middle name too long`);
@@ -313,26 +225,17 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
           if (!validateLength(sanitizedIndex, LIMITS.index_no)) lengthErrors.push(`Index No too long`);
           if (!validateLength(cseeYear, LIMITS.csee_year)) lengthErrors.push(`CSEE Year too long`);
 
-          if (lengthErrors.length > 0) {
-            localErrors.push({ ...rowData, error_message: lengthErrors.join(", ") });
-            continue;
-          }
-
+          if (lengthErrors.length > 0) { localErrors.push({ ...rowData, error_message: lengthErrors.join(", ") }); continue; }
           processedRows.push({ row: rowData, sanitizedPhone, sanitizedIndex, sanitizedCenter, type, centerInfo, cseeYear });
         }
 
         setProgress(35);
-
         const isDuplicateChecker = await batchCheckDuplicates(processedRows);
         setProgress(50);
 
         for (let i = 0; i < processedRows.length; i++) {
           const { row, sanitizedPhone, sanitizedIndex, sanitizedCenter, type, centerInfo, cseeYear } = processedRows[i];
-
-          if (i % 10 === 0) {
-            setProgress(50 + Math.round((i / processedRows.length) * 25));
-          }
-
+          if (i % 10 === 0) setProgress(50 + Math.round((i / processedRows.length) * 25));
           if (isDuplicateChecker({ row, sanitizedPhone, sanitizedIndex, sanitizedCenter })) {
             localErrors.push({ ...row, error_message: "Duplicate supervisor found" });
             continue;
@@ -349,7 +252,7 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
             region: centerInfo.region,
             district: centerInfo.district,
             center_no: sanitizedCenter,
-            center_type: 'government', // Since we only allow public
+            center_type: 'government',
             index_no: sanitizedIndex,
             csee_year: cseeYear,
             year_imported,
@@ -358,37 +261,29 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
         }
 
         setProgress(75);
-
         if (toInsert.length > 0) {
           for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
             const chunk = toInsert.slice(i, i + CHUNK_SIZE);
-            try {
-              const { error } = await supabase.from('supervisors').insert(chunk);
-              
-              if (error) {
-                console.error("Chunk insert failed, falling back to individual inserts:", error);
-                for (const item of chunk) {
-                  const { error: singleError } = await supabase.from('supervisors').insert(item);
-                  if (singleError) {
-                    localErrors.push({ ...item, error_message: singleError.message });
-                  }
-                }
-              }
-            } catch (chunkErr: any) {
-              // Catch unexpected exceptions during insert
+            const { error } = await supabase.from('supervisors').insert(chunk);
+            if (error) {
               for (const item of chunk) {
                 const { error: singleError } = await supabase.from('supervisors').insert(item);
-                if (singleError) {
-                  localErrors.push({ ...item, error_message: singleError.message });
-                }
+                if (singleError) localErrors.push({ ...item, error_message: singleError.message });
               }
             }
             setProgress(75 + Math.round(((i + chunk.length) / toInsert.length) * 25));
           }
+          
+          // Log the batch import
+          await logDataChange({
+            table_name: 'supervisors',
+            record_id: 'BATCH',
+            action_type: 'IMPORT',
+            new_data: { count: toInsert.length, filename: values.file[0].name }
+          });
         }
 
         setProgress(100);
-
         if (localErrors.length > 0) {
           setErrorFile({ data: localErrors, name: "supervisor_import_errors.xlsx" });
           toast.warning(`Imported ${toInsert.length} supervisors, but ${localErrors.length} had errors.`);
@@ -454,14 +349,7 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
                     )}>
                       <FileSpreadsheet className={cn("h-10 w-10 mb-2", fileSelected?.length > 0 ? "text-black" : "text-muted-foreground")} />
                       <p className="text-sm font-medium">{fileSelected?.length > 0 ? fileSelected[0].name : "Select Supervisor File"}</p>
-                      <Input 
-                        type="file" 
-                        accept=".xlsx,.csv" 
-                        disabled={loading} 
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
-                        onChange={(e) => onChange(e.target.files)} 
-                        {...field}
-                      />
+                      <Input type="file" accept=".xlsx,.csv" disabled={loading} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => onChange(e.target.files)} {...field} />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -477,12 +365,7 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
             )}
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                onClick={form.handleSubmit(onSubmit)} 
-                disabled={loading || !fileSelected}
-                className="w-full sm:w-auto"
-              >
+              <Button type="button" onClick={form.handleSubmit(onSubmit)} disabled={loading || !fileSelected} className="w-full sm:w-auto">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start Import"}
               </Button>
             </DialogFooter>

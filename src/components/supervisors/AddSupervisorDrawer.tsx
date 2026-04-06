@@ -20,6 +20,7 @@ import {
 import { UserPlus, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logDataChange } from "@/utils/auditLogger";
 
 interface AddSupervisorDrawerProps {
   isOpen: boolean;
@@ -50,7 +51,6 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
     csee_year: ''
   });
 
-  // ====================== MASK FUNCTIONS ======================
   const applyPhoneMask = (input: string) => {
     let raw = input.replace(/\D/g, '');
     if (raw.length > 12) raw = raw.slice(0, 12);
@@ -90,7 +90,6 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
     setTimeout(() => setShake(false), 500);
   };
 
-  // Get current username from localStorage (set by AuthProvider)
   const getCurrentUsername = (): string => {
     try {
       const stored = localStorage.getItem('neas_user_profile');
@@ -98,46 +97,32 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
         const parsed = JSON.parse(stored);
         return parsed.username || 'system';
       }
-    } catch (e) {
-      console.error('Failed to parse username from localStorage');
-    }
+    } catch (e) {}
     return 'system';
   };
 
-  // ====================== VALIDATION ======================
   const validate = () => {
     const newErrors: Record<string, string> = {};
-
     if (!formData.first_name.trim()) newErrors.first_name = "Required";
     if (!formData.last_name.trim()) newErrors.last_name = "Required";
-
     const phoneDigits = formData.phone.replace(/\D/g, '');
     if (phoneDigits.length !== 12) newErrors.phone = "Invalid phone number";
-
     if (!formData.region) newErrors.region = "Required";
     if (!formData.district) newErrors.district = "Required";
-
-    if (!/^S\d{4}$/.test(formData.center_no)) newErrors.center_no = "Format: S followed by 4 digits (e.g. S0101)";
+    if (!/^S\d{4}$/.test(formData.center_no)) newErrors.center_no = "Format: S0101";
     if (!formData.center_type) newErrors.center_type = "Required";
-
-    // Index Number and CSEE Year must both be provided or both empty
     if (formData.index_no || formData.csee_year) {
-      if (!formData.index_no) newErrors.index_no = "Required when CSEE Year is provided";
-      if (!formData.csee_year) newErrors.csee_year = "Required when Index Number is provided";
+      if (!formData.index_no) newErrors.index_no = "Required with Year";
+      if (!formData.csee_year) newErrors.csee_year = "Required with Index";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Fetch regions when drawer opens
   useEffect(() => {
     if (isOpen) {
       const fetchRegions = async () => {
-        const { data } = await supabase
-          .from('regions')
-          .select('*')
-          .order('region_name');
+        const { data } = await supabase.from('regions').select('*').order('region_name');
         if (data) setRegions(data);
       };
       fetchRegions();
@@ -147,47 +132,32 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
   const handleRegionChange = async (regionName: string) => {
     setFormData(prev => ({ ...prev, region: regionName, district: '' }));
     setErrors(prev => ({ ...prev, region: '', district: '' }));
-
     const selectedRegion = regions.find(r => r.region_name === regionName);
     if (selectedRegion) {
-      const { data } = await supabase
-        .from('districts')
-        .select('*')
-        .eq('region_number', selectedRegion.region_code);
+      const { data } = await supabase.from('districts').select('*').eq('region_number', selectedRegion.region_code);
       if (data) setDistricts(data);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) {
-      triggerShake();
-      return;
-    }
+    if (!validate()) { triggerShake(); return; }
 
     setLoading(true);
     const currentUsername = getCurrentUsername();
 
     try {
-      // 1. Verify center exists and matches location + ownership
-      const { data: centerData, error: centerError } = await supabase
+      const { data: centerData } = await supabase
         .from('secondaryschools')
         .select('region, district, center_type')
         .eq('center_no', formData.center_no)
         .maybeSingle();
 
-      if (centerError) throw centerError;
       if (!centerData) throw new Error(`Center ${formData.center_no} does not exist.`);
-
       if (centerData.region !== formData.region || centerData.district !== formData.district) {
         throw new Error(`Location mismatch: Center is in ${centerData.region}/${centerData.district}`);
       }
 
-      if (centerData.center_type.toLowerCase() !== formData.center_type.toLowerCase()) {
-        throw new Error(`Ownership mismatch: This center is registered as ${centerData.center_type}`);
-      }
-
-      // 2. Insert supervisor
       const { data: insertedSupervisor, error: insertError } = await supabase
         .from('supervisors')
         .insert([{
@@ -199,55 +169,27 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
         .single();
 
       if (insertError) throw insertError;
-      if (!insertedSupervisor?.id) throw new Error("Failed to create supervisor record");
 
-      // 3. Log the change to datachange_logs (changed_by is now TEXT)
-      const { error: logError } = await supabase
-        .from('datachange_logs')
-        .insert([{
-          table_name: 'supervisors',
-          record_id: insertedSupervisor.id,        // serial integer
-          action_type: 'INSERT',
-          old_data: null,
-          new_data: {
-            ...formData,
-            added_by: currentUsername,
-            year_imported: new Date().getFullYear().toString(),
-          },
-          changed_by: currentUsername,   // Stored as username (text)
-        }]);
-
-      if (logError) {
-        console.warn('Data change log failed:', logError);
-      }
+      // Log the change
+      await logDataChange({
+        table_name: 'supervisors',
+        record_id: insertedSupervisor.id,
+        action_type: 'INSERT',
+        new_data: formData
+      });
 
       toast.success('Supervisor registered successfully');
       onRefresh();
       onClose();
-
-      // Reset form
       setFormData({
-        first_name: '',
-        middle_name: '',
-        last_name: '',
-        nin: '',
-        phone: '',
-        tsc_no: '',
-        cheque_no: '',
-        region: '',
-        district: '',
-        center_no: '',
-        center_type: '',
-        index_no: '',
-        csee_year: ''
+        first_name: '', middle_name: '', last_name: '', nin: '', phone: '',
+        tsc_no: '', cheque_no: '', region: '', district: '', center_no: '',
+        center_type: '', index_no: '', csee_year: ''
       });
       setErrors({});
-
     } catch (err: any) {
-      console.error(err);
-      const errorMessage = err.message || 'Failed to register supervisor';
-      setErrors({ submit: errorMessage });
-      toast.error(errorMessage);
+      setErrors({ submit: err.message });
+      toast.error(err.message);
       triggerShake();
     } finally {
       setLoading(false);
@@ -257,48 +199,29 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent className="sm:max-w-[600px] p-0 flex flex-col bg-white overflow-hidden">
-        {/* Header */}
         <div className="px-6 py-4 border-b bg-slate-50/50">
           <SheetHeader>
             <div className="flex items-center gap-3">
-              <div className="p-1.5 bg-black text-white rounded-md">
-                <UserPlus className="h-4 w-4" />
-              </div>
+              <div className="p-1.5 bg-black text-white rounded-md"><UserPlus className="h-4 w-4" /></div>
               <SheetTitle className="text-lg font-bold">Register New Supervisor</SheetTitle>
             </div>
           </SheetHeader>
         </div>
 
-        {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          className={`flex-1 px-8 py-4 space-y-3 overflow-y-auto transition-transform ${shake ? 'animate-shake' : ''}`}
-        >
+        <form onSubmit={handleSubmit} className={`flex-1 px-8 py-4 space-y-3 overflow-y-auto transition-transform ${shake ? 'animate-shake' : ''}`}>
           <div className="grid grid-cols-3 gap-x-4 gap-y-2">
             <div className="space-y-1">
               <Label className={`text-xs ${errors.first_name ? "text-red-500" : ""}`}>First Name *</Label>
-              <Input
-                className={`h-8 ${errors.first_name ? "border-red-500" : ""}`}
-                value={formData.first_name}
-                onChange={e => setFormData({ ...formData, first_name: e.target.value })}
-              />
+              <Input className={`h-8 ${errors.first_name ? "border-red-500" : ""}`} value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })} />
               {errors.first_name && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.first_name}</p>}
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Middle Name</Label>
-              <Input
-                className="h-8"
-                value={formData.middle_name}
-                onChange={e => setFormData({ ...formData, middle_name: e.target.value })}
-              />
+              <Input className="h-8" value={formData.middle_name} onChange={e => setFormData({ ...formData, middle_name: e.target.value })} />
             </div>
             <div className="space-y-1">
               <Label className={`text-xs ${errors.last_name ? "text-red-500" : ""}`}>Last Name *</Label>
-              <Input
-                className={`h-8 ${errors.last_name ? "border-red-500" : ""}`}
-                value={formData.last_name}
-                onChange={e => setFormData({ ...formData, last_name: e.target.value })}
-              />
+              <Input className={`h-8 ${errors.last_name ? "border-red-500" : ""}`} value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })} />
               {errors.last_name && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.last_name}</p>}
             </div>
           </div>
@@ -306,20 +229,11 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             <div className="space-y-1">
               <Label className="text-xs">National ID (NIN)</Label>
-              <Input
-                className="h-8"
-                value={formData.nin}
-                onChange={e => setFormData({ ...formData, nin: applyNINMask(e.target.value) })}
-                placeholder="000000000-00000-00000-00"
-              />
+              <Input className="h-8" value={formData.nin} onChange={e => setFormData({ ...formData, nin: applyNINMask(e.target.value) })} placeholder="000000000-00000-00000-00" />
             </div>
             <div className="space-y-1">
               <Label className={`text-xs ${errors.phone ? "text-red-500" : ""}`}>Phone Number *</Label>
-              <Input
-                className={`h-8 ${errors.phone ? "border-red-500" : ""}`}
-                value={formData.phone}
-                onChange={e => setFormData({ ...formData, phone: applyPhoneMask(e.target.value) })}
-              />
+              <Input className={`h-8 ${errors.phone ? "border-red-500" : ""}`} value={formData.phone} onChange={e => setFormData({ ...formData, phone: applyPhoneMask(e.target.value) })} />
               {errors.phone && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.phone}</p>}
             </div>
           </div>
@@ -327,19 +241,11 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             <div className="space-y-1">
               <Label className="text-xs">TSC Number</Label>
-              <Input
-                className="h-8"
-                value={formData.tsc_no}
-                onChange={e => setFormData({ ...formData, tsc_no: e.target.value })}
-              />
+              <Input className="h-8" value={formData.tsc_no} onChange={e => setFormData({ ...formData, tsc_no: e.target.value })} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Cheque Number</Label>
-              <Input
-                className="h-8"
-                value={formData.cheque_no}
-                onChange={e => setFormData({ ...formData, cheque_no: e.target.value })}
-              />
+              <Input className="h-8" value={formData.cheque_no} onChange={e => setFormData({ ...formData, cheque_no: e.target.value })} />
             </div>
           </div>
 
@@ -347,36 +253,16 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
             <div className="space-y-1">
               <Label className={`text-xs ${errors.region ? "text-red-500" : ""}`}>Region *</Label>
               <Select onValueChange={handleRegionChange} value={formData.region}>
-                <SelectTrigger className={`h-8 ${errors.region ? "border-red-500" : ""}`}>
-                  <SelectValue placeholder="Select region" />
-                </SelectTrigger>
-                <SelectContent>
-                  {regions.map(r => (
-                    <SelectItem key={r.id} value={r.region_name}>
-                      {r.region_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectTrigger className={`h-8 ${errors.region ? "border-red-500" : ""}`}><SelectValue placeholder="Select region" /></SelectTrigger>
+                <SelectContent>{regions.map(r => <SelectItem key={r.id} value={r.region_name}>{r.region_name}</SelectItem>)}</SelectContent>
               </Select>
               {errors.region && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.region}</p>}
             </div>
             <div className="space-y-1">
               <Label className={`text-xs ${errors.district ? "text-red-500" : ""}`}>District *</Label>
-              <Select
-                disabled={!formData.region}
-                onValueChange={val => setFormData({ ...formData, district: val })}
-                value={formData.district}
-              >
-                <SelectTrigger className={`h-8 ${errors.district ? "border-red-500" : ""}`}>
-                  <SelectValue placeholder="Select district" />
-                </SelectTrigger>
-                <SelectContent>
-                  {districts.map(d => (
-                    <SelectItem key={d.id} value={d.district_name}>
-                      {d.district_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+              <Select disabled={!formData.region} onValueChange={val => setFormData({ ...formData, district: val })} value={formData.district}>
+                <SelectTrigger className={`h-8 ${errors.district ? "border-red-500" : ""}`}><SelectValue placeholder="Select district" /></SelectTrigger>
+                <SelectContent>{districts.map(d => <SelectItem key={d.id} value={d.district_name}>{d.district_name}</SelectItem>)}</SelectContent>
               </Select>
               {errors.district && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.district}</p>}
             </div>
@@ -385,27 +271,17 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             <div className="space-y-1">
               <Label className={`text-xs ${errors.center_no ? "text-red-500" : ""}`}>Center Number *</Label>
-              <Input
-                className={`h-8 uppercase font-mono ${errors.center_no ? "border-red-500" : ""}`}
-                value={formData.center_no}
-                onChange={e => {
-                  let val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                  if (val.length > 0 && val[0] !== 'S') val = 'S' + val.replace(/\D/g, '');
-                  setFormData({ ...formData, center_no: val.slice(0, 5) });
-                }}
-                placeholder="S0101"
-              />
+              <Input className={`h-8 uppercase font-mono ${errors.center_no ? "border-red-500" : ""}`} value={formData.center_no} onChange={e => {
+                let val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (val.length > 0 && val[0] !== 'S') val = 'S' + val.replace(/\D/g, '');
+                setFormData({ ...formData, center_no: val.slice(0, 5) });
+              }} placeholder="S0101" />
               {errors.center_no && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.center_no}</p>}
             </div>
             <div className="space-y-1">
               <Label className={`text-xs ${errors.center_type ? "text-red-500" : ""}`}>Center Ownership *</Label>
-              <Select
-                onValueChange={val => setFormData({ ...formData, center_type: val })}
-                value={formData.center_type}
-              >
-                <SelectTrigger className={`h-8 ${errors.center_type ? "border-red-500" : ""}`}>
-                  <SelectValue placeholder="Select ownership" />
-                </SelectTrigger>
+              <Select onValueChange={val => setFormData({ ...formData, center_type: val })} value={formData.center_type}>
+                <SelectTrigger className={`h-8 ${errors.center_type ? "border-red-500" : ""}`}><SelectValue placeholder="Select ownership" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="government">Government</SelectItem>
                   <SelectItem value="private">Private</SelectItem>
@@ -419,55 +295,26 @@ const AddSupervisorDrawer = ({ isOpen, onClose, onRefresh }: AddSupervisorDrawer
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 pb-2">
             <div className="space-y-1">
               <Label className={`text-xs ${errors.index_no ? "text-red-500" : ""}`}>Index Number</Label>
-              <Input
-                className={`h-8 ${errors.index_no ? "border-red-500" : ""}`}
-                value={formData.index_no}
-                onChange={e => setFormData({ ...formData, index_no: applyIndexMask(e.target.value) })}
-                placeholder="S0101-0001"
-              />
+              <Input className={`h-8 ${errors.index_no ? "border-red-500" : ""}`} value={formData.index_no} onChange={e => setFormData({ ...formData, index_no: applyIndexMask(e.target.value) })} placeholder="S0101-0001" />
               {errors.index_no && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.index_no}</p>}
             </div>
             <div className="space-y-1">
               <Label className={`text-xs ${errors.csee_year ? "text-red-500" : ""}`}>CSEE Year</Label>
-              <Input
-                className={`h-8 ${errors.csee_year ? "border-red-500" : ""}`}
-                value={formData.csee_year}
-                onChange={e => setFormData({ ...formData, csee_year: e.target.value.replace(/\D/g, '') })}
-                placeholder="2024"
-                maxLength={4}
-              />
+              <Input className={`h-8 ${errors.csee_year ? "border-red-500" : ""}`} value={formData.csee_year} onChange={e => setFormData({ ...formData, csee_year: e.target.value.replace(/\D/g, '') })} placeholder="2024" maxLength={4} />
               {errors.csee_year && <p className="text-[9px] text-red-500 font-bold uppercase leading-tight">{errors.csee_year}</p>}
             </div>
           </div>
 
-          {errors.submit && (
-            <div className="py-1.5 px-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-[10px] font-semibold">
-              {errors.submit}
-            </div>
-          )}
+          {errors.submit && <div className="py-1.5 px-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-[10px] font-semibold">{errors.submit}</div>}
         </form>
 
-        {/* Footer */}
         <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3">
-          <Button
-            size="sm"
-            className="bg-black text-white hover:bg-slate-800 px-6"
-            disabled={loading}
-            onClick={handleSubmit}
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Save Supervisor
-              </>
-            )}
+          <Button size="sm" className="bg-black text-white hover:bg-slate-800 px-6" disabled={loading} onClick={handleSubmit}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Save Supervisor</>}
           </Button>
         </div>
       </SheetContent>
 
-      {/* Shake Animation */}
       <style jsx global>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }

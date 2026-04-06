@@ -25,6 +25,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { showStyledSwal } from '@/utils/alerts';
 import { cn } from "@/lib/utils";
 import PaginationControls from "@/components/ui/pagination-controls";
+import { logDataChange } from "@/utils/auditLogger";
 
 // Components
 import Spinner from "@/components/Spinner";
@@ -59,9 +60,8 @@ const SupervisorsManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   
-  // Drawer States
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
-  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false); // NEW STATE
+  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   
@@ -92,7 +92,6 @@ const SupervisorsManagementPage = () => {
     setLoading(false);
   };
 
-  // --- ACTION HANDLERS ---
   const handleViewDetails = (id: number) => {
     setSelectedSupervisorId(id);
     setIsDetailsDrawerOpen(true);
@@ -117,6 +116,12 @@ const SupervisorsManagementPage = () => {
         const { error } = await supabase.from('supervisors').delete().neq('id', 0);
         if (error) showError(error.message);
         else {
+          await logDataChange({
+            table_name: 'supervisors',
+            record_id: 'ALL',
+            action_type: 'DELETE',
+            old_data: { count: supervisors.length }
+          });
           showSuccess("All supervisor records cleared.");
           fetchSupervisors();
         }
@@ -139,6 +144,12 @@ const SupervisorsManagementPage = () => {
         const { error } = await supabase.from('supervisors').delete().eq('id', record.id);
         if (error) showError(error.message);
         else {
+          await logDataChange({
+            table_name: 'supervisors',
+            record_id: record.id,
+            action_type: 'DELETE',
+            old_data: record
+          });
           showSuccess("Supervisor deleted successfully");
           fetchSupervisors();
         }
@@ -264,7 +275,7 @@ const SupervisorsManagementPage = () => {
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8 text-blue-600"
-                          onClick={() => handleEdit(item.id)} // LINKED EDIT HANDLER
+                          onClick={() => handleEdit(item.id)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -290,16 +301,12 @@ const SupervisorsManagementPage = () => {
         </CardContent>
       </Card>
 
-      {/* --- DRAWERS & MODALS --- */}
-      
-      {/* View Profile */}
       <SupervisorDetailsDrawer 
         open={isDetailsDrawerOpen} 
         onOpenChange={setIsDetailsDrawerOpen} 
         supervisorId={selectedSupervisorId?.toString() || null} 
       />
 
-      {/* Edit Supervisor */}
       <EditSupervisorDrawer 
         isOpen={isEditDrawerOpen} 
         onClose={() => setIsEditDrawerOpen(false)} 
@@ -307,14 +314,12 @@ const SupervisorsManagementPage = () => {
         supervisorId={selectedSupervisorId?.toString() || null} 
       />
 
-      {/* Add Supervisor */}
       <AddSupervisorDrawer 
         isOpen={isAddDrawerOpen} 
         onClose={() => setIsAddDrawerOpen(false)} 
         onRefresh={fetchSupervisors} 
       />
 
-      {/* Import Modal */}
       <ImportSupervisorsModal 
         open={isImportModalOpen} 
         onOpenChange={setIsImportModalOpen} 
