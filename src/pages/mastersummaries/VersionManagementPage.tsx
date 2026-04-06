@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'export default VersionManagementPage;';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,23 +41,20 @@ const VersionManagementPage: React.FC = () => {
   const [selectedVersion2, setSelectedVersion2] = useState<MasterSummary | null>(null);
 
   const fetchVersions = useCallback(async () => {
-    console.log("[VersionManagementPage] Starting fetchVersions for masterSummaryId:", masterSummaryId);
     setError(null);
     setLoading(true);
     setAllVersions([]);
     setMasterSummary(null);
-    setSelectedVersion1(null); // Reset selected versions on fetch
+    setSelectedVersion1(null);
     setSelectedVersion2(null);
 
     if (!masterSummaryId) {
       setError("Master summary ID is missing from the URL.");
       setLoading(false);
-      console.log("[VersionManagementPage] masterSummaryId is missing.");
       return;
     }
 
     try {
-      // 1. Fetch the main master summary entry to get its current latest version and other metadata
       const { data: mainSummary, error: mainSummaryError } = await supabase
         .from('mastersummaries')
         .select('*')
@@ -65,27 +62,22 @@ const VersionManagementPage: React.FC = () => {
         .single();
 
       if (mainSummaryError) {
-        console.error("[VersionManagementPage] Error fetching main master summary details:", mainSummaryError);
         setError(mainSummaryError.message || "Failed to fetch main master summary details.");
         setLoading(false);
         return;
       }
       setMasterSummary(mainSummary as MasterSummary);
-      console.log("[VersionManagementPage] Fetched mainSummary:", mainSummary);
 
-      // 2. Use the new RPC function to get distinct versions and their created_at
       const { data: distinctVersionsData, error: rpcError } = await supabase.rpc('get_distinct_mastersummary_versions', {
         p_mid: parseInt(masterSummaryId),
         p_code: mainSummary.Code,
       });
 
       if (rpcError) {
-        console.error("[VersionManagementPage] Error calling RPC function get_distinct_mastersummary_versions:", rpcError);
         setError(rpcError.message || "Failed to fetch distinct versions.");
         setLoading(false);
         return;
       }
-      console.log("[VersionManagementPage] Raw distinctVersionsData from RPC:", distinctVersionsData);
 
       const constructedVersions: MasterSummary[] = (distinctVersionsData || []).map(record => ({
         id: mainSummary.id,
@@ -97,11 +89,9 @@ const VersionManagementPage: React.FC = () => {
         is_latest: record.version === mainSummary.version,
       }));
 
-      const sortedConstructedVersions = constructedVersions.sort((a, b) => b.version - a.version); // Sort descending by version number for display
+      const sortedConstructedVersions = constructedVersions.sort((a, b) => b.version - a.version);
       setAllVersions(sortedConstructedVersions);
-      console.log("[VersionManagementPage] Final constructed and sorted versions:", sortedConstructedVersions);
 
-      // Pre-select the latest two versions if available
       if (sortedConstructedVersions.length >= 1) {
         setSelectedVersion1(sortedConstructedVersions[0]);
       }
@@ -110,13 +100,11 @@ const VersionManagementPage: React.FC = () => {
       }
 
     } catch (err: any) {
-      console.error("[VersionManagementPage] Unexpected error in fetchVersions:", err);
       setError(err.message || "An unexpected error occurred while fetching versions.");
       setMasterSummary(null);
       setAllVersions([]);
     } finally {
       setLoading(false);
-      console.log("[VersionManagementPage] fetchVersions finished. Loading set to false.");
     }
   }, [masterSummaryId]);
 
@@ -124,7 +112,6 @@ const VersionManagementPage: React.FC = () => {
     fetchVersions();
   }, [fetchVersions]);
 
-  // Set dynamic document title
   useEffect(() => {
     if (masterSummary) {
       document.title = `Versions - ${masterSummary.Code} ${masterSummary.Year} | NEAS`;
@@ -134,7 +121,7 @@ const VersionManagementPage: React.FC = () => {
   }, [masterSummary]);
 
   const handleViewDetails = (summaryId: number) => {
-    navigate(`/dashboard/mastersummaries/${summaryId}/details`);
+    navigate(`/dashboard/mastersummaries/details/${summaryId}`);
   };
 
   const handleSetAsLatest = async (targetMasterSummaryId: number, targetVersionNumber: number) => {
@@ -161,41 +148,28 @@ const VersionManagementPage: React.FC = () => {
             throw new Error(`Unknown examination code: ${masterSummary.Code}`);
           }
 
-          // 1. Mark all detailed data for this masterSummaryId as not latest
           const { error: updateOldDetailedError } = await supabase
             .from(detailedTableName)
             .update({ is_latest: false })
             .eq("mid", targetMasterSummaryId);
 
-          if (updateOldDetailedError) {
-            console.error("Error marking old detailed data as not latest:", updateOldDetailedError);
-            throw new Error(updateOldDetailedError.message || "Failed to mark old detailed data as historical.");
-          }
+          if (updateOldDetailedError) throw updateOldDetailedError;
 
-          // 2. Mark the target detailed data as latest
           const { error: updateTargetDetailedError } = await supabase
             .from(detailedTableName)
             .update({ is_latest: true })
             .eq("mid", targetMasterSummaryId)
-            .eq("version", targetVersionNumber); // Use targetVersionNumber here
+            .eq("version", targetVersionNumber);
 
-          if (updateTargetDetailedError) {
-            console.error("Error marking target detailed data as latest:", updateTargetDetailedError);
-            throw new Error(updateTargetDetailedError.message || "Failed to mark target detailed data as latest.");
-          }
+          if (updateTargetDetailedError) throw updateTargetDetailedError;
 
-          // 3. Update the main mastersummaries entry to reflect the new latest version
           const { error: updateMasterSummaryError } = await supabase
             .from("mastersummaries")
             .update({ version: targetVersionNumber, created_at: new Date().toISOString() })
             .eq("id", targetMasterSummaryId);
 
-          if (updateMasterSummaryError) {
-            console.error("Error updating master summary entry:", updateMasterSummaryError);
-            throw new Error(updateMasterSummaryError.message || "Failed to update master summary entry.");
-          }
+          if (updateMasterSummaryError) throw updateMasterSummaryError;
 
-          // Log the version change
           await logDataChange({
             table_name: 'mastersummaries',
             record_id: targetMasterSummaryId,
@@ -252,20 +226,15 @@ const VersionManagementPage: React.FC = () => {
           }
 
           for (const oldVersion of oldVersions) {
-            // Delete associated detailed data for each old version
             const { error: deleteDetailedError } = await supabase
               .from(detailedTableName)
               .delete()
-              .eq('mid', masterSummaryId) // Use the main masterSummaryId
-              .eq('version', oldVersion.version); // Delete specific version data
+              .eq('mid', masterSummaryId)
+              .eq('version', oldVersion.version);
 
-            if (deleteDetailedError) {
-              console.error(`Error deleting detailed data for old version ${oldVersion.version}:`, deleteDetailedError);
-              throw new Error(`Failed to delete detailed data for version ${oldVersion.version}.`);
-            }
+            if (deleteDetailedError) throw deleteDetailedError;
           }
 
-          // Log the deletion of old versions
           await logDataChange({
             table_name: 'mastersummaries',
             record_id: masterSummaryId,
@@ -279,7 +248,7 @@ const VersionManagementPage: React.FC = () => {
           });
 
           showSuccess(`All ${oldVersions.length} previous versions deleted successfully!`);
-          fetchVersions(); // Re-fetch to update the list
+          fetchVersions();
         } catch (err: any) {
           showError(err.message || "An unexpected error occurred during deletion.");
         } finally {
@@ -299,7 +268,6 @@ const VersionManagementPage: React.FC = () => {
       return;
     }
 
-    // Ensure currentVersion is always the higher version number for consistent reporting
     const current = selectedVersion1.version > selectedVersion2.version ? selectedVersion1 : selectedVersion2;
     const previous = selectedVersion1.version < selectedVersion2.version ? selectedVersion1 : selectedVersion2;
 
@@ -357,10 +325,8 @@ const VersionManagementPage: React.FC = () => {
 
   return (
     <div className="container mx-auto py-4 px-4">
-      
-
       <Card className="shadow-lg rounded-xl overflow-hidden bg-white">
-        <CardHeader className="border-b pb-4 flex-row items-center justify-between">
+        <CardHeader className="border-b pb-4 flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-2xl font-bold text-gray-800 flex items-center gap-2">
               <GitBranch className="h-6 w-6 text-neas-green" /> Master Summary Version Management
@@ -393,7 +359,6 @@ const VersionManagementPage: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
-          {/* Version Comparison Section */}
           <div className="flex flex-col md:flex-row items-center gap-4 mb-6 p-4 border rounded-lg bg-gray-50">
             <span className="font-semibold text-gray-700">Compare:</span>
             <Select
@@ -453,7 +418,6 @@ const VersionManagementPage: React.FC = () => {
                   <TableRow>
                     <TableHead className="h-8 px-2 text-base">Version</TableHead>
                     <TableHead className="h-8 px-2 text-base">Status</TableHead>
-                    {/* Removed Created At column */}
                     <TableHead className="h-8 px-2 text-base text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -470,7 +434,6 @@ const VersionManagementPage: React.FC = () => {
                           <Badge variant="secondary">Historical</Badge>
                         )}
                       </TableCell>
-                      {/* Removed Created At cell */}
                       <TableCell className="py-2 px-2 text-base text-right">
                         <div className="flex justify-end gap-2">
                           <Button
