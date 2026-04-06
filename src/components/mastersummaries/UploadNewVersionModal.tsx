@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { showSuccess, showError } from "@/utils/toast";
 import { MasterSummary } from "@/types/mastersummaries";
+import { logDataChange } from "@/utils/auditLogger";
 
 const uploadNewVersionSchema = z.object({
   file: z.any() // This will hold the FileList object temporarily
@@ -50,6 +51,7 @@ interface UploadNewVersionModalProps {
 const UploadNewVersionModal: React.FC<UploadNewVersionModalProps> = ({ open, onOpenChange, masterSummaryData, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [parsedFileData, setParsedFileData] = useState<string | null>(null); // State to hold parsed JSON data
+  const [fileName, setFileName] = useState<string | null>(null);
 
   const form = useForm<UploadNewVersionFormValues>({
     resolver: zodResolver(uploadNewVersionSchema),
@@ -63,6 +65,7 @@ const UploadNewVersionModal: React.FC<UploadNewVersionModalProps> = ({ open, onO
     if (open) {
       form.reset({ file: undefined });
       setParsedFileData(null); // Clear parsed data
+      setFileName(null);
     }
   }, [open, masterSummaryData, form]);
 
@@ -72,10 +75,12 @@ const UploadNewVersionModal: React.FC<UploadNewVersionModalProps> = ({ open, onO
 
     if (!files || files.length === 0) {
       setParsedFileData(null);
+      setFileName(null);
       return;
     }
 
     const file = files[0];
+    setFileName(file.name);
 
     // Perform client-side file validation
     if (file.size > 10 * 1024 * 1024) {
@@ -158,6 +163,20 @@ const UploadNewVersionModal: React.FC<UploadNewVersionModalProps> = ({ open, onO
       if (!response.ok) {
         throw new Error(result.error || 'Failed to upload new version of master summary.');
       }
+
+      // Log the version upload
+      await logDataChange({
+        table_name: 'mastersummaries',
+        record_id: masterSummaryData.id,
+        action_type: 'INSERT',
+        new_data: {
+          action: 'NEW_VERSION_UPLOAD',
+          examination: masterSummaryData.Examination,
+          code: masterSummaryData.Code,
+          year: masterSummaryData.Year,
+          filename: fileName
+        }
+      });
 
       showSuccess(result.message || "New version uploaded successfully!");
       

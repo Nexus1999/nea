@@ -11,6 +11,7 @@ import { MasterSummary, SpecialNeedType } from "@/types/mastersummaries";
 import SpecialNeedsMasterSummaryForm from "@/components/mastersummaries/SpecialNeedsMasterSummaryForm";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { showStyledSwal } from '@/utils/alerts';
+import { logDataChange } from "@/utils/auditLogger";
 
 interface SpecialNeedsSummaryRow {
   special_need: SpecialNeedType;
@@ -167,6 +168,19 @@ const SpecialNeedsPage: React.FC = () => {
         .eq('special_need', specialNeedType);
 
       if (error) throw error;
+
+      // Log the deletion
+      await logDataChange({
+        table_name: tableName,
+        record_id: id,
+        action_type: 'DELETE',
+        old_data: {
+          action: 'SPECIAL_NEEDS_DELETE',
+          special_need: specialNeedType,
+          code: masterSummary.Code,
+          year: masterSummary.Year
+        }
+      });
 
       showSuccess(`All ${specialNeedType} data deleted successfully`);
       fetchSpecialNeedsData();

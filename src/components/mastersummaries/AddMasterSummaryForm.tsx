@@ -45,6 +45,7 @@ import {
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { logDataChange } from "@/utils/auditLogger";
 
 const CSEE_FTNA_SUBJECT_CODES = ['011','012','013','014','015','016','017','018','019','021','022','023','024','025','026','031','032','033','034','035','036','041','042','050','051','052','061','062','071','072','073','074','080','081','082','083','087','088','090','091'];
 const ACSEE_SUBJECT_CODES = ['111','112','113','114','115','116','118','121','122','123','125','126','131','132','133','134','136','137','141','142','151','152','153','155','161'];
@@ -212,6 +213,19 @@ const AddMasterSummaryForm: React.FC<AddMasterSummaryFormProps> = ({ open, onOpe
         }
         return;
       }
+
+      // Log the creation
+      await logDataChange({
+        table_name: 'mastersummaries',
+        record_id: result.masterSummaryId || 'NEW',
+        action_type: 'INSERT',
+        new_data: {
+          examination: values.examination,
+          code: values.code,
+          year: values.year,
+          filename: fileName
+        }
+      });
 
       showSuccess("Master summary created successfully!");
       onSuccess();

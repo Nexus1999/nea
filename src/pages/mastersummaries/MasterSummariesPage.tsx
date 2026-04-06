@@ -42,6 +42,7 @@ import AddMasterSummaryForm from "@/components/mastersummaries/AddMasterSummaryF
 import { MasterSummary } from "@/types/mastersummaries";
 import { useNavigate } from 'react-router-dom';
 import Spinner from "@/components/Spinner";
+import { logDataChange } from "@/utils/auditLogger";
 
 const MasterSummariesPage = () => {
   const [masterSummaries, setMasterSummaries] = useState<MasterSummary[]>([]);
@@ -126,7 +127,7 @@ const MasterSummariesPage = () => {
       // Get code (already have it, but keeping fetch for safety/consistency)
       const { data: summary, error: fetchError } = await supabase
         .from('mastersummaries')
-        .select('Code')
+        .select('*')
         .eq('id', id)
         .single();
 
@@ -156,6 +157,14 @@ const MasterSummariesPage = () => {
         .eq('id', id);
 
       if (masterError) throw masterError;
+
+      // Log the deletion
+      await logDataChange({
+        table_name: 'mastersummaries',
+        record_id: id,
+        action_type: 'DELETE',
+        old_data: summary
+      });
 
       showSuccess(`Master summary for ${code} (${year}) deleted successfully.`);
       fetchMasterSummaries();

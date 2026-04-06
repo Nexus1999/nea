@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { showSuccess, showError } from "@/utils/toast";
+import { logDataChange } from "@/utils/auditLogger";
 
 const specialNeedsMasterSummaryFormSchema = z.object({
   mid: z.number(),
@@ -130,6 +131,20 @@ const SpecialNeedsMasterSummaryForm: React.FC<SpecialNeedsMasterSummaryFormProps
         }
         return;
       }
+
+      // Log the special needs upload
+      await logDataChange({
+        table_name: 'mastersummaries_specialneeds',
+        record_id: values.mid,
+        action_type: 'INSERT',
+        new_data: {
+          action: 'SPECIAL_NEEDS_UPLOAD',
+          special_need: values.special_need,
+          code: values.code,
+          year: values.year,
+          filename: fileToUpload.name
+        }
+      });
 
       showSuccess(result.message || "Special needs data processed successfully!");
       onSuccess();

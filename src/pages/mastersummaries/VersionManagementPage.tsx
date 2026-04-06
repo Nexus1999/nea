@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'export default VersionManagementPage;';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { logDataChange } from "@/utils/auditLogger";
 
 const VersionManagementPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -133,12 +134,6 @@ const VersionManagementPage: React.FC = () => {
   }, [masterSummary]);
 
   const handleViewDetails = (summaryId: number) => {
-    // When viewing details, we want to see the data associated with the specific masterSummaryId
-    // The MasterSummaryDetailsPage already handles fetching data for a given masterSummaryId
-    // and implicitly shows the latest version associated with it.
-    // If we want to view a *specific historical version's* details, the MasterSummaryDetailsPage
-    // would need to be updated to accept a version parameter. For now, it shows the latest.
-    // For this context, we'll navigate to the main details page for the master summary.
     navigate(`/dashboard/mastersummaries/${summaryId}/details`);
   };
 
@@ -200,6 +195,19 @@ const VersionManagementPage: React.FC = () => {
             throw new Error(updateMasterSummaryError.message || "Failed to update master summary entry.");
           }
 
+          // Log the version change
+          await logDataChange({
+            table_name: 'mastersummaries',
+            record_id: targetMasterSummaryId,
+            action_type: 'UPDATE',
+            new_data: {
+              action: 'SET_LATEST_VERSION',
+              version: targetVersionNumber,
+              code: masterSummary.Code,
+              year: masterSummary.Year
+            }
+          });
+
           showSuccess(`Version ${targetVersionNumber} is now the latest!`);
           fetchVersions();
         } catch (err: any) {
@@ -256,6 +264,19 @@ const VersionManagementPage: React.FC = () => {
               throw new Error(`Failed to delete detailed data for version ${oldVersion.version}.`);
             }
           }
+
+          // Log the deletion of old versions
+          await logDataChange({
+            table_name: 'mastersummaries',
+            record_id: masterSummaryId,
+            action_type: 'DELETE',
+            old_data: {
+              action: 'DELETE_OLD_VERSIONS',
+              versions: oldVersions.map(v => v.version),
+              code: masterSummary.Code,
+              year: masterSummary.Year
+            }
+          });
 
           showSuccess(`All ${oldVersions.length} previous versions deleted successfully!`);
           fetchVersions(); // Re-fetch to update the list
