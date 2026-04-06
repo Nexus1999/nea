@@ -1,164 +1,189 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  PlusCircle, Edit, Trash2, Map, Search, Mail, Phone, Globe
+  Search, Plus, Globe, RefreshCw, MapPin, Edit2, Trash2, Filter
 } from "lucide-react";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { showSuccess, showError } from "@/utils/toast";
-import { showStyledSwal } from '@/utils/alerts';
-import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
+import { cn } from "@/lib/utils";
 import { AddRegionDrawer, EditRegionDrawer } from "@/components/settings/RegionDrawers";
-import { logDataChange } from "@/utils/auditLogger";
+import { toast } from "sonner";
 
-const RegionsPage = () => {
+const Regions = () => {
   const [regions, setRegions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [selectedRegion, setSelectedRegion] = useState<any>(null);
+  const [editingRegion, setEditingRegion] = useState<any>(null);
 
   useEffect(() => {
-    document.title = "Regions Management | NEAS";
+    document.title = "Settings - Regions | NEAS";
     fetchRegions();
   }, []);
 
   const fetchRegions = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('regions').select('*').order('region_name');
-    if (error) showError(error.message);
-    else setRegions(data || []);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('regions')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      setRegions(data || []);
+    } catch (err) {
+      toast.error("Failed to load regions");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = async (region: any) => {
-    showStyledSwal({
-      title: 'Delete Region?',
-      html: `Are you sure you want to delete <b>${region.region_name}</b>?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        const { error } = await supabase.from('regions').delete().eq('id', region.id);
-        if (error) showError(error.message);
-        else {
-          await logDataChange({
-            table_name: 'regions',
-            record_id: region.id,
-            action_type: 'DELETE',
-            old_data: region
-          });
-          showSuccess("Region deleted successfully");
-          fetchRegions();
-        }
-      }
-    });
-  };
-
-  const filteredData = useMemo(() => {
-    return regions.filter(r => 
-      r.region_name.toLowerCase().includes(search.toLowerCase()) ||
-      r.region_code.toString().includes(search) ||
-      r.reo?.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [regions, search]);
-
-  const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const filteredRegions = regions.filter(r => 
+    r.name.toLowerCase().includes(search.toLowerCase()) ||
+    r.code?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="p-6 space-y-4">
-      <Card className="border-none shadow-sm overflow-hidden">
-        <CardHeader className="bg-white border-b p-6 flex flex-row items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
-              <Globe className="h-6 w-6 text-white" />
+    <div className="space-y-4">
+      <Card className="w-full relative min-h-[500px] border-none shadow-sm">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
+            <Spinner label="Loading regions..." size="lg" />
+          </div>
+        )}
+
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 border-b mb-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-2 rounded-lg">
+              <Globe className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-2xl font-black uppercase tracking-tight text-slate-900">Regions</CardTitle>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Geographic Administrative Units</p>
+              <CardTitle className="text-2xl font-bold">Administrative Regions</CardTitle>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Manage high-level geographical divisions</p>
             </div>
           </div>
-          <Button onClick={() => setIsAddOpen(true)} className="bg-slate-900 hover:bg-black text-white font-black uppercase text-[10px] tracking-widest h-11 px-6 rounded-xl">
-            <PlusCircle className="h-4 w-4 mr-2" /> Add New Region
-          </Button>
+
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-9 rounded-xl border-slate-200 gap-2"
+              onClick={fetchRegions}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+              Refresh
+            </Button>
+            <Button 
+              size="sm" 
+              className="h-9 rounded-xl gap-2 px-4"
+              onClick={() => setIsAddOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Add Region
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="mb-6 relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input 
-              placeholder="Search regions..." 
-              className="pl-10 h-11 border-slate-200 rounded-xl focus:ring-slate-100"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+
+        <CardContent>
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search regions by name or code..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-10 h-10 rounded-xl border-slate-200 focus:ring-slate-100"
+              />
+            </div>
+            <Button variant="ghost" size="sm" className="text-slate-500 gap-2">
+              <Filter className="h-4 w-4" />
+              Filters
+            </Button>
           </div>
 
-          <div className="border border-slate-100 rounded-2xl overflow-hidden">
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
             <Table>
               <TableHeader className="bg-slate-50/50">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500 px-6">Code</TableHead>
+                <TableRow className="hover:bg-transparent border-b border-slate-200">
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">Region Name</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">REO Details</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Location</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Code</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Created At</TableHead>
                   <TableHead className="text-right text-[10px] font-black uppercase text-slate-500 px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
-                {loading ? (
-                  <TableRow><TableCell colSpan={5} className="h-40 text-center"><Spinner /></TableCell></TableRow>
-                ) : paginatedData.map((region) => (
-                  <TableRow key={region.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="px-6 font-mono text-xs font-bold text-slate-400">{region.region_code}</TableCell>
-                    <TableCell className="font-black text-slate-900 uppercase tracking-tight">{region.region_name}</TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <p className="text-xs font-bold text-slate-700">{region.reo || 'N/A'}</p>
-                        <div className="flex gap-3">
-                          {region.reo_email && <span className="flex items-center gap-1 text-[10px] text-slate-400"><Mail className="h-3 w-3" /> {region.reo_email}</span>}
-                          {region.reo_phone && <span className="flex items-center gap-1 text-[10px] text-slate-400"><Phone className="h-3 w-3" /> {region.reo_phone}</span>}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-500 font-medium">{region.town}, {region.postal_address}</TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-blue-50 hover:text-blue-600" onClick={() => { setSelectedRegion(region); setIsEditOpen(true); }}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-red-50 hover:text-red-600" onClick={() => handleDelete(region)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                {filteredRegions.length === 0 && !loading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                      No regions found.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredRegions.map((region) => (
+                    <TableRow key={region.id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                            <MapPin className="h-4 w-4 text-slate-500" />
+                          </div>
+                          <span className="font-bold text-slate-700">{region.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <code className="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-600">
+                          {region.code || 'N/A'}
+                        </code>
+                      </TableCell>
+                      <TableCell className="text-xs text-slate-500">
+                        {new Date(region.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-slate-900 transition-all"
+                            onClick={() => setEditingRegion(region)}
+                          >
+                            <Edit2 className="h-3.5 w-3.5 text-slate-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
-          </div>
-          <div className="mt-6 flex justify-center">
-            <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
         </CardContent>
       </Card>
 
-      <AddRegionDrawer open={isAddOpen} onOpenChange={setIsAddOpen} onSuccess={fetchRegions} />
-      <EditRegionDrawer open={isEditOpen} onOpenChange={setIsEditOpen} region={selectedRegion} onSuccess={fetchRegions} />
+      <AddRegionDrawer 
+        open={isAddOpen} 
+        onOpenChange={setIsAddOpen} 
+        onSuccess={fetchRegions} 
+      />
+      
+      <EditRegionDrawer 
+        region={editingRegion} 
+        open={!!editingRegion} 
+        onOpenChange={(open) => !open && setEditingRegion(null)} 
+        onSuccess={fetchRegions} 
+      />
     </div>
   );
 };
 
-export default RegionsPage;
+export default Regions;

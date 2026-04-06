@@ -1,169 +1,195 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  PlusCircle, Edit, Trash2, MapPin, Search, Layers
+  Search, Plus, Map, RefreshCw, Navigation, Edit2, Filter
 } from "lucide-react";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { showSuccess, showError } from "@/utils/toast";
-import { showStyledSwal } from '@/utils/alerts';
-import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
+import { cn } from "@/lib/utils";
 import { AddDistrictDrawer, EditDistrictDrawer } from "@/components/settings/DistrictDrawers";
-import { logDataChange } from "@/utils/auditLogger";
+import { toast } from "sonner";
 
-const DistrictsPage = () => {
+const Districts = () => {
   const [districts, setDistricts] = useState<any[]>([]);
-  const [regions, setRegions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [selectedDistrict, setSelectedDistrict] = useState<any>(null);
+  const [editingDistrict, setEditingDistrict] = useState<any>(null);
 
   useEffect(() => {
-    document.title = "Districts Management | NEAS";
-    fetchData();
+    document.title = "Settings - Districts | NEAS";
+    fetchDistricts();
   }, []);
 
-  const fetchData = async () => {
+  const fetchDistricts = async () => {
     setLoading(true);
-    const { data: regData } = await supabase.from('regions').select('region_code, region_name');
-    const { data: distData, error } = await supabase.from('districts').select('*').order('district_name');
-    
-    if (error) showError(error.message);
-    else {
-      setRegions(regData || []);
-      setDistricts(distData || []);
+    try {
+      const { data, error } = await supabase
+        .from('districts')
+        .select(`
+          *,
+          regions (name)
+        `)
+        .order('name');
+      if (error) throw error;
+      setDistricts(data || []);
+    } catch (err) {
+      toast.error("Failed to load districts");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleDelete = async (district: any) => {
-    showStyledSwal({
-      title: 'Delete District?',
-      html: `Are you sure you want to delete <b>${district.district_name}</b>?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        const { error } = await supabase.from('districts').delete().eq('id', district.id);
-        if (error) showError(error.message);
-        else {
-          await logDataChange({
-            table_name: 'districts',
-            record_id: district.id,
-            action_type: 'DELETE',
-            old_data: district
-          });
-          showSuccess("District deleted successfully");
-          fetchData();
-        }
-      }
-    });
-  };
-
-  const filteredData = useMemo(() => {
-    return districts.filter(d => 
-      d.district_name.toLowerCase().includes(search.toLowerCase()) ||
-      d.district_number.toString().includes(search)
-    );
-  }, [districts, search]);
-
-  const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
-  const getRegionName = (code: number) => {
-    return regions.find(r => r.region_code === code)?.region_name || 'Unknown';
-  };
+  const filteredDistricts = districts.filter(d => 
+    d.name.toLowerCase().includes(search.toLowerCase()) ||
+    d.regions?.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="p-6 space-y-4">
-      <Card className="border-none shadow-sm overflow-hidden">
-        <CardHeader className="bg-white border-b p-6 flex flex-row items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Layers className="h-6 w-6 text-white" />
+    <div className="space-y-4">
+      <Card className="w-full relative min-h-[500px] border-none shadow-sm">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
+            <Spinner label="Loading districts..." size="lg" />
+          </div>
+        )}
+
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 border-b mb-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-2 rounded-lg">
+              <Map className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-2xl font-black uppercase tracking-tight text-slate-900">Districts</CardTitle>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Local Government Authorities</p>
+              <CardTitle className="text-2xl font-bold">Districts</CardTitle>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Manage local administrative districts</p>
             </div>
           </div>
-          <Button onClick={() => setIsAddOpen(true)} className="bg-slate-900 hover:bg-black text-white font-black uppercase text-[10px] tracking-widest h-11 px-6 rounded-xl">
-            <PlusCircle className="h-4 w-4 mr-2" /> Add New District
-          </Button>
+
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-9 rounded-xl border-slate-200 gap-2"
+              onClick={fetchDistricts}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+              Refresh
+            </Button>
+            <Button 
+              size="sm" 
+              className="h-9 rounded-xl gap-2 px-4"
+              onClick={() => setIsAddOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Add District
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="mb-6 relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input 
-              placeholder="Search districts..." 
-              className="pl-10 h-11 border-slate-200 rounded-xl focus:ring-slate-100"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+
+        <CardContent>
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search districts or regions..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-10 h-10 rounded-xl border-slate-200 focus:ring-slate-100"
+              />
+            </div>
+            <Button variant="ghost" size="sm" className="text-slate-500 gap-2">
+              <Filter className="h-4 w-4" />
+              Filters
+            </Button>
           </div>
 
-          <div className="border border-slate-100 rounded-2xl overflow-hidden">
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
             <Table>
               <TableHeader className="bg-slate-50/50">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500 px-6">Dist. No</TableHead>
+                <TableRow className="hover:bg-transparent border-b border-slate-200">
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">District Name</TableHead>
                   <TableHead className="text-[10px] font-black uppercase text-slate-500">Parent Region</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Full Form</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Code</TableHead>
                   <TableHead className="text-right text-[10px] font-black uppercase text-slate-500 px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
-                {loading ? (
-                  <TableRow><TableCell colSpan={5} className="h-40 text-center"><Spinner /></TableCell></TableRow>
-                ) : paginatedData.map((dist) => (
-                  <TableRow key={dist.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="px-6 font-mono text-xs font-bold text-slate-400">{dist.district_number}</TableCell>
-                    <TableCell className="font-black text-slate-900 uppercase tracking-tight">{dist.district_name}</TableCell>
-                    <TableCell>
-                      <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black uppercase text-slate-600">
-                        {getRegionName(dist.region_number)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-500 font-medium">{dist.full_form || '—'}</TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-blue-50 hover:text-blue-600" onClick={() => { setSelectedDistrict(dist); setIsEditOpen(true); }}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-red-50 hover:text-red-600" onClick={() => handleDelete(dist)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                {filteredDistricts.length === 0 && !loading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-20 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                      No districts found.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredDistricts.map((district) => (
+                    <TableRow key={district.id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                            <Navigation className="h-4 w-4 text-slate-500" />
+                          </div>
+                          <span className="font-bold text-slate-700">{district.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100 font-bold text-[10px] uppercase tracking-tight">
+                          {district.regions?.name || 'Unassigned'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <code className="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-600">
+                          {district.code || 'N/A'}
+                        </code>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-slate-900 transition-all"
+                            onClick={() => setEditingDistrict(district)}
+                          >
+                            <Edit2 className="h-3.5 w-3.5 text-slate-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
-          </div>
-          <div className="mt-6 flex justify-center">
-            <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
         </CardContent>
       </Card>
 
-      <AddDistrictDrawer open={isAddOpen} onOpenChange={setIsAddOpen} regions={regions} onSuccess={fetchData} />
-      <EditDistrictDrawer open={isEditOpen} onOpenChange={setIsEditOpen} district={selectedDistrict} regions={regions} onSuccess={fetchData} />
+      <AddDistrictDrawer 
+        open={isAddOpen} 
+        onOpenChange={setIsAddOpen} 
+        onSuccess={fetchDistricts} 
+      />
+      
+      <EditDistrictDrawer 
+        district={editingDistrict} 
+        open={!!editingDistrict} 
+        onOpenChange={(open) => !open && setEditingDistrict(null)} 
+        onSuccess={fetchDistricts} 
+      />
     </div>
   );
 };
 
-export default DistrictsPage;
+export default Districts;
