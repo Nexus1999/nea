@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  PlusCircle, Edit, Trash2, ArrowUpDown, Eye, Globe, AlertTriangle 
+  PlusCircle, Edit, Trash2, ArrowUpDown, Eye, Globe, AlertTriangle, Phone, Mail 
 } from "lucide-react";
 import {
   Table,
@@ -25,6 +25,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
@@ -51,6 +58,9 @@ const Regions = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingRegion, setEditingRegion] = useState<Region | null>(null);
+
+  const [viewingRegion, setViewingRegion] = useState<Region | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
 
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -85,6 +95,11 @@ const Regions = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewClick = (region: Region) => {
+    setViewingRegion(region);
+    setIsViewOpen(true);
   };
 
   const handleEditClick = (region: Region) => {
@@ -136,8 +151,7 @@ const Regions = () => {
         r.region_name?.toLowerCase().includes(term) ||
         r.region_code?.toString().includes(term) ||
         r.town?.toLowerCase().includes(term) ||
-        r.reo?.toLowerCase().includes(term) ||
-        r.reo_email?.toLowerCase().includes(term)
+        r.reo?.toLowerCase().includes(term)
       );
     }
 
@@ -215,7 +229,7 @@ const Regions = () => {
                     Region Name <ArrowUpDown className="ml-2 h-3 w-3 inline" />
                   </TableHead>
                   <TableHead>Town</TableHead>
-                  <TableHead>REO Details</TableHead>
+                  <TableHead>REO Information</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -237,26 +251,19 @@ const Regions = () => {
                       <TableCell className="font-medium">{region.region_name}</TableCell>
                       <TableCell>{region.town || '—'}</TableCell>
 
-                      {/* REO Details as Chips/Pills */}
+                      {/* One Beautiful REO Pill */}
                       <TableCell>
-                        <div className="flex flex-wrap gap-1.5">
-                          {region.reo && (
-                            <div className="bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-full font-medium">
-                              {region.reo}
-                            </div>
-                          )}
+                        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-2xl px-4 py-2 text-sm">
+                          <div className="font-semibold text-slate-700">{region.reo || 'No REO'}</div>
                           {region.reo_phone && (
-                            <div className="bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full font-medium">
-                              📞 {region.reo_phone}
+                            <div className="flex items-center gap-1 text-green-600 text-xs">
+                              <Phone className="h-3.5 w-3.5" /> {region.reo_phone}
                             </div>
                           )}
                           {region.reo_email && (
-                            <div className="bg-purple-50 text-purple-700 text-xs px-2.5 py-1 rounded-full font-medium">
-                              ✉️ {region.reo_email}
+                            <div className="flex items-center gap-1 text-purple-600 text-xs">
+                              <Mail className="h-3.5 w-3.5" /> {region.reo_email}
                             </div>
-                          )}
-                          {!region.reo && !region.reo_phone && !region.reo_email && (
-                            <span className="text-slate-400 text-xs">—</span>
                           )}
                         </div>
                       </TableCell>
@@ -268,6 +275,7 @@ const Regions = () => {
                             size="icon"
                             className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             title="View Details"
+                            onClick={() => handleViewClick(region)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -313,14 +321,13 @@ const Regions = () => {
         </CardContent>
       </Card>
 
-      {/* Add Drawer */}
+      {/* Add & Edit Drawers */}
       <AddRegionDrawer 
         open={isAddOpen} 
         onOpenChange={setIsAddOpen} 
         onSuccess={fetchRegions} 
       />
 
-      {/* Edit Drawer */}
       <EditRegionDrawer 
         region={editingRegion} 
         open={isEditOpen} 
@@ -331,7 +338,51 @@ const Regions = () => {
         onSuccess={fetchRegions} 
       />
 
-      {/* Delete Confirmation Dialog */}
+      {/* View Details Drawer (Inline) */}
+      <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+        <DialogContent className="max-w-lg rounded-3xl p-8">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center">
+              {viewingRegion?.region_name}
+            </DialogTitle>
+            <DialogDescription className="text-center text-slate-500">
+              Code: {viewingRegion?.region_code}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 mt-6">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">Town</p>
+              <p className="font-medium">{viewingRegion?.town || 'Not provided'}</p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">Postal Address</p>
+              <p className="font-medium">{viewingRegion?.postal_address || 'Not provided'}</p>
+            </div>
+
+            <div className="pt-4 border-t">
+              <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">REO Information</p>
+              <div className="bg-slate-50 rounded-2xl p-5 space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Name</span>
+                  <span className="font-semibold">{viewingRegion?.reo || '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Phone</span>
+                  <span className="font-semibold">{viewingRegion?.reo_phone || '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Email</span>
+                  <span className="font-semibold text-purple-600">{viewingRegion?.reo_email || '—'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
         if (!deleteLoading) setDeleteDialogOpen(open);
       }}>
@@ -352,10 +403,7 @@ const Regions = () => {
           </AlertDialogHeader>
 
           <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
-            <AlertDialogCancel 
-              disabled={deleteLoading}
-              className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl"
-            >
+            <AlertDialogCancel disabled={deleteLoading} className="flex-1 h-11 font-bold uppercase text-[10px] tracking-widest rounded-xl">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
