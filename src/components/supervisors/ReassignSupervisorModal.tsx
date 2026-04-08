@@ -121,11 +121,18 @@ const ReassignSupervisorModal = ({
     }
   };
 
+  const isReserve = useMemo(() => {
+    return currentAssignment?.center_no?.toUpperCase().includes('RESERVE');
+  }, [currentAssignment]);
+
   const targetCenters = useMemo(() => {
     if (!currentAssignment?.center_no) return [];
     const centerNo = currentAssignment.center_no;
-    const centers = [centerNo];
     
+    // Reserves don't have linked centers
+    if (isReserve) return [centerNo];
+
+    const centers = [centerNo];
     const match = centerNo.match(/^([SP])(\d+)$/);
     if (match) {
       const type = match[1];
@@ -134,7 +141,7 @@ const ReassignSupervisorModal = ({
       centers.push(`${linkedType}${number}`);
     }
     return centers;
-  }, [currentAssignment]);
+  }, [currentAssignment, isReserve]);
 
   const handleSupervisorSelect = (supervisor: any) => {
     setFormData((prev) => ({
@@ -235,35 +242,47 @@ const ReassignSupervisorModal = ({
 
         if (insertError) throw insertError;
 
-        // Handle linked center
-        const linkedCenter = targetCenters.find(c => c !== currentAssignment.center_no);
-        if (linkedCenter) {
-          const { data: updated } = await supabase
-            .from('supervisorassignments')
-            .update(updateData)
-            .eq('supervision_id', supervisionId)
-            .eq('center_no', linkedCenter)
-            .select();
+        // Handle linked center (only for non-reserves)
+        if (!isReserve) {
+          const linkedCenter = targetCenters.find(c => c !== currentAssignment.center_no);
+          if (linkedCenter) {
+            const { data: updated } = await supabase
+              .from('supervisorassignments')
+              .update(updateData)
+              .eq('supervision_id', supervisionId)
+              .eq('center_no', linkedCenter)
+              .select();
 
-          if (!updated || updated.length === 0) {
-            await supabase.from('supervisorassignments').insert({
-              ...updateData,
-              supervision_id: supervisionId,
-              center_no: linkedCenter,
-              region: currentAssignment.region,
-              district: currentAssignment.district,
-            });
+            if (!updated || updated.length === 0) {
+              await supabase.from('supervisorassignments').insert({
+                ...updateData,
+                supervision_id: supervisionId,
+                center_no: linkedCenter,
+                region: currentAssignment.region,
+                district: currentAssignment.district,
+              });
+            }
           }
         }
       } else {
-        // Update all linked centers at once
-        const { error: updateError } = await supabase
-          .from('supervisorassignments')
-          .update(updateData)
-          .eq('supervision_id', supervisionId)
-          .in('center_no', targetCenters);
+        // If it's a reserve, update ONLY this specific assignment record
+        if (isReserve) {
+          const { error: updateError } = await supabase
+            .from('supervisorassignments')
+            .update(updateData)
+            .eq('assignment_id', currentAssignment.assignment_id);
 
-        if (updateError) throw updateError;
+          if (updateError) throw updateError;
+        } else {
+          // Update all linked centers at once for normal centers
+          const { error: updateError } = await supabase
+            .from('supervisorassignments')
+            .update(updateData)
+            .eq('supervision_id', supervisionId)
+            .in('center_no', targetCenters);
+
+          if (updateError) throw updateError;
+        }
       }
 
       showSuccess(currentAssignment.isPlaceholder ? 'Supervisor assigned' : 'Supervisor reassigned');
