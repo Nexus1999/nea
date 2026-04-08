@@ -37,8 +37,6 @@ const filter = createFilterOptions({
   stringify: (option: any) => option.searchBlob,
 });
 
-const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
-
 interface ReassignSupervisorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -192,32 +190,57 @@ const ReassignSupervisorModal = ({
     setLoading(true);
     setIsConfirmOpen(false);
     try {
-      const payload = {
-        supervision_id: supervisionId,
-        center_no: currentAssignment.center_no,
+      const updateData = {
         supervisor_name: formData.newSupervisor.full_name,
         workstation: formData.newSupervisor.center_no,
         phone: formData.newSupervisor.phone,
-        region: currentAssignment.region,
-        district: currentAssignment.district,
         assigned_by: 'system_admin'
       };
 
-      let error;
       if (currentAssignment.isPlaceholder) {
-        ({ error } = await supabase.from('supervisorassignments').insert(payload));
-      } else {
-        ({ error } = await supabase
-          .from('supervisorassignments')
-          .update({
-            supervisor_name: payload.supervisor_name,
-            workstation: payload.workstation,
-            phone: payload.phone
-          })
-          .eq('assignment_id', currentAssignment.assignment_id));
-      }
+        // Insert for the primary center
+        const { error: insertError } = await supabase.from('supervisorassignments').insert({
+          ...updateData,
+          supervision_id: supervisionId,
+          center_no: currentAssignment.center_no,
+          region: currentAssignment.region,
+          district: currentAssignment.district,
+        });
 
-      if (error) throw error;
+        if (insertError) throw insertError;
+
+        // Check if linked center exists and update it if it's already assigned, 
+        // or insert if it's also a placeholder (missing record)
+        const linkedCenter = targetCenters.find(c => c !== currentAssignment.center_no);
+        if (linkedCenter) {
+          const { data: updated } = await supabase
+            .from('supervisorassignments')
+            .update(updateData)
+            .eq('supervision_id', supervisionId)
+            .eq('center_no', linkedCenter)
+            .select();
+
+          if (!updated || updated.length === 0) {
+            // If no record was updated, it means the linked center is also a placeholder
+            await supabase.from('supervisorassignments').insert({
+              ...updateData,
+              supervision_id: supervisionId,
+              center_no: linkedCenter,
+              region: currentAssignment.region,
+              district: currentAssignment.district,
+            });
+          }
+        }
+      } else {
+        // Update all linked centers for this supervision at once
+        const { error: updateError } = await supabase
+          .from('supervisorassignments')
+          .update(updateData)
+          .eq('supervision_id', supervisionId)
+          .in('center_no', targetCenters);
+
+        if (updateError) throw updateError;
+      }
 
       showSuccess(currentAssignment.isPlaceholder ? 'Supervisor assigned' : 'Supervisor reassigned');
       onClose();
@@ -335,7 +358,7 @@ const ReassignSupervisorModal = ({
               <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">Confirm Assignment?</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
-              Assign <strong>{formData.newSupervisor?.full_name}</strong> to <strong>{currentAssignment?.location}</strong>?
+              Assign <strong>{formData.newSupervisor?.full_name}</strong> to <strong>{targetCenters.join(' & ')}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
