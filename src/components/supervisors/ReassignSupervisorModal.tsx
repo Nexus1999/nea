@@ -37,8 +37,6 @@ const filter = createFilterOptions({
   stringify: (option: any) => option.searchBlob,
 });
 
-const UALIMU_CODES = ["GATCE", "DSEE", "GATSCCE", "DPEE", "DSPEE", "DPPEE"];
-
 interface ReassignSupervisorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -123,11 +121,18 @@ const ReassignSupervisorModal = ({
     }
   };
 
+  const isReserve = useMemo(() => {
+    return currentAssignment?.center_no?.toUpperCase().includes('RESERVE');
+  }, [currentAssignment]);
+
   const targetCenters = useMemo(() => {
     if (!currentAssignment?.center_no) return [];
     const centerNo = currentAssignment.center_no;
-    const centers = [centerNo];
     
+    // Reserves don't have linked centers
+    if (isReserve) return [centerNo];
+
+    const centers = [centerNo];
     const match = centerNo.match(/^([SP])(\d+)$/);
     if (match) {
       const type = match[1];
@@ -136,7 +141,7 @@ const ReassignSupervisorModal = ({
       centers.push(`${linkedType}${number}`);
     }
     return centers;
-  }, [currentAssignment]);
+  }, [currentAssignment, isReserve]);
 
   const handleSupervisorSelect = (supervisor: any) => {
     setFormData((prev) => ({
@@ -153,6 +158,7 @@ const ReassignSupervisorModal = ({
     const supervisorWorkstation = formData.newSupervisor.center_no?.trim().toUpperCase();
     const isSelfSupervising = targetCenters.some(c => c.trim().toUpperCase() === supervisorWorkstation);
 
+    // 1. Self-Supervision Conflict
     if (isSelfSupervising) {
       setErrorDialog({
         open: true,
@@ -162,8 +168,33 @@ const ReassignSupervisorModal = ({
       return;
     }
 
+    // 2. ACSEE vs Ualimu Exclusion
+    const isUalimuSupervisor = supervisorWorkstation.startsWith('U');
+    const isSecondarySupervisor = supervisorWorkstation.startsWith('S');
+    const isUalimuExam = ['GATCE', 'GATSCCE', 'DTEE', 'DSEE'].includes(examCode.toUpperCase());
+    const isACSEEExam = examCode.toUpperCase() === 'ACSEE';
+
+    if (isACSEEExam && isUalimuSupervisor) {
+      setErrorDialog({
+        open: true,
+        title: 'Exclusion Conflict',
+        message: `Supervisors from Ualimu centers (${supervisorWorkstation}) cannot supervise ACSEE examinations.`
+      });
+      return;
+    }
+
+    if (isUalimuExam && isSecondarySupervisor) {
+      setErrorDialog({
+        open: true,
+        title: 'Exclusion Conflict',
+        message: `Supervisors from Secondary centers (${supervisorWorkstation}) cannot supervise Ualimu examinations.`
+      });
+      return;
+    }
+
     setLoading(true);
     try {
+      // 3. Already Assigned Conflict
       const { data: currentConflicts } = await supabase
         .from('supervisorassignments')
         .select('assignment_id')
@@ -192,32 +223,67 @@ const ReassignSupervisorModal = ({
     setLoading(true);
     setIsConfirmOpen(false);
     try {
-      const payload = {
-        supervision_id: supervisionId,
-        center_no: currentAssignment.center_no,
+      const updateData = {
         supervisor_name: formData.newSupervisor.full_name,
         workstation: formData.newSupervisor.center_no,
         phone: formData.newSupervisor.phone,
-        region: currentAssignment.region,
-        district: currentAssignment.district,
         assigned_by: 'system_admin'
       };
 
-      let error;
       if (currentAssignment.isPlaceholder) {
-        ({ error } = await supabase.from('supervisorassignments').insert(payload));
-      } else {
-        ({ error } = await supabase
-          .from('supervisorassignments')
-          .update({
-            supervisor_name: payload.supervisor_name,
-            workstation: payload.workstation,
-            phone: payload.phone
-          })
-          .eq('assignment_id', currentAssignment.assignment_id));
-      }
+        // Insert for the primary center
+        const { error: insertError } = await supabase.from('supervisorassignments').insert({
+          ...updateData,
+          supervision_id: supervisionId,
+          center_no: currentAssignment.center_no,
+          region: currentAssignment.region,
+          district: currentAssignment.district,
+        });
 
-      if (error) throw error;
+        if (insertError) throw insertError;
+
+        // Handle linked center (only for non-reserves)
+        if (!isReserve) {
+          const linkedCenter = targetCenters.find(c => c !== currentAssignment.center_no);
+          if (linkedCenter) {
+            const { data: updated } = await supabase
+              .from('supervisorassignments')
+              .update(updateData)
+              .eq('supervision_id', supervisionId)
+              .eq('center_no', linkedCenter)
+              .select();
+
+            if (!updated || updated.length === 0) {
+              await supabase.from('supervisorassignments').insert({
+                ...updateData,
+                supervision_id: supervisionId,
+                center_no: linkedCenter,
+                region: currentAssignment.region,
+                district: currentAssignment.district,
+              });
+            }
+          }
+        }
+      } else {
+        // If it's a reserve, update ONLY this specific assignment record
+        if (isReserve) {
+          const { error: updateError } = await supabase
+            .from('supervisorassignments')
+            .update(updateData)
+            .eq('assignment_id', currentAssignment.assignment_id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Update all linked centers at once for normal centers
+          const { error: updateError } = await supabase
+            .from('supervisorassignments')
+            .update(updateData)
+            .eq('supervision_id', supervisionId)
+            .in('center_no', targetCenters);
+
+          if (updateError) throw updateError;
+        }
+      }
 
       showSuccess(currentAssignment.isPlaceholder ? 'Supervisor assigned' : 'Supervisor reassigned');
       onClose();
@@ -335,7 +401,7 @@ const ReassignSupervisorModal = ({
               <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">Confirm Assignment?</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-sm text-slate-500 text-center leading-relaxed">
-              Assign <strong>{formData.newSupervisor?.full_name}</strong> to <strong>{currentAssignment?.location}</strong>?
+              Assign <strong>{formData.newSupervisor?.full_name}</strong> to <strong>{targetCenters.join(' & ')}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row items-center gap-3 mt-6">
