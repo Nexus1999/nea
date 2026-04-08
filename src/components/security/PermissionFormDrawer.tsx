@@ -96,7 +96,7 @@ const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpe
     try {
       const payload = {
         name: generatedName,
-        description: description || `Permission to ${actionon ${subModule || parentModule}`
+        description: description || `Permission to ${action} on ${subModule || parentModule}`
       };
 
       if (isEditing) {
