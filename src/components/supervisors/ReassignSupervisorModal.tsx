@@ -151,6 +151,7 @@ const ReassignSupervisorModal = ({
     const supervisorWorkstation = formData.newSupervisor.center_no?.trim().toUpperCase();
     const isSelfSupervising = targetCenters.some(c => c.trim().toUpperCase() === supervisorWorkstation);
 
+    // 1. Self-Supervision Conflict
     if (isSelfSupervising) {
       setErrorDialog({
         open: true,
@@ -160,8 +161,33 @@ const ReassignSupervisorModal = ({
       return;
     }
 
+    // 2. ACSEE vs Ualimu Exclusion
+    const isUalimuSupervisor = supervisorWorkstation.startsWith('U');
+    const isSecondarySupervisor = supervisorWorkstation.startsWith('S');
+    const isUalimuExam = ['GATCE', 'GATSCCE', 'DTEE', 'DSEE'].includes(examCode.toUpperCase());
+    const isACSEEExam = examCode.toUpperCase() === 'ACSEE';
+
+    if (isACSEEExam && isUalimuSupervisor) {
+      setErrorDialog({
+        open: true,
+        title: 'Exclusion Conflict',
+        message: `Supervisors from Ualimu centers (${supervisorWorkstation}) cannot supervise ACSEE examinations.`
+      });
+      return;
+    }
+
+    if (isUalimuExam && isSecondarySupervisor) {
+      setErrorDialog({
+        open: true,
+        title: 'Exclusion Conflict',
+        message: `Supervisors from Secondary centers (${supervisorWorkstation}) cannot supervise Ualimu examinations.`
+      });
+      return;
+    }
+
     setLoading(true);
     try {
+      // 3. Already Assigned Conflict
       const { data: currentConflicts } = await supabase
         .from('supervisorassignments')
         .select('assignment_id')
@@ -209,8 +235,7 @@ const ReassignSupervisorModal = ({
 
         if (insertError) throw insertError;
 
-        // Check if linked center exists and update it if it's already assigned, 
-        // or insert if it's also a placeholder (missing record)
+        // Handle linked center
         const linkedCenter = targetCenters.find(c => c !== currentAssignment.center_no);
         if (linkedCenter) {
           const { data: updated } = await supabase
@@ -221,7 +246,6 @@ const ReassignSupervisorModal = ({
             .select();
 
           if (!updated || updated.length === 0) {
-            // If no record was updated, it means the linked center is also a placeholder
             await supabase.from('supervisorassignments').insert({
               ...updateData,
               supervision_id: supervisionId,
@@ -232,7 +256,7 @@ const ReassignSupervisorModal = ({
           }
         }
       } else {
-        // Update all linked centers for this supervision at once
+        // Update all linked centers at once
         const { error: updateError } = await supabase
           .from('supervisorassignments')
           .update(updateData)
