@@ -8,9 +8,11 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  userRole: string | null;
   permissions: string[];
   hasPermission: (permission: string) => boolean;
   refreshPermissions: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,36 +21,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
 
-  const fetchPermissions = async (userId: string) => {
+  const fetchUserData = async (userId: string) => {
     try {
+      // Fetch profile with role name
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('role_id')
-        .eq('id', userId)
-        .single();
-
-      if (profileError || !profile?.role_id) return;
-
-      const { data, error } = await supabase
-        .from('role_permissions')
         .select(`
-          permissions (
+          role_id,
+          roles (
             name
           )
         `)
-        .eq('role_id', profile.role_id);
+        .eq('id', userId)
+        .single();
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      const permList = data
-        ?.map((item: any) => item.permissions?.name)
-        .filter(Boolean) || [];
-      
-      setPermissions(permList);
+      if (profile?.roles) {
+        setUserRole((profile.roles as any).name);
+      }
+
+      // Fetch permissions for this role
+      if (profile?.role_id) {
+        const { data, error } = await supabase
+          .from('role_permissions')
+          .select(`
+            permissions (
+              name
+            )
+          `)
+          .eq('role_id', profile.role_id);
+
+        if (error) throw error;
+
+        const permList = data
+          ?.map((item: any) => item.permissions?.name)
+          .filter(Boolean) || [];
+        
+        setPermissions(permList);
+      }
     } catch (err) {
-      console.error("Error fetching permissions:", err);
+      console.error("Error fetching user data:", err);
     }
   };
 
@@ -56,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchPermissions(session.user.id);
+      if (session?.user) fetchUserData(session.user.id);
       setLoading(false);
     });
 
@@ -64,9 +80,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchPermissions(session.user.id);
+        fetchUserData(session.user.id);
       } else {
         setPermissions([]);
+        setUserRole(null);
       }
       setLoading(false);
     });
@@ -75,15 +92,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const hasPermission = (permission: string) => {
-    return permissions.includes(permission) || permissions.includes('ADMINISTRATOR');
+    return permissions.includes(permission) || userRole === 'ADMINISTRATOR';
   };
 
   const refreshPermissions = async () => {
-    if (user) await fetchPermissions(user.id);
+    if (user) await fetchUserData(user.id);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, permissions, hasPermission, refreshPermissions }}>
+    <AuthContext.Provider value={{ 
+      session, 
+      user, 
+      loading, 
+      userRole, 
+      permissions, 
+      hasPermission, 
+      refreshPermissions,
+      logout 
+    }}>
       {children}
     </AuthContext.Provider>
   );
