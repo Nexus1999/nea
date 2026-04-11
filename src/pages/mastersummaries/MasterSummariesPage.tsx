@@ -43,7 +43,6 @@ import { MasterSummary } from "@/types/mastersummaries";
 import { useNavigate } from 'react-router-dom';
 import Spinner from "@/components/Spinner";
 import { logDataChange } from "@/utils/auditLogger";
-import { usePermissions } from "@/hooks/usePermissions";
 
 const MasterSummariesPage = () => {
   const [masterSummaries, setMasterSummaries] = useState<MasterSummary[]>([]);
@@ -53,7 +52,6 @@ const MasterSummariesPage = () => {
   const [orderBy, setOrderBy] = useState<keyof MasterSummary>('Year');
   const [order, setOrder] = useState<'desc' | 'asc'>('desc');
   const navigate = useNavigate();
-  const { hasPermission } = usePermissions();
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -236,12 +234,10 @@ const MasterSummariesPage = () => {
 
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-2xl font-bold">Master Summaries</CardTitle>
-        {hasPermission('Master Summaries:add') && (
-          <Button size="sm" className="h-8 gap-1" onClick={handleAddMasterSummary} disabled={loading}>
-            <PlusCircle className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Add Master Summary</span>
-          </Button>
-        )}
+        <Button size="sm" className="h-8 gap-1" onClick={handleAddMasterSummary} disabled={loading}>
+          <PlusCircle className="h-3.5 w-3.5" />
+          <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Add Master Summary</span>
+        </Button>
       </CardHeader>
 
       <CardContent>
@@ -309,57 +305,49 @@ const MasterSummariesPage = () => {
                           <LayoutDashboard className="h-4 w-4" />
                         </Button>
 
-                        {hasPermission('Master Summaries:view details') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                            title="View Details"
-                            onClick={() => handleViewMasterSummaryDetails(summary.id)}
-                            disabled={loading}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                          title="View Details"
+                          onClick={() => handleViewMasterSummaryDetails(summary.id)}
+                          disabled={loading}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
 
-                        {hasPermission('Master Summaries:manage special needs') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
-                            title="Manage Special Needs"
-                            onClick={() => handleManageSpecialNeeds(summary.id)}
-                            disabled={loading}
-                          >
-                            <Accessibility className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                          title="Manage Special Needs"
+                          onClick={() => handleManageSpecialNeeds(summary.id)}
+                          disabled={loading}
+                        >
+                          <Accessibility className="h-4 w-4" />
+                        </Button>
 
-                        {hasPermission('Master Summaries:manage version') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                            title="Manage Versions"
-                            onClick={() => handleManageVersions(summary.id)}
-                            disabled={loading}
-                          >
-                            <GitBranch className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          title="Manage Versions"
+                          onClick={() => handleManageVersions(summary.id)}
+                          disabled={loading}
+                        >
+                          <GitBranch className="h-4 w-4" />
+                        </Button>
 
-                        {hasPermission('Master Summaries:delete') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-red-700 hover:bg-red-50"
-                            title="Delete Summary"
-                            onClick={() => requestDelete(summary.id, summary.Code, summary.Year)}
-                            disabled={loading}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-red-700 hover:bg-red-50"
+                          title="Delete Summary"
+                          onClick={() => requestDelete(summary.id, summary.Code, summary.Year)}
+                          disabled={loading}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

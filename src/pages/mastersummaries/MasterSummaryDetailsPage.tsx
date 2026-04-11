@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, Eye, Search, X, ShieldAlert } from "lucide-react";
+import { ArrowUpDown, Eye, Search, X } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -23,7 +23,6 @@ import PaginationControls from "@/components/ui/pagination-controls";
 import SecondarySchoolDetailsDrawer from "@/components/mastersummaries/SecondarySchoolDetailsDrawer";
 import { MasterSummary, MasterSummaryDetail, SecondaryMasterSummary } from "@/types/mastersummaries";
 import abbreviateSchoolName from "@/utils/abbreviateSchoolName";
-import { usePermissions } from "@/hooks/usePermissions";
 
 type DetailSortKey = keyof MasterSummaryDetail | 'center_name' | 'center_number' | 'region' | 'district';
 
@@ -33,8 +32,6 @@ const PRIMARY_CODES = ["SFNA", "SSNA", "PSLE"];
 
 const MasterSummaryDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { hasPermission } = usePermissions();
 
   const [masterSummary, setMasterSummary] = useState<MasterSummary | null>(null);
   const [allDetails, setAllDetails] = useState<MasterSummaryDetail[]>([]);
@@ -61,11 +58,6 @@ const MasterSummaryDetailsPage: React.FC = () => {
   useEffect(() => {
     document.title = "Summary Details | NEAS";
     if (!id) return;
-
-    if (!hasPermission('Master Summaries:view details')) {
-      setLoading(false);
-      return;
-    }
 
     const fetchData = async () => {
       setLoading(true);
@@ -119,7 +111,7 @@ const MasterSummaryDetailsPage: React.FC = () => {
     };
 
     fetchData();
-  }, [id, hasPermission]);
+  }, [id]);
 
   // Client-side filtering + sorting + pagination
   const filteredAndSortedData = useMemo(() => {
@@ -171,6 +163,9 @@ const MasterSummaryDetailsPage: React.FC = () => {
     setCurrentPage(1);
   };
 
+  // Column count for the empty-state colspan
+  const colSpan = isPrimary ? 8 : hasDetailDrawer ? 6 : 5;
+
   if (loading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
@@ -178,20 +173,6 @@ const MasterSummaryDetailsPage: React.FC = () => {
       </div>
     );
   }
-
-  if (!hasPermission('Master Summaries:view details')) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
-        <ShieldAlert className="h-16 w-16 text-red-500" />
-        <h2 className="text-2xl font-bold text-slate-900">Access Denied</h2>
-        <p className="text-slate-500">You do not have permission to view master summary details.</p>
-        <Button onClick={() => navigate(-1)}>Go Back</Button>
-      </div>
-    );
-  }
-
-  // Column count for the empty-state colspan
-  const colSpan = isPrimary ? 8 : hasDetailDrawer ? 6 : 5;
 
   return (
     <div className="space-y-4 p-4">

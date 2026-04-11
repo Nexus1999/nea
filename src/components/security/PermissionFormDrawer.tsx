@@ -26,7 +26,7 @@ import { Loader2, Shield } from "lucide-react";
 const MODULES = [
   { name: 'Timetables', actions: ['view', 'add', 'edit', 'delete'] },
   { name: 'Budgets', actions: ['view', 'add', 'edit', 'delete', 'approve'] },
-  { name: 'Master Summaries', actions: ['view', 'view details', 'add', 'delete', 'manage version', 'manage special needs'] },
+  { name: 'Master Summaries', actions: ['view', 'add', 'delete', 'manage version', 'manage special needs'] },
   { name: 'Supervisors', actions: ['view', 'add supervisor', 'assign supervisors', 'reshuffle supervisors'] },
   { name: 'Security', subModels: ['Users', 'Roles', 'Permissions', 'Audit'], actions: ['view'] },
   { name: 'Settings', subModels: ['Regions', 'Districts', 'Examinations', 'Subjects'], actions: ['view'] },

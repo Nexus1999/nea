@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Accessibility, Loader2, UploadCloud, Eye, Trash2, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Accessibility, Loader2, UploadCloud, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { MasterSummary, SpecialNeedType } from "@/types/mastersummaries";
@@ -12,7 +12,6 @@ import SpecialNeedsMasterSummaryForm from "@/components/mastersummaries/SpecialN
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { showStyledSwal } from '@/utils/alerts';
 import { logDataChange } from "@/utils/auditLogger";
-import { usePermissions } from "@/hooks/usePermissions";
 
 interface SpecialNeedsSummaryRow {
   special_need: SpecialNeedType;
@@ -22,7 +21,6 @@ interface SpecialNeedsSummaryRow {
 const SpecialNeedsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { hasPermission } = usePermissions();
 
   const [masterSummary, setMasterSummary] = useState<MasterSummary | null>(null);
   const [specialNeedsSummary, setSpecialNeedsSummary] = useState<SpecialNeedsSummaryRow[]>([]);
@@ -49,11 +47,6 @@ const SpecialNeedsPage: React.FC = () => {
   }
 
   const fetchSpecialNeedsData = useCallback(async () => {
-    if (!hasPermission('Master Summaries:manage special needs')) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setSpecialNeedsSummary([]);
 
@@ -120,7 +113,7 @@ const SpecialNeedsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, hasPermission]);
+  }, [id]);
 
   useEffect(() => {
     fetchSpecialNeedsData();
@@ -203,17 +196,6 @@ const SpecialNeedsPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-10 w-10 animate-spin text-neas-green" />
-      </div>
-    );
-  }
-
-  if (!hasPermission('Master Summaries:manage special needs')) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
-        <ShieldAlert className="h-16 w-16 text-red-500" />
-        <h2 className="text-2xl font-bold text-slate-900">Access Denied</h2>
-        <p className="text-slate-500">You do not have permission to manage special needs data.</p>
-        <Button onClick={() => navigate(-1)}>Go Back</Button>
       </div>
     );
   }
