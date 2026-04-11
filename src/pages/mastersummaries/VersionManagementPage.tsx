@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, GitBranch, Loader2, Eye, History, Trash2, CheckCircle, UploadCloud } from "lucide-react";
+import { ArrowLeft, GitBranch, Loader2, Eye, History, Trash2, CheckCircle, UploadCloud, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { MasterSummary } from "@/types/mastersummaries";
@@ -22,11 +22,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { logDataChange } from "@/utils/auditLogger";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const VersionManagementPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const masterSummaryId = id;
   const navigate = useNavigate();
+  const { hasPermission } = usePermissions();
 
   const [masterSummary, setMasterSummary] = useState<MasterSummary | null>(null);
   const [allVersions, setAllVersions] = useState<MasterSummary[]>([]);
@@ -41,6 +43,11 @@ const VersionManagementPage: React.FC = () => {
   const [selectedVersion2, setSelectedVersion2] = useState<MasterSummary | null>(null);
 
   const fetchVersions = useCallback(async () => {
+    if (!hasPermission('Master Summaries:manage version')) {
+      setLoading(false);
+      return;
+    }
+
     setError(null);
     setLoading(true);
     setAllVersions([]);
@@ -106,7 +113,7 @@ const VersionManagementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [masterSummaryId]);
+  }, [masterSummaryId, hasPermission]);
 
   useEffect(() => {
     fetchVersions();
@@ -283,6 +290,17 @@ const VersionManagementPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-10 w-10 animate-spin text-neas-green" />
+      </div>
+    );
+  }
+
+  if (!hasPermission('Master Summaries:manage version')) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+        <ShieldAlert className="h-16 w-16 text-red-500" />
+        <h2 className="text-2xl font-bold text-slate-900">Access Denied</h2>
+        <p className="text-slate-500">You do not have permission to manage master summary versions.</p>
+        <Button onClick={() => navigate(-1)}>Go Back</Button>
       </div>
     );
   }
