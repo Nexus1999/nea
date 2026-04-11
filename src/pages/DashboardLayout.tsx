@@ -18,16 +18,17 @@ import DynamicBreadcrumbs from "@/components/DynamicBreadcrumbs";
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: Home, key: 'Dashboard' },
-  { path: '/dashboard/timetables', label: 'Timetables', icon: Clock, key: 'Timetables' },
-  { path: '/dashboard/budgets', label: 'Budgets', icon: DollarSign, key: 'Budgets' },
-  { path: '/dashboard/mastersummaries', label: 'Master Summaries', icon: Database, key:'Master Summaries'},
-  { path: '/dashboard/stationeries', label: 'Stationeries', icon: PenLine, key: 'Stationeries' },
-  { path: '/dashboard/supervisors', label: 'Supervisions', icon: UserCog, key: 'Supervisions' },
+  { path: '/dashboard/timetables', label: 'Timetables', icon: Clock, key: 'Timetables', permission: 'Timetables:view' },
+  { path: '/dashboard/budgets', label: 'Budgets', icon: DollarSign, key: 'Budgets', permission: 'Budgets:view' },
+  { path: '/dashboard/mastersummaries', label: 'Master Summaries', icon: Database, key:'Master Summaries', permission: 'Master Summaries:view' },
+  { path: '/dashboard/stationeries', label: 'Stationeries', icon: PenLine, key: 'Stationeries', permission: 'Stationeries:view' },
+  { path: '/dashboard/supervisors', label: 'Supervisions', icon: UserCog, key: 'Supervisions', permission: 'Supervisors:view' },
   { 
     path: '/dashboard/institutions', 
     label: 'Institutions', 
     icon: Building, 
     key: 'Institutions',
+    permission: 'Institutions:view',
     subItems: [
       { path: '/dashboard/institutions', label: 'Overview', icon: LayoutDashboard, key: 'InstitutionsOverview' },
       { path: '/dashboard/institutions/primary', label: 'Primary Schools', icon: Building, key: 'PrimarySchools' },
@@ -40,6 +41,7 @@ const navItems = [
     label: 'Miscellaneous',
     icon: Tags,
     key: 'Miscellaneous',
+    permission: 'Miscellaneous:view',
     subItems: [
       { path: '/dashboard/miscellaneous/overview', label: 'OverView', icon: LayoutDashboard, key: 'MiscellaneousOverview' },
       { path: '/dashboard/miscellaneous/jobs', label: 'Teachers Inventory', icon: Users, key: 'MiscellaneousTeachers' },
@@ -50,6 +52,7 @@ const navItems = [
     label: 'Security',
     icon: Shield,
     key: 'Security',
+    permission: 'Security:view',
     subItems: [
       { path: '/dashboard/security', label: 'Overview', icon: Shield, key: 'SecurityOverview' },
       { path: '/dashboard/security/users', label: 'Users', icon: Users, key: 'SecurityUsers' },
@@ -58,12 +61,13 @@ const navItems = [
       { path: '/dashboard/security/audit-logs', label: 'Audit Logs', icon: FileText, key: 'SecurityAuditLogs' },
     ]
   },
-  { path: '/dashboard/reports', label: 'Reports', icon: FileText, key: 'Reports' },
+  { path: '/dashboard/reports', label: 'Reports', icon: FileText, key: 'Reports', permission: 'Reports:view' },
   {
     path: '/dashboard/settings',
     label: 'Settings',
     icon: Settings,
     key: 'Settings',
+    permission: 'Settings:view',
     subItems: [
       { path: '/dashboard/settings/regions', label: 'Regions', icon: Globe, key: 'SettingsRegions' },
       { path: '/dashboard/settings/districts', label: 'Districts', icon: MapPin, key: 'SettingsDistricts' },
@@ -86,7 +90,7 @@ const DashboardLayout = () => {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { session, user, loading, userRole, logout } = useAuth();
+  const { session, user, loading, userRole, logout, hasPermission } = useAuth();
 
   useEffect(() => {
     setIsSecuritySubMenuOpen(location.pathname.startsWith('/dashboard/security'));
@@ -96,8 +100,6 @@ const DashboardLayout = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    // Only redirect if we are not loading and there is no session
-    // and we are not currently on the login page
     if (!loading && !session && location.pathname !== '/login') {
       navigate("/login", { replace: true });
     }
@@ -105,8 +107,6 @@ const DashboardLayout = () => {
 
   const handleLogout = async () => {
     try {
-      // The logout function in AuthProvider now handles the full sequence
-      // including database updates and final navigation.
       await logout();
     } catch (error) {
       console.error("Logout failed:", error);
@@ -135,6 +135,11 @@ const DashboardLayout = () => {
       </div>
     );
   }
+
+  const filteredNavItems = navItems.filter(item => {
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
@@ -185,7 +190,7 @@ const DashboardLayout = () => {
           </div>
 
           <nav className="flex-1 p-4 space-y-2">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const isActive = location.pathname === item.path || (item.subItems && location.pathname.startsWith(item.path));
               
               if (item.subItems) {
