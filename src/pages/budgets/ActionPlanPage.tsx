@@ -11,14 +11,16 @@ import {
   Truck, 
   Calendar, 
   Package,
-  CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  PlusCircle,
+  Save
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { showSuccess } from "@/utils/toast";
 
 interface Region {
   id: string;
@@ -111,209 +113,175 @@ const ActionPlanPage = () => {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
-      {/* Header & Stepper */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <Card className="border-none shadow-sm rounded-2xl overflow-hidden min-h-[600px]">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 bg-slate-50/50 border-b">
         <div>
-          <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
             <span className="hover:text-indigo-600 cursor-pointer" onClick={() => navigate('/dashboard/budgets')}>Budgets</span>
-            <ChevronRight className="w-4 h-4" />
-            <span className="font-medium text-slate-900">Action Plan</span>
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-slate-900">Action Plan</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Budget Action Plan</h1>
+          <CardTitle className="text-2xl font-black uppercase tracking-tight">Action Plan Setup</CardTitle>
         </div>
 
-        <div className="flex items-center gap-4 bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${step === 1 ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400'}`}>
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 1 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>1</div>
-            <span className="font-medium">Routes</span>
+        <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-inner">
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${step === 1 ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>
+            <span className="text-[10px] font-black uppercase tracking-widest">1. Routes</span>
           </div>
-          <ChevronRight className="w-4 h-4 text-slate-300" />
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${step === 2 ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400'}`}>
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 2 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>2</div>
-            <span className="font-medium">Regions</span>
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${step === 2 ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>
+            <span className="text-[10px] font-black uppercase tracking-widest">2. Regions</span>
           </div>
         </div>
-      </div>
+      </CardHeader>
 
-      {/* Step 1: Routes */}
-      {step === 1 && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Truck className="w-5 h-5 text-indigo-600" />
-              Define Transportation Routes
-            </h2>
-            <Button onClick={addRoute} variant="outline" size="sm" className="border-indigo-200 text-indigo-600 hover:bg-indigo-50">
-              <Plus className="w-4 h-4 mr-2" /> Add Route
-            </Button>
-          </div>
-
-          {routes.length === 0 ? (
-            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
-              <div className="bg-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                <Truck className="w-6 h-6 text-slate-300" />
-              </div>
-              <h3 className="text-slate-900 font-medium">No routes added yet</h3>
-              <p className="text-slate-500 text-sm mt-1 mb-6">Start by adding the transportation routes for this budget.</p>
-              <Button onClick={addRoute}>Add Your First Route</Button>
+      <CardContent className="pt-8 max-w-5xl mx-auto">
+        {step === 1 ? (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex justify-between items-center">
+              <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+                <Truck className="w-4 h-4 text-indigo-600" />
+                Transportation Routes
+              </h2>
+              <Button onClick={addRoute} variant="outline" size="sm" className="h-9 rounded-xl border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold uppercase text-[10px] tracking-widest">
+                <PlusCircle className="w-3.5 h-3.5 mr-2" /> Add Route
+              </Button>
             </div>
-          ) : (
+
             <div className="grid gap-4">
               {routes.map((route, index) => (
-                <Card key={route.id} className="border-slate-200 shadow-sm overflow-hidden">
-                  <CardHeader className="bg-slate-50/50 py-4 flex flex-row items-center justify-between space-y-0">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="bg-white">Route #{index + 1}</Badge>
+                <div key={route.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="bg-slate-50/50 px-6 py-4 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1">
+                      <Badge className="bg-slate-900 text-white rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest">Route #{index + 1}</Badge>
                       <Input 
-                        className="h-8 w-64 bg-transparent border-none font-semibold text-lg focus-visible:ring-0 p-0" 
+                        className="h-9 bg-transparent border-none font-black text-lg uppercase tracking-tight focus-visible:ring-0 p-0 placeholder:text-slate-300" 
                         placeholder="Enter Route Name..."
                         value={route.name}
                         onChange={(e) => updateRoute(route.id, 'name', e.target.value)}
                       />
                     </div>
-                    <Button variant="ghost" size="icon" className="text-slate-400 hover:text-red-600" onClick={() => removeRoute(route.id)}>
+                    <Button variant="ghost" size="icon" className="text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={() => removeRoute(route.id)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-slate-400" /> Loading Date
-                        </label>
-                        <Input 
-                          type="date" 
-                          value={route.loadingDate}
-                          onChange={(e) => updateRoute(route.id, 'loadingDate', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-slate-400" /> Start Date
-                        </label>
-                        <Input 
-                          type="date" 
-                          value={route.startDate}
-                          onChange={(e) => updateRoute(route.id, 'startDate', e.target.value)}
-                        />
-                      </div>
+                  </div>
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <Calendar className="w-3 h-3" /> Loading Date
+                      </label>
+                      <Input 
+                        type="date" 
+                        className="h-11 rounded-xl border-slate-200"
+                        value={route.loadingDate}
+                        onChange={(e) => updateRoute(route.id, 'loadingDate', e.target.value)}
+                      />
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <Calendar className="w-3 h-3" /> Start Date
+                      </label>
+                      <Input 
+                        type="date" 
+                        className="h-11 rounded-xl border-slate-200"
+                        value={route.startDate}
+                        onChange={(e) => updateRoute(route.id, 'startDate', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Step 2: Regions per Route */}
-      {step === 2 && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-indigo-600" />
-              Assign Regions to Routes
-            </h2>
           </div>
-
-          <div className="space-y-8">
+        ) : (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {routes.map((route) => (
               <div key={route.id} className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-indigo-600 text-white p-2 rounded-lg">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
                     <Truck className="w-5 h-5" />
                   </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900">{route.name || 'Unnamed Route'}</h3>
-                    <p className="text-xs text-slate-500">Starts: {route.startDate || 'Not set'}</p>
+                  <div className="flex-1">
+                    <h3 className="font-black text-lg uppercase tracking-tight text-slate-900">{route.name || 'Unnamed Route'}</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Starts: {route.startDate || 'Not set'}</p>
                   </div>
-                  <Separator className="flex-1" />
-                  <Button onClick={() => addRegion(route.id)} variant="outline" size="sm" className="h-8">
-                    <Plus className="w-3 h-3 mr-1" /> Add Region
+                  <Button onClick={() => addRegion(route.id)} variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 font-bold uppercase text-[10px] tracking-widest">
+                    <Plus className="w-3 h-3 mr-1.5" /> Add Region
                   </Button>
                 </div>
 
-                <div className="grid gap-4">
-                  {route.regions.length === 0 ? (
-                    <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-500 text-sm">
-                      No regions assigned to this route yet.
-                    </div>
-                  ) : (
-                    route.regions.map((region) => (
-                      <div key={region.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Region Name</label>
+                <div className="grid gap-3">
+                  {route.regions.map((region) => (
+                    <div key={region.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-6 items-end group hover:border-indigo-200 transition-colors">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">Region Name</label>
+                        <Input 
+                          placeholder="e.g. Arusha" 
+                          className="h-10 rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white"
+                          value={region.name}
+                          onChange={(e) => updateRegion(route.id, region.id, 'name', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">Boxes</label>
+                        <div className="relative">
+                          <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                           <Input 
-                            placeholder="e.g. Kilimanjaro" 
-                            className="h-9"
-                            value={region.name}
-                            onChange={(e) => updateRegion(route.id, region.id, 'name', e.target.value)}
+                            type="number" 
+                            className="h-10 pl-9 rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white"
+                            value={region.boxes}
+                            onChange={(e) => updateRegion(route.id, region.id, 'boxes', parseInt(e.target.value))}
                           />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Boxes</label>
-                          <div className="relative">
-                            <Package className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input 
-                              type="number" 
-                              className="h-9 pl-9"
-                              value={region.boxes}
-                              onChange={(e) => updateRegion(route.id, region.id, 'boxes', parseInt(e.target.value))}
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Delivery Date</label>
-                          <Input 
-                            type="date" 
-                            className="h-9"
-                            value={region.deliveryDate}
-                            onChange={(e) => updateRegion(route.id, region.id, 'deliveryDate', e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Receiving Place</label>
-                          <Input 
-                            placeholder="e.g. Police Station" 
-                            className="h-9"
-                            value={region.receivingPlace}
-                            onChange={(e) => updateRegion(route.id, region.id, 'receivingPlace', e.target.value)}
-                          />
-                        </div>
-                        <div className="flex justify-end">
-                          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-red-600 h-9 w-9" onClick={() => removeRegion(route.id, region.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
                       </div>
-                    ))
-                  )}
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">Delivery Date</label>
+                        <Input 
+                          type="date" 
+                          className="h-10 rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white"
+                          value={region.deliveryDate}
+                          onChange={(e) => updateRegion(route.id, region.id, 'deliveryDate', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">Receiving Place</label>
+                        <Input 
+                          placeholder="e.g. Police Station" 
+                          className="h-10 rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white"
+                          value={region.receivingPlace}
+                          onChange={(e) => updateRegion(route.id, region.id, 'receivingPlace', e.target.value)}
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <Button variant="ghost" size="icon" className="text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl h-10 w-10" onClick={() => removeRegion(route.id, region.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Footer Navigation */}
-      <div className="flex justify-between items-center pt-6 border-t border-slate-200">
-        <Button 
-          variant="ghost" 
-          onClick={() => step === 1 ? navigate('/dashboard/budgets') : setStep(1)}
-          className="text-slate-600"
-        >
-          <ChevronLeft className="w-4 h-4 mr-2" /> {step === 1 ? 'Back to Budgets' : 'Previous Step'}
-        </Button>
-        
-        <Button 
-          onClick={() => step === 1 ? setStep(2) : navigate(`/dashboard/budgets/template/${id}`)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-8"
-        >
-          {step === 1 ? 'Next: Assign Regions' : 'Generate Template'} <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
-    </div>
+        <div className="flex justify-between items-center pt-12 mt-12 border-t border-slate-100">
+          <Button 
+            variant="ghost" 
+            onClick={() => step === 1 ? navigate('/dashboard/budgets') : setStep(1)}
+            className="text-slate-500 font-bold uppercase text-[10px] tracking-widest h-11 rounded-xl px-6"
+          >
+            <ChevronLeft className="w-4 h-4 mr-2" /> {step === 1 ? 'Back to Budgets' : 'Previous Step'}
+          </Button>
+          
+          <Button 
+            onClick={() => step === 1 ? setStep(2) : navigate(`/dashboard/budgets/template/${id}`)}
+            className="bg-slate-900 hover:bg-black text-white font-black uppercase text-[10px] tracking-widest h-11 rounded-xl px-8 shadow-lg shadow-slate-200"
+          >
+            {step === 1 ? 'Next: Assign Regions' : 'Generate Template'} <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

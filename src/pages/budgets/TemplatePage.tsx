@@ -13,7 +13,8 @@ import {
   Calculator,
   Truck,
   Save,
-  CheckCircle2
+  CheckCircle2,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
+import { showSuccess } from "@/utils/toast";
 
 interface PersonnelRow {
   id: string;
@@ -58,7 +59,6 @@ const TemplatePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   
-  // Mock initial state based on a "generated" template
   const [routes, setRoutes] = useState<RouteBudget[]>([
     {
       id: '1',
@@ -147,13 +147,8 @@ const TemplatePage = () => {
     }));
   };
 
-  const calculatePersonnelTotal = (p: PersonnelRow) => {
-    return p.count * (p.days + p.transitDays) * p.rate;
-  };
-
-  const calculateCostTotal = (c: CostRow) => {
-    return c.quantity * c.days * c.rate;
-  };
+  const calculatePersonnelTotal = (p: PersonnelRow) => p.count * (p.days + p.transitDays) * p.rate;
+  const calculateCostTotal = (c: CostRow) => c.quantity * c.days * c.rate;
 
   const routeTotals = useMemo(() => {
     return routes.map(r => {
@@ -165,247 +160,164 @@ const TemplatePage = () => {
 
   const grandTotal = routeTotals.reduce((sum, t) => sum + t, 0);
 
-  const handleSave = () => {
-    toast.success("Budget template saved successfully!");
-  };
-
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Budget Template</h1>
-            <p className="text-sm text-slate-500">Review and adjust the generated budget draft.</p>
+    <Card className="border-none shadow-sm rounded-2xl overflow-hidden min-h-[600px]">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 bg-slate-50/50 border-b">
+        <div>
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
+            <span className="hover:text-indigo-600 cursor-pointer" onClick={() => navigate('/dashboard/budgets')}>Budgets</span>
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-slate-900">Template</span>
           </div>
+          <CardTitle className="text-2xl font-black uppercase tracking-tight">Budget Template</CardTitle>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 font-bold uppercase text-[10px] tracking-widest">
             <Printer className="w-4 h-4 mr-2" /> Print
           </Button>
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" /> Export PDF
+          <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 font-bold uppercase text-[10px] tracking-widest">
+            <Download className="w-4 h-4 mr-2" /> Export
           </Button>
-          <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+          <Button onClick={() => showSuccess("Changes saved")} className="h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest px-6">
             <Save className="w-4 h-4 mr-2" /> Save Changes
           </Button>
         </div>
-      </div>
+      </CardHeader>
 
-      {/* Grand Total Summary */}
-      <Card className="bg-indigo-600 text-white border-none shadow-lg overflow-hidden">
-        <CardContent className="p-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-4">
-            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
-              <Calculator className="w-8 h-8" />
+      <CardContent className="pt-8 space-y-10">
+        {/* Grand Total Summary */}
+        <div className="bg-slate-900 rounded-3xl p-8 text-white flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl shadow-slate-200">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10">
+              <Calculator className="w-8 h-8 text-indigo-400" />
             </div>
             <div>
-              <p className="text-indigo-100 text-sm font-medium uppercase tracking-wider">Estimated Grand Total</p>
-              <h2 className="text-4xl font-black">TZS {grandTotal.toLocaleString()}</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Estimated Grand Total</p>
+              <h2 className="text-4xl font-black tracking-tighter">TZS {grandTotal.toLocaleString()}</h2>
             </div>
           </div>
-          <div className="flex gap-4">
-            <div className="text-right">
-              <p className="text-indigo-100 text-xs">Routes</p>
-              <p className="text-xl font-bold">{routes.length}</p>
+          <div className="flex gap-12">
+            <div className="text-center">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Routes</p>
+              <p className="text-2xl font-black">{routes.length}</p>
             </div>
-            <div className="w-px h-10 bg-white/20" />
-            <div className="text-right">
-              <p className="text-indigo-100 text-xs">Personnel</p>
-              <p className="text-xl font-bold">{routes.reduce((sum, r) => sum + r.personnel.length, 0)}</p>
+            <div className="text-center">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Personnel</p>
+              <p className="text-2xl font-black">{routes.reduce((sum, r) => sum + r.personnel.length, 0)}</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Routes Sections */}
-      <div className="space-y-12">
-        {routes.map((route, rIndex) => (
-          <div key={route.id} className="space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-slate-900 text-white p-2 rounded-lg">
-                <Truck className="w-5 h-5" />
+        {/* Routes Sections */}
+        <div className="space-y-16">
+          {routes.map((route, rIndex) => (
+            <div key={route.id} className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-slate-100 text-slate-900 rounded-xl flex items-center justify-center">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900">{route.name}</h3>
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Route Total: TZS {routeTotals[rIndex].toLocaleString()}</p>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">{route.name}</h3>
-              <Badge variant="secondary" className="bg-slate-100 text-slate-600">
-                Route Total: TZS {routeTotals[rIndex].toLocaleString()}
-              </Badge>
+
+              {/* Personnel Table */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                    <Users className="w-3.5 h-3.5" /> Personnel Allowances
+                  </h4>
+                  <Button variant="ghost" size="sm" className="h-7 text-indigo-600 font-bold uppercase text-[9px] tracking-widest" onClick={() => addPersonnel(route.id)}>
+                    <Plus className="w-3 h-3 mr-1" /> Add Row
+                  </Button>
+                </div>
+                <div className="border rounded-2xl overflow-hidden shadow-sm">
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Role</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Region</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Count</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Days</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Transit</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Rate (TZS)</TableHead>
+                        <TableHead className="text-right text-[9px] font-black uppercase tracking-widest">Total</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {route.personnel.map((p) => (
+                        <TableRow key={p.id} className="hover:bg-slate-50/30">
+                          <TableCell><Input className="h-8 text-xs rounded-lg border-slate-100" value={p.role} onChange={(e) => updatePersonnel(route.id, p.id, 'role', e.target.value)} /></TableCell>
+                          <TableCell><Input className="h-8 text-xs rounded-lg border-slate-100" value={p.region} onChange={(e) => updatePersonnel(route.id, p.id, 'region', e.target.value)} /></TableCell>
+                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={p.count} onChange={(e) => updatePersonnel(route.id, p.id, 'count', parseInt(e.target.value))} /></TableCell>
+                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={p.days} onChange={(e) => updatePersonnel(route.id, p.id, 'days', parseInt(e.target.value))} /></TableCell>
+                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={p.transitDays} onChange={(e) => updatePersonnel(route.id, p.id, 'transitDays', parseInt(e.target.value))} /></TableCell>
+                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={p.rate} onChange={(e) => updatePersonnel(route.id, p.id, 'rate', parseInt(e.target.value))} /></TableCell>
+                          <TableCell className="text-right font-bold text-slate-900 text-xs">{calculatePersonnelTotal(p).toLocaleString()}</TableCell>
+                          <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-600 rounded-lg" onClick={() => removePersonnel(route.id, p.id)}><Trash2 className="w-3.5 h-3.5" /></Button></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Other Costs Table */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                    <CreditCard className="w-3.5 h-3.5" /> Operational Costs
+                  </h4>
+                  <Button variant="ghost" size="sm" className="h-7 text-indigo-600 font-bold uppercase text-[9px] tracking-widest" onClick={() => addCost(route.id)}>
+                    <Plus className="w-3 h-3 mr-1" /> Add Row
+                  </Button>
+                </div>
+                <div className="border rounded-2xl overflow-hidden shadow-sm">
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Item Name</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Quantity</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Days</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Rate (TZS)</TableHead>
+                        <TableHead className="text-right text-[9px] font-black uppercase tracking-widest">Total</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {route.costs.map((c) => (
+                        <TableRow key={c.id} className="hover:bg-slate-50/30">
+                          <TableCell><Input className="h-8 text-xs rounded-lg border-slate-100" value={c.name} onChange={(e) => updateCost(route.id, c.id, 'name', e.target.value)} /></TableCell>
+                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={c.quantity} onChange={(e) => updateCost(route.id, c.id, 'quantity', parseInt(e.target.value))} /></TableCell>
+                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={c.days} onChange={(e) => updateCost(route.id, c.id, 'days', parseInt(e.target.value))} /></TableCell>
+                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={c.rate} onChange={(e) => updateCost(route.id, c.id, 'rate', parseInt(e.target.value))} /></TableCell>
+                          <TableCell className="text-right font-bold text-slate-900 text-xs">{calculateCostTotal(c).toLocaleString()}</TableCell>
+                          <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-600 rounded-lg" onClick={() => {
+                            setRoutes(routes.map(r => r.id === route.id ? { ...r, costs: r.costs.filter(item => item.id !== c.id) } : r));
+                          }}><Trash2 className="w-3.5 h-3.5" /></Button></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             </div>
+          ))}
+        </div>
 
-            {/* Personnel Table */}
-            <Card className="border-slate-200 shadow-sm overflow-hidden">
-              <CardHeader className="bg-slate-50/50 py-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <Users className="w-4 h-4 text-indigo-600" /> Personnel Allowances
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 text-indigo-600" onClick={() => addPersonnel(route.id)}>
-                  <Plus className="w-3 h-3 mr-1" /> Add Row
-                </Button>
-              </CardHeader>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/30">
-                    <TableHead className="w-[180px]">Role</TableHead>
-                    <TableHead>Region</TableHead>
-                    <TableHead className="w-[80px]">Count</TableHead>
-                    <TableHead className="w-[80px]">Days</TableHead>
-                    <TableHead className="w-[80px]">Transit</TableHead>
-                    <TableHead className="w-[120px]">Rate (TZS)</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {route.personnel.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        <Input 
-                          className="h-8 text-xs" 
-                          value={p.role} 
-                          onChange={(e) => updatePersonnel(route.id, p.id, 'role', e.target.value)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input 
-                          className="h-8 text-xs" 
-                          value={p.region} 
-                          onChange={(e) => updatePersonnel(route.id, p.id, 'region', e.target.value)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input 
-                          type="number" 
-                          className="h-8 text-xs" 
-                          value={p.count} 
-                          onChange={(e) => updatePersonnel(route.id, p.id, 'count', parseInt(e.target.value))}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input 
-                          type="number" 
-                          className="h-8 text-xs" 
-                          value={p.days} 
-                          onChange={(e) => updatePersonnel(route.id, p.id, 'days', parseInt(e.target.value))}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input 
-                          type="number" 
-                          className="h-8 text-xs" 
-                          value={p.transitDays} 
-                          onChange={(e) => updatePersonnel(route.id, p.id, 'transitDays', parseInt(e.target.value))}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input 
-                          type="number" 
-                          className="h-8 text-xs" 
-                          value={p.rate} 
-                          onChange={(e) => updatePersonnel(route.id, p.id, 'rate', parseInt(e.target.value))}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {calculatePersonnelTotal(p).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={() => removePersonnel(route.id, p.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-
-            {/* Other Costs Table */}
-            <Card className="border-slate-200 shadow-sm overflow-hidden">
-              <CardHeader className="bg-slate-50/50 py-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-indigo-600" /> Other Operational Costs
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 text-indigo-600" onClick={() => addCost(route.id)}>
-                  <Plus className="w-3 h-3 mr-1" /> Add Row
-                </Button>
-              </CardHeader>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/30">
-                    <TableHead>Item Name</TableHead>
-                    <TableHead className="w-[100px]">Quantity</TableHead>
-                    <TableHead className="w-[100px]">Days</TableHead>
-                    <TableHead className="w-[150px]">Rate (TZS)</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {route.costs.map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell>
-                        <Input 
-                          className="h-8 text-xs" 
-                          value={c.name} 
-                          onChange={(e) => updateCost(route.id, c.id, 'name', e.target.value)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input 
-                          type="number" 
-                          className="h-8 text-xs" 
-                          value={c.quantity} 
-                          onChange={(e) => updateCost(route.id, c.id, 'quantity', parseInt(e.target.value))}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input 
-                          type="number" 
-                          className="h-8 text-xs" 
-                          value={c.days} 
-                          onChange={(e) => updateCost(route.id, c.id, 'days', parseInt(e.target.value))}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input 
-                          type="number" 
-                          className="h-8 text-xs" 
-                          value={c.rate} 
-                          onChange={(e) => updateCost(route.id, c.id, 'rate', parseInt(e.target.value))}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {calculateCostTotal(c).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={() => {
-                          setRoutes(routes.map(r => r.id === route.id ? { ...r, costs: r.costs.filter(item => item.id !== c.id) } : r));
-                        }}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          </div>
-        ))}
-      </div>
-
-      {/* Final Action */}
-      <div className="flex justify-center py-12">
-        <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white px-12 rounded-full shadow-xl" onClick={() => {
-          toast.success("Budget finalized and submitted for approval!");
-          navigate('/dashboard/budgets');
-        }}>
-          <CheckCircle2 className="w-5 h-5 mr-2" /> Finalize & Submit Budget
-        </Button>
-      </div>
-    </div>
+        <div className="flex justify-center py-12 border-t border-slate-100">
+          <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white px-12 rounded-2xl shadow-xl shadow-green-100 font-black uppercase text-xs tracking-widest h-14" onClick={() => {
+            showSuccess("Budget finalized and submitted for approval!");
+            navigate('/dashboard/budgets');
+          }}>
+            <CheckCircle2 className="w-5 h-5 mr-2" /> Finalize & Submit Budget
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
