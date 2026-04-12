@@ -41,6 +41,11 @@ import Roles from "./pages/security/Roles";
 import Permissions from "./pages/security/Permissions";
 import AuditLogs from "./pages/security/AuditLogs";
 
+// Budget Module Pages
+import BudgetsPage from "./pages/budgets/BudgetsPage";
+import ActionPlanPage from "./pages/budgets/ActionPlanPage";
+import TemplatePage from "./pages/budgets/TemplatePage";
+
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -113,6 +118,11 @@ const App = () => (
               <Route path="settings/examinations" element={<Examinations />} />
               <Route path="settings/regions" element={<Regions />} />
               <Route path="settings/districts" element={<Districts />} />
+
+              {/* Budget Module Routes */}
+              <Route path="budgets" element={<BudgetsPage />} />
+              <Route path="budgets/action-plan/:id" element={<ActionPlanPage />} />
+              <Route path="budgets/template/:id" element={<TemplatePage />} />
 
               {/* Add more routes as needed */}
               <Route path="*" element={<div className="p-4">Page under construction</div>} />
