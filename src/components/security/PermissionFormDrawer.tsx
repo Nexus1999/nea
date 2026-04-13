@@ -30,6 +30,10 @@ const MODULES = [
   { name: 'Supervisors', actions: ['view', 'add supervisor', 'assign supervisors', 'reshuffle supervisors'] },
   { name: 'Security', subModels: ['Users', 'Roles', 'Permissions', 'Audit'], actions: ['view'] },
   { name: 'Settings', subModels: ['Regions', 'Districts', 'Examinations', 'Subjects'], actions: ['view'] },
+  { name: 'Stationeries', actions: ['view', 'add', 'edit', 'delete'] },
+  { name: 'Institutions', subModels: ['Primary Schools', 'Secondary Schools', 'Teachers Colleges'], actions: ['view', 'add', 'edit', 'delete','import'] },
+  { name: 'Miscellaneous', subModels: ['Teachers Inventory'], actions: ['view', 'add', 'edit', 'delete','import'] },
+  { name: 'Reports', actions: ['view', 'generate', 'export'] },
 ];
 
 const SUB_ACTIONS: Record<string, string[]> = {
@@ -37,6 +41,15 @@ const SUB_ACTIONS: Record<string, string[]> = {
   'Roles': ['view', 'add', 'edit', 'delete'],
   'Permissions': ['view', 'add', 'edit', 'delete'],
   'Regions': ['view', 'add', 'edit', 'delete'],
+  'Districts': ['view', 'add', 'edit', 'delete'],
+  'Examinations': ['view', 'add', 'edit', 'delete'],
+  'Subjects': ['view', 'add', 'edit', 'delete'],
+  'Primary Schools': ['view', 'add', 'edit', 'delete','import'],
+  'Secondary Schools': ['view', 'add', 'edit', 'delete','import'],
+  'Teachers Colleges': ['view', 'add', 'edit', 'delete','import'],
+  'Teachers Inventory': ['Manage Teachers', 'Add Teacher', 'Import Teachers', 'delete Teacher','delete All Teachers', 'view Teacher','edit Teacher','add assignment',
+    'assign teachers','edit assignment','delete assignment','auto-assign teachers','create accounts link','reset assignments','export assignments'
+  ]
 };
 
 interface PermissionFormDrawerProps {

@@ -13,8 +13,7 @@ import {
   Clock, 
   AlertTriangle,
   RefreshCw,
-  Search,
-  MoreVertical
+  Search
 } from "lucide-react";
 import {
   Table,
@@ -71,6 +70,10 @@ const BudgetsPage = () => {
     title: '',
   });
 
+  useEffect(() => {
+    document.title = "Budgets | NEAS";
+  }, []);
+
   const handleAddBudget = (values: BudgetFormValues) => {
     const newBudget = {
       id: Math.random().toString(36).substr(2, 9),
@@ -80,7 +83,7 @@ const BudgetsPage = () => {
     };
     setBudgets([newBudget, ...budgets]);
     showSuccess("Budget created successfully");
-    navigate(`/dashboard/budgets/action-plan/${newBudget.id}`);
+    setIsFormOpen(false);
   };
 
   const handleSort = (columnId: string) => {
@@ -92,7 +95,6 @@ const BudgetsPage = () => {
 
   const filteredAndSortedBudgets = useMemo(() => {
     let list = [...budgets];
-
     if (search.trim()) {
       const term = search.toLowerCase();
       list = list.filter(b =>
@@ -101,11 +103,9 @@ const BudgetsPage = () => {
         String(b.year).includes(term)
       );
     }
-
     list.sort((a: any, b: any) => {
       const aVal = a[orderBy];
       const bVal = b[orderBy];
-
       if (typeof aVal === 'string' && typeof bVal === 'string') {
         return order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
       }
@@ -114,23 +114,20 @@ const BudgetsPage = () => {
       }
       return 0;
     });
-
     return list;
   }, [budgets, search, orderBy, order]);
 
   const totalPages = Math.ceil(filteredAndSortedBudgets.length / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredAndSortedBudgets.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = filteredAndSortedBudgets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Draft':
-        return <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200"><Clock className="w-3 h-3 mr-1" /> Draft</Badge>;
+        return <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200 gap-1"><Clock className="w-3 h-3" /> Draft</Badge>;
       case 'Template Generated':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200"><FileText className="w-3 h-3 mr-1" /> Template Generated</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 gap-1"><FileText className="w-3 h-3" /> Template Generated</Badge>;
       case 'Implemented':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200"><CheckCircle2 className="w-3 h-3 mr-1" /> Implemented</Badge>;
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1"><CheckCircle2 className="w-3 h-3" /> Implemented</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -143,72 +140,68 @@ const BudgetsPage = () => {
   };
 
   return (
-    <Card className="relative min-h-[600px] border-none shadow-sm rounded-2xl overflow-hidden">
+    <Card className="relative min-h-[600px]">
       {loading && (
         <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
           <Spinner label="Loading budgets..." size="lg" />
         </div>
       )}
 
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 bg-slate-50/50 border-b">
-        <div>
-          <CardTitle className="text-2xl font-black uppercase tracking-tight">Budgets</CardTitle>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Manage examination administration costs</p>
-        </div>
-        <Button size="sm" className="h-10 gap-2 bg-indigo-600 hover:bg-indigo-700 rounded-xl px-4" onClick={() => setIsFormOpen(true)}>
-          <PlusCircle className="h-4 w-4" />
-          <span className="font-bold uppercase text-xs tracking-wider">Create Budget</span>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-2xl font-bold">Budgets</CardTitle>
+        <Button size="sm" className="h-8 gap-1" onClick={() => setIsFormOpen(true)} disabled={loading}>
+          <PlusCircle className="h-3.5 w-3.5" />
+          <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Create Budget</span>
         </Button>
       </CardHeader>
 
-      <CardContent className="pt-6">
-        <div className="mb-6 flex items-center gap-4">
-          <div className="relative max-w-sm flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search budgets..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-10 h-11 rounded-xl border-slate-200"
-            />
-          </div>
+      <CardContent>
+        <div className="mb-4">
+          <Input
+            type="text"
+            placeholder="Search budgets..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="max-w-sm"
+            disabled={loading}
+          />
         </div>
 
-        <div className="border rounded-2xl overflow-hidden shadow-sm">
+        <div className="border rounded-lg overflow-hidden">
           <Table>
-            <TableHeader className="bg-slate-50/50">
+            <TableHeader>
               <TableRow>
                 <TableHead>
-                  <Button variant="ghost" onClick={() => handleSort('title')} className="px-0 hover:bg-transparent font-bold uppercase text-[10px] tracking-widest">
+                  <Button variant="ghost" onClick={() => handleSort('title')} className="px-0 hover:bg-transparent">
                     Title
-                    <ArrowUpDown className={cn("ml-2 h-3 w-3", orderBy === 'title' ? 'opacity-100' : 'opacity-50')} />
+                    <ArrowUpDown className={cn("ml-2 h-4 w-4", orderBy === 'title' ? 'opacity-100' : 'opacity-50')} />
                   </Button>
                 </TableHead>
                 <TableHead>
-                  <Button variant="ghost" onClick={() => handleSort('year')} className="px-0 hover:bg-transparent font-bold uppercase text-[10px] tracking-widest">
+                  <Button variant="ghost" onClick={() => handleSort('year')} className="px-0 hover:bg-transparent">
                     Year
-                    <ArrowUpDown className={cn("ml-2 h-3 w-3", orderBy === 'year' ? 'opacity-100' : 'opacity-50')} />
+                    <ArrowUpDown className={cn("ml-2 h-4 w-4", orderBy === 'year' ? 'opacity-100' : 'opacity-50')} />
                   </Button>
                 </TableHead>
-                <TableHead className="font-bold uppercase text-[10px] tracking-widest">Type</TableHead>
-                <TableHead className="font-bold uppercase text-[10px] tracking-widest">Status</TableHead>
-                <TableHead className="text-right font-bold uppercase text-[10px] tracking-widest">Actions</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {currentItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-slate-400 font-medium">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     No budgets found.
                   </TableCell>
                 </TableRow>
               ) : (
                 currentItems.map(budget => (
-                  <TableRow key={budget.id} className="hover:bg-slate-50/30 transition-colors">
-                    <TableCell className="font-bold text-slate-900">{budget.title}</TableCell>
-                    <TableCell className="font-medium text-slate-600">{budget.year}</TableCell>
+                  <TableRow key={budget.id}>
+                    <TableCell className="font-medium">{budget.title}</TableCell>
+                    <TableCell>{budget.year}</TableCell>
                     <TableCell>
-                      <span className="text-[10px] font-black uppercase tracking-tighter text-slate-400">
+                      <span className="text-xs text-muted-foreground uppercase">
                         {budget.type.replace('_', ' ')}
                       </span>
                     </TableCell>
@@ -251,8 +244,8 @@ const BudgetsPage = () => {
           </Table>
         </div>
 
-        {totalPages > 1 && (
-          <div className="mt-6">
+        {!loading && totalPages > 1 && (
+          <div className="mt-4">
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
@@ -272,29 +265,27 @@ const BudgetsPage = () => {
         open={deleteConfig.open}
         onOpenChange={(open) => setDeleteConfig(prev => ({ ...prev, open }))}
       >
-        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6">
+        <AlertDialogContent className="max-w-[420px]">
           <AlertDialogHeader>
             <div className="flex flex-col items-center text-center mb-2">
-              <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
-                <AlertTriangle className="h-7 w-7" />
+               <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+                <AlertTriangle className="h-6 w-6" />
               </div>
-              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
+              <AlertDialogTitle className="text-xl font-bold">
                 Confirm Deletion
               </AlertDialogTitle>
             </div>
-            <AlertDialogDescription className="text-base text-slate-700 text-center font-medium leading-relaxed mt-3">
+            <AlertDialogDescription className="text-center">
               Are you sure you want to delete the budget: <br/>
-              <span className="font-bold text-red-700">"{deleteConfig.title}"</span>?
+              <span className="font-semibold text-foreground">"{deleteConfig.title}"</span>?
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <AlertDialogFooter className="flex flex-row items-center gap-3 mt-8">
-            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-xs tracking-wider rounded-xl">
-              Cancel
-            </AlertDialogCancel>
+          <AlertDialogFooter className="flex items-center gap-2 mt-4">
+            <AlertDialogCancel className="flex-1">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="flex-[1.5] h-11 font-black uppercase text-xs tracking-wider rounded-xl bg-red-600 hover:bg-red-700 text-white"
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
             >
               Yes, Delete
             </AlertDialogAction>

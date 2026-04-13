@@ -1,29 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Calculator, Save } from "lucide-react";
-
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle,
+  SheetDescription 
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -31,24 +21,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from "@/components/ui/form";
+import { Calculator, Save, Loader2 } from "lucide-react";
+
+// Budget Types as requested
+const BUDGET_TYPES = [
+  { value: "TRANSPORT_EXAMS", label: "TRANSPORTATION OF EXAMINATIONS" },
+  { value: "TRANSPORT_STATIONERY", label: "TRANSPORTATION OF EXAMINATION STATIONERIES" },
+  { value: "TRANSPORT_CERTIFICATES", label: "TRANSPORTATION OF CERTIFICATES" },
+  { value: "EXAM_ADMINISTRATION", label: "EXAMINATION ADMINISTRATION" },
+  { value: "EXAM_MONITORING", label: "EXAMINATION MONITORING" },
+  // PLACEHOLDER: ADD NEW BUDGET TYPES HERE
+] as const;
 
 const budgetFormSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
   year: z.coerce.number().min(2000).max(2100),
-  type: z.enum(["TRANSPORT_EXAMS", "STATIONERY", "MONITORING"], {
-    required_error: "Please select a budget type.",
-  }),
+  type: z.string({ required_error: "Please select a budget type." }),
 });
 
 export type BudgetFormValues = z.infer<typeof budgetFormSchema>;
 
-interface AddBudgetFormProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface AddBudgetDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
   onSuccess: (values: BudgetFormValues) => void;
 }
 
-const AddBudgetForm: React.FC<AddBudgetFormProps> = ({ open, onOpenChange, onSuccess }) => {
+const AddBudgetDrawer = ({ isOpen, onClose, onSuccess }: AddBudgetDrawerProps) => {
   const [loading, setLoading] = useState(false);
 
   const form = useForm<BudgetFormValues>({
@@ -62,95 +69,114 @@ const AddBudgetForm: React.FC<AddBudgetFormProps> = ({ open, onOpenChange, onSuc
 
   const onSubmit = async (values: BudgetFormValues) => {
     setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Logic for Supabase Insert would go here
+    await new Promise(resolve => setTimeout(resolve, 800)); 
     onSuccess(values);
     setLoading(false);
-    onOpenChange(false);
+    onClose();
     form.reset();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-            <Calculator className="h-5 w-5 text-indigo-600" />
-            Create New Budget
-          </DialogTitle>
-          <DialogDescription>
-            Initialize a new budget plan for examination activities.
-          </DialogDescription>
-        </DialogHeader>
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent className="sm:max-w-[500px] p-0 flex flex-col bg-white overflow-hidden">
+        {/* Header Section */}
+        <div className="px-6 py-5 border-b bg-slate-50/50">
+          <SheetHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-600 text-white rounded-lg">
+                <Calculator className="h-5 w-5" />
+              </div>
+              <div>
+                <SheetTitle className="text-xl font-bold">Create New Budget</SheetTitle>
+                <SheetDescription>Initialize a new financial plan for examination logistics.</SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+        </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-bold uppercase tracking-wider text-slate-500">Budget Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. National Exam Transport 2024" {...field} className="h-11 rounded-xl" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+        {/* Form Body */}
+        <div className="flex-1 px-8 py-6 overflow-y-auto">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
-                name="year"
+                name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-slate-500">Fiscal Year</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase text-slate-500">Budget Title</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} className="h-11 rounded-xl" />
+                      <Input placeholder="e.g. National Exam Transport 2024" {...field} className="h-10" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-slate-500">Budget Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold uppercase text-slate-500">Fiscal Year</FormLabel>
                       <FormControl>
-                        <SelectTrigger className="h-11 rounded-xl">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
+                        <Input type="number" {...field} className="h-10" />
                       </FormControl>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="TRANSPORT_EXAMS">Transport of Exams</SelectItem>
-                        <SelectItem value="STATIONERY">Stationery</SelectItem>
-                        <SelectItem value="MONITORING">Monitoring</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-8">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Create Budget</>}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold uppercase text-slate-500">Budget Category</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {BUDGET_TYPES.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* PLACEHOLDER: ADD ADDITIONAL BUDGET FIELDS HERE 
+                (e.g., Estimated Cost, Department, etc.)
+              */}
+            </form>
+          </Form>
+        </div>
+
+        {/* Action Footer */}
+        <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button 
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8" 
+            disabled={loading}
+            onClick={form.handleSubmit(onSubmit)}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Save Budget</>}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 };
 
-export default AddBudgetForm;
+export default AddBudgetDrawer;
