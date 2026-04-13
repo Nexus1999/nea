@@ -11,9 +11,7 @@ import {
   AlertTriangle,
   Search,
   Settings2,
-  RefreshCw,
-  Printer,
-  PlayCircle
+  RefreshCw
 } from "lucide-react";
 import {
   Table,
@@ -143,12 +141,6 @@ const BudgetsPage = () => {
     }
   };
 
-  const handlePrint = (budget: any) => {
-    showSuccess(`Preparing print view for ${budget.title}...`);
-    // In a real app, this would open a print-friendly route or generate a PDF
-    window.print();
-  };
-
   return (
     <Card className="relative min-h-[600px]">
       {loading && (
@@ -198,87 +190,64 @@ const BudgetsPage = () => {
                 </TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Created At</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {currentItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No budget records found.
                   </TableCell>
                 </TableRow>
               ) : (
-                currentItems.map(budget => {
-                  const isTransport = budget.type === 'TRANSPORT_EXAMS';
-                  
-                  return (
-                    <TableRow key={budget.id}>
-                      <TableCell className="font-medium">{budget.title}</TableCell>
-                      <TableCell>{budget.year}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-wider">
-                          {budget.type.replace(/_/g, ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(budget.status)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {isTransport ? (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                                title="Action Plan"
-                                onClick={() => navigate(`/dashboard/budgets/transportation/action-plan/${budget.id}`)}
-                              >
-                                <Settings2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                title="Implementation"
-                                onClick={() => navigate(`/dashboard/budgets/transportation/implementation/${budget.id}`)}
-                              >
-                                <PlayCircle className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-slate-600 hover:text-slate-700 hover:bg-slate-50"
-                                title="Print"
-                                onClick={() => handlePrint(budget)}
-                              >
-                                <Printer className="h-4 w-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              title="View Template"
-                              onClick={() => navigate(`/dashboard/budgets/template/${budget.id}`)}
-                            >
-                              <FileText className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-red-700 hover:bg-red-50"
-                            title="Delete"
-                            onClick={() => setDeleteConfig({ open: true, id: budget.id, title: budget.title })}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                currentItems.map(budget => (
+                  <TableRow key={budget.id}>
+                    <TableCell className="font-medium">{budget.title}</TableCell>
+                    <TableCell>{budget.year}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-wider">
+                        {budget.type.replace(/_/g, ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(budget.status)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {format(new Date(budget.created_at), 'PPP')}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                          title="Action Plan"
+                          onClick={() => navigate(`/dashboard/budgets/action-plan/${budget.id}`)}
+                        >
+                          <Settings2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="View Template"
+                          onClick={() => navigate(`/dashboard/budgets/template/${budget.id}`)}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-red-700 hover:bg-red-50"
+                          title="Delete"
+                          onClick={() => setDeleteConfig({ open: true, id: budget.id, title: budget.title })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
