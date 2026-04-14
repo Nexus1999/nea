@@ -141,6 +141,33 @@ const BudgetsPage = () => {
     }
   };
 
+  const handleActionPlan = (budget: any) => {
+    // We pass the budget type in the state so the destination page can adapt if needed
+    if (budget.type === 'TRANSPORT_EXAMS') {
+      navigate(`/dashboard/budgets/transportation/action-plan/${budget.id}`, { 
+        state: { type: budget.type } 
+      });
+    } else {
+      // Fallback for other types
+      navigate(`/dashboard/budgets/action-plan/${budget.id}`, { 
+        state: { type: budget.type } 
+      });
+    }
+  };
+
+  const handleTemplate = (budget: any) => {
+    if (budget.type === 'TRANSPORT_EXAMS') {
+      navigate(`/dashboard/budgets/transportation/template/${budget.id}`, { 
+        state: { type: budget.type } 
+      });
+    } else {
+      // Fallback for other types
+      navigate(`/dashboard/budgets/template/${budget.id}`, { 
+        state: { type: budget.type } 
+      });
+    }
+  };
+
   return (
     <Card className="relative min-h-[600px]">
       {loading && (
@@ -222,7 +249,7 @@ const BudgetsPage = () => {
                           size="icon"
                           className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
                           title="Action Plan"
-                          onClick={() => navigate(`/dashboard/budgets/action-plan/${budget.id}`)}
+                          onClick={() => handleActionPlan(budget)}
                         >
                           <Settings2 className="h-4 w-4" />
                         </Button>
@@ -231,7 +258,7 @@ const BudgetsPage = () => {
                           size="icon"
                           className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           title="View Template"
-                          onClick={() => navigate(`/dashboard/budgets/template/${budget.id}`)}
+                          onClick={() => handleTemplate(budget)}
                         >
                           <FileText className="h-4 w-4" />
                         </Button>
