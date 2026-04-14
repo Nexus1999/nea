@@ -1,39 +1,34 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ChevronRight, 
-  ChevronLeft, 
   Plus, 
   Trash2, 
+  Edit2,
   Truck, 
-  Calendar, 
-  Package,
+  Shield,
   ArrowRight,
-  PlusCircle,
-  Car,
-  Info,
-  MapPin
+  LayoutDashboard,
+  Weight,
+  Package,
+  MapPin,
+  Calendar
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { showSuccess } from "@/utils/toast";
-
-interface Vehicle {
-  id: string;
-  type: 'LORRY' | 'ESCORT_HARDTOP' | 'ESCORT_COASTER';
-  quantity: number;
-}
+import RouteFormDrawer from "@/components/budgets/transportation/RouteFormDrawer";
 
 interface Region {
   id: string;
@@ -48,84 +43,64 @@ interface Route {
   name: string;
   loadingDate: string;
   startDate: string;
+  lorryCount: number;
+  escortCount: number;
   regions: Region[];
-  vehicles: Vehicle[];
 }
 
 const ActionPlanPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
   
   const [routes, setRoutes] = useState<Route[]>([
     { 
       id: '1', 
-      name: 'Northern Route', 
-      loadingDate: '', 
-      startDate: '',
-      regions: [],
-      vehicles: [
-        { id: 'v1', type: 'LORRY', quantity: 1 },
-        { id: 'v2', type: 'ESCORT_HARDTOP', quantity: 1 }
+      name: 'NORTHERN ROUTE', 
+      loadingDate: '2024-10-15', 
+      startDate: '2024-10-16',
+      lorryCount: 1,
+      escortCount: 1,
+      regions: [
+        { id: 'r1', name: 'Arusha', boxes: 45, deliveryDate: '2024-10-17', receivingPlace: 'Regional Office' },
+        { id: 'r2', name: 'Kilimanjaro', boxes: 38, deliveryDate: '2024-10-18', receivingPlace: 'Police Station' }
       ]
     }
   ]);
 
-  const addRoute = () => {
-    setRoutes([...routes, {
-      id: Math.random().toString(36).substr(2, 9),
-      name: '',
-      loadingDate: '',
-      startDate: '',
-      regions: [],
-      vehicles: [
-        { id: Math.random().toString(36).substr(2, 9), type: 'LORRY', quantity: 1 },
-        { id: Math.random().toString(36).substr(2, 9), type: 'ESCORT_HARDTOP', quantity: 1 }
-      ]
-    }]);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
+
+  const handleAddRoute = () => {
+    setEditingRoute(null);
+    setIsDrawerOpen(true);
   };
 
-  const updateRoute = (routeId: string, field: keyof Route, value: any) => {
-    setRoutes(routes.map(r => r.id === routeId ? { ...r, [field]: value } : r));
+  const handleEditRoute = (route: Route) => {
+    setEditingRoute(route);
+    setIsDrawerOpen(true);
   };
 
-  const addVehicle = (routeId: string) => {
-    setRoutes(routes.map(r => r.id === routeId ? {
-      ...r,
-      vehicles: [...r.vehicles, { id: Math.random().toString(36).substr(2, 9), type: 'LORRY', quantity: 1 }]
-    } : r));
+  const handleFormSubmit = (data: any) => {
+    if (editingRoute) {
+      setRoutes(routes.map(r => r.id === editingRoute.id ? { ...data, id: r.id } : r));
+      showSuccess("Route updated successfully");
+    } else {
+      setRoutes([...routes, { ...data, id: Math.random().toString(36).substr(2, 9) }]);
+      showSuccess("New route added to action plan");
+    }
+    setIsDrawerOpen(false);
   };
 
-  const updateVehicle = (routeId: string, vehicleId: string, field: keyof Vehicle, value: any) => {
-    setRoutes(routes.map(r => r.id === routeId ? {
-      ...r,
-      vehicles: r.vehicles.map(v => v.id === vehicleId ? { ...v, [field]: value } : v)
-    } : r));
+  const handleDeleteRoute = (routeId: string) => {
+    setRoutes(routes.filter(r => r.id !== routeId));
+    showSuccess("Route removed");
   };
 
-  const addRegion = (routeId: string) => {
-    setRoutes(routes.map(r => r.id === routeId ? {
-      ...r,
-      regions: [...r.regions, {
-        id: Math.random().toString(36).substr(2, 9),
-        name: '',
-        boxes: 0,
-        deliveryDate: '',
-        receivingPlace: ''
-      }]
-    } : r));
-  };
-
-  const updateRegion = (routeId: string, regionId: string, field: keyof Region, value: any) => {
-    setRoutes(routes.map(r => r.id === routeId ? {
-      ...r,
-      regions: r.regions.map(reg => reg.id === regionId ? { ...reg, [field]: value } : reg)
-    } : r));
-  };
+  // Calculate weight in tons (34kg per box)
+  const calculateWeight = (boxes: number) => (boxes * 34) / 1000;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-20">
-      {/* Header */}
+    <div className="space-y-8 pb-24">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
@@ -133,234 +108,186 @@ const ActionPlanPage = () => {
             <ChevronRight className="w-3 h-3" />
             <span className="text-slate-900">Transportation Action Plan</span>
           </div>
-          <h1 className="text-3xl font-black uppercase tracking-tight text-slate-900">Action Plan Setup</h1>
+          <h1 className="text-3xl font-black uppercase tracking-tight text-slate-900">Action Plan</h1>
         </div>
 
-        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
-          <div className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all ${step === 1 ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>
-            <span className="text-[11px] font-black uppercase tracking-widest">1. Routes & Vehicles</span>
-          </div>
-          <div className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all ${step === 2 ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>
-            <span className="text-[11px] font-black uppercase tracking-widest">2. Regions & Delivery</span>
-          </div>
-        </div>
+        <Button onClick={handleAddRoute} className="h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[11px] tracking-widest px-8 shadow-xl shadow-indigo-100">
+          <Plus className="w-4 h-4 mr-2" /> Add New Route
+        </Button>
       </div>
 
-      {/* Info Banner */}
-      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex gap-4 items-start">
-        <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-100">
-          <Info className="w-5 h-5" />
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs font-black text-indigo-900 uppercase tracking-wider">System Requirements</p>
-          <p className="text-xs text-indigo-700 font-medium leading-relaxed">
-            Each route automatically includes <span className="font-bold">2 Police Officers</span>, <span className="font-bold">1 Security Officer</span>, and <span className="font-bold">1 Exam Officer per region</span>. 
-            Ensure at least one Lorry and one Escort vehicle are assigned per route.
-          </p>
-        </div>
-      </div>
-
-      {/* Step 1: Routes & Vehicles */}
-      {step === 1 && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex justify-between items-center">
-            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
-              <Truck className="w-4 h-4 text-indigo-600" />
-              Route Configuration
-            </h2>
-            <Button onClick={addRoute} className="h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest px-6">
-              <PlusCircle className="w-4 h-4 mr-2" /> Add New Route
-            </Button>
-          </div>
-
-          <div className="grid gap-6">
-            {routes.map((route, index) => (
-              <Card key={route.id} className="border-none shadow-sm rounded-3xl overflow-hidden ring-1 ring-slate-200">
-                <div className="bg-slate-50/80 px-8 py-5 border-b flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
-                    <Badge className="bg-slate-900 text-white rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest">Route #{index + 1}</Badge>
-                    <Input 
-                      className="h-10 bg-transparent border-none font-black text-xl uppercase tracking-tight focus-visible:ring-0 p-0 placeholder:text-slate-300" 
-                      placeholder="Enter Route Name (e.g. COASTAL ROUTE)..."
-                      value={route.name}
-                      onChange={(e) => updateRoute(route.id, 'name', e.target.value)}
-                    />
-                  </div>
-                  <Button variant="ghost" size="icon" className="text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={() => setRoutes(routes.filter(r => r.id !== route.id))}>
-                    <Trash2 className="w-5 h-5" />
-                  </Button>
-                </div>
-                
-                <CardContent className="p-8 space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5" /> Loading Date (Upakiaji)
-                      </label>
-                      <Input type="date" className="h-12 rounded-xl border-slate-200" value={route.loadingDate} onChange={(e) => updateRoute(route.id, 'loadingDate', e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5" /> Travel Start Date
-                      </label>
-                      <Input type="date" className="h-12 rounded-xl border-slate-200" value={route.startDate} onChange={(e) => updateRoute(route.id, 'startDate', e.target.value)} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                        <Car className="w-3.5 h-3.5" /> Vehicle Specification
-                      </h4>
-                      <Button variant="ghost" size="sm" className="h-8 text-indigo-600 font-bold uppercase text-[9px] tracking-widest" onClick={() => addVehicle(route.id)}>
-                        <Plus className="w-3 h-3 mr-1" /> Add Vehicle
-                      </Button>
-                    </div>
-                    
-                    <div className="grid gap-3">
-                      {route.vehicles.map((vehicle) => (
-                        <div key={vehicle.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                          <div className="flex-1">
-                            <Select value={vehicle.type} onValueChange={(val: any) => updateVehicle(route.id, vehicle.id, 'type', val)}>
-                              <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="LORRY">LORRY (Cargo)</SelectItem>
-                                <SelectItem value="ESCORT_HARDTOP">ESCORT (Hardtop)</SelectItem>
-                                <SelectItem value="ESCORT_COASTER">ESCORT (Coaster)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="w-32">
-                            <Input 
-                              type="number" 
-                              className="h-10 rounded-xl border-slate-200 bg-white" 
-                              value={vehicle.quantity} 
-                              onChange={(e) => updateVehicle(route.id, vehicle.id, 'quantity', parseInt(e.target.value))}
-                              placeholder="Qty"
-                            />
-                          </div>
-                          <Button variant="ghost" size="icon" className="text-slate-300 hover:text-red-600" onClick={() => updateRoute(route.id, 'vehicles', route.vehicles.filter(v => v.id !== vehicle.id))}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Step 2: Regions & Delivery */}
-      {step === 2 && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {routes.map((route) => (
-            <div key={route.id} className="space-y-4">
-              <div className="flex items-center gap-4 px-2">
-                <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-xl">
-                  <Truck className="w-6 h-6" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-black text-xl uppercase tracking-tight text-slate-900">{route.name || 'Unnamed Route'}</h3>
-                  <div className="flex gap-4 mt-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> Starts: {route.startDate || 'TBD'}
-                    </p>
-                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1">
-                      <Car className="w-3 h-3" /> {route.vehicles.reduce((sum, v) => sum + v.quantity, 0)} Vehicles
-                    </p>
-                  </div>
-                </div>
-                <Button onClick={() => addRegion(route.id)} className="h-10 rounded-xl bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest px-6">
-                  <Plus className="w-4 h-4 mr-2" /> Add Region
-                </Button>
+      <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden ring-1 ring-slate-200/50">
+        <CardHeader className="bg-slate-50/50 border-b px-10 py-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white text-slate-900 rounded-2xl flex items-center justify-center shadow-sm border border-slate-100">
+                <LayoutDashboard className="w-6 h-6" />
               </div>
-
-              <div className="grid gap-4">
-                {route.regions.length === 0 ? (
-                  <div className="p-12 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/30">
-                    <MapPin className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No regions assigned to this route yet</p>
-                  </div>
-                ) : (
-                  route.regions.map((region) => (
-                    <div key={region.id} className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-6 items-end group hover:border-indigo-200 transition-all">
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">Region Name</label>
-                        <Input 
-                          placeholder="e.g. Arusha" 
-                          className="h-11 rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white font-bold"
-                          value={region.name}
-                          onChange={(e) => updateRegion(route.id, region.id, 'name', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">Boxes</label>
-                        <div className="relative">
-                          <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <Input 
-                            type="number" 
-                            className="h-11 pl-10 rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white font-bold"
-                            value={region.boxes}
-                            onChange={(e) => updateRegion(route.id, region.id, 'boxes', parseInt(e.target.value))}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">Expected Delivery</label>
-                        <Input 
-                          type="date" 
-                          className="h-11 rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white"
-                          value={region.deliveryDate}
-                          onChange={(e) => updateRegion(route.id, region.id, 'deliveryDate', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">Receiving Place</label>
-                        <Input 
-                          placeholder="e.g. Police Station" 
-                          className="h-11 rounded-xl border-slate-100 bg-slate-50/50 focus:bg-white"
-                          value={region.receivingPlace}
-                          onChange={(e) => updateRegion(route.id, region.id, 'receivingPlace', e.target.value)}
-                        />
-                      </div>
-                      <div className="flex justify-end">
-                        <Button variant="ghost" size="icon" className="text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl h-11 w-11" onClick={() => updateRoute(route.id, 'regions', route.regions.filter(reg => reg.id !== region.id))}>
-                          <Trash2 className="w-5 h-5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
+              <div>
+                <CardTitle className="text-xl font-black uppercase tracking-tight">Route Distribution Matrix</CardTitle>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Defined routes and regional delivery schedules</p>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="flex gap-8">
+              <div className="text-center">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Routes</p>
+                <p className="text-2xl font-black text-slate-900">{routes.length}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Boxes</p>
+                <p className="text-2xl font-black text-indigo-600">
+                  {routes.reduce((sum, r) => sum + r.regions.reduce((s, reg) => s + reg.boxes, 0), 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50/80">
+                <TableRow className="hover:bg-transparent border-b border-slate-200">
+                  <TableHead className="w-[60px] text-[10px] font-black uppercase tracking-widest text-slate-500 px-8 py-5">NA</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Msafara (Route)</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Regions</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Receiving Place</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Delivery Date</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Boxes</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Uzito (Tons)</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Lori</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Escort</TableHead>
+                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-500 px-8">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {routes.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="h-64 text-center">
+                      <div className="flex flex-col items-center justify-center text-slate-300">
+                        <Truck className="w-12 h-12 mb-4 opacity-20" />
+                        <p className="text-[10px] font-black uppercase tracking-widest">No routes defined in action plan</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  routes.map((route, routeIdx) => (
+                    <React.Fragment key={route.id}>
+                      {route.regions.map((region, regionIdx) => (
+                        <TableRow key={region.id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
+                          {/* NA Column */}
+                          <TableCell className="px-8 py-4 text-xs font-bold text-slate-400">
+                            {routeIdx + 1}.{regionIdx + 1}
+                          </TableCell>
 
-      {/* Navigation Footer */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 z-50">
+                          {/* MSAFARA Column (Merged Vertically) */}
+                          {regionIdx === 0 && (
+                            <TableCell rowSpan={route.regions.length} className="bg-white border-r border-slate-100 align-top pt-4">
+                              <div className="space-y-1">
+                                <p className="font-black text-sm text-slate-900 uppercase tracking-tight">{route.name}</p>
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                                    <Calendar className="w-2.5 h-2.5" /> Load: {route.loadingDate}
+                                  </span>
+                                  <span className="text-[9px] font-bold text-indigo-600 uppercase flex items-center gap-1">
+                                    <Truck className="w-2.5 h-2.5" /> Start: {route.startDate}
+                                  </span>
+                                </div>
+                              </div>
+                            </TableCell>
+                          )}
+
+                          {/* Region Details */}
+                          <TableCell className="font-bold text-slate-700 text-sm">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-3 h-3 text-indigo-400" />
+                              {region.name}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-500 font-medium">{region.receivingPlace}</TableCell>
+                          <TableCell className="text-xs text-slate-500 font-medium">{region.deliveryDate}</TableCell>
+                          
+                          {/* Boxes & Weight */}
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="rounded-lg border-slate-200 font-black text-xs px-3 py-1">
+                              {region.boxes}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center">
+                              <span className="text-xs font-black text-slate-900">{calculateWeight(region.boxes).toFixed(2)}</span>
+                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Tons</span>
+                            </div>
+                          </TableCell>
+
+                          {/* Vehicles (Merged Vertically) */}
+                          {regionIdx === 0 && (
+                            <>
+                              <TableCell rowSpan={route.regions.length} className="bg-white border-x border-slate-100 text-center align-middle">
+                                <div className="flex flex-col items-center gap-1">
+                                  <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center mx-auto">
+                                    <Truck className="w-4 h-4" />
+                                  </div>
+                                  <span className="text-lg font-black text-slate-900">{route.lorryCount}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell rowSpan={route.regions.length} className="bg-white border-r border-slate-100 text-center align-middle">
+                                <div className="flex flex-col items-center gap-1">
+                                  <div className="w-8 h-8 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center mx-auto">
+                                    <Shield className="w-4 h-4" />
+                                  </div>
+                                  <span className="text-lg font-black text-slate-900">{route.escortCount}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell rowSpan={route.regions.length} className="bg-white px-8 text-right align-middle">
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="ghost" size="icon" onClick={() => handleEditRoute(route)} className="h-9 w-9 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteRoute(route.id)} className="h-9 w-9 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50">
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </>
+                          )}
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Footer Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 p-6 z-50">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <Button 
             variant="ghost" 
-            onClick={() => step === 1 ? navigate('/dashboard/budgets') : setStep(1)}
+            onClick={() => navigate('/dashboard/budgets')}
             className="text-slate-500 font-bold uppercase text-[10px] tracking-widest h-12 rounded-2xl px-8"
           >
-            <ChevronLeft className="w-4 h-4 mr-2" /> {step === 1 ? 'Cancel' : 'Previous Step'}
+            Cancel Action Plan
           </Button>
           
           <Button 
-            onClick={() => step === 1 ? setStep(2) : navigate(`/dashboard/budgets/transportation/template/${id}`)}
-            className="bg-slate-900 hover:bg-black text-white font-black uppercase text-[11px] tracking-widest h-12 rounded-2xl px-10 shadow-xl shadow-slate-200"
+            onClick={() => navigate(`/dashboard/budgets/transportation/template/${id}`)}
+            className="bg-slate-900 hover:bg-black text-white font-black uppercase text-[11px] tracking-widest h-12 rounded-2xl px-12 shadow-2xl shadow-slate-200"
+            disabled={routes.length === 0}
           >
-            {step === 1 ? 'Next: Assign Regions' : 'Generate Budget Template'} <ArrowRight className="w-4 h-4 ml-2" />
+            Generate Budget Template <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
       </div>
+
+      <RouteFormDrawer 
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onSubmit={handleFormSubmit}
+        initialData={editingRoute}
+      />
     </div>
   );
 };
