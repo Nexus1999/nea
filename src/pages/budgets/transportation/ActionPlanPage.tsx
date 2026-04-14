@@ -210,13 +210,8 @@ const ActionPlanPage = () => {
     <div className="space-y-6 pb-12">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/budgets')} className="rounded-full">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Transportation Action Plan</h1>
-            <p className="text-sm text-slate-500">Manage distribution routes and logistics</p>
-          </div>
+           
+           
         </div>
         <Button size="sm" className="h-9 gap-1 bg-slate-900 hover:bg-slate-800" onClick={handleAddRoute} disabled={loading}>
           <PlusCircle className="h-4 w-4" />
@@ -296,15 +291,15 @@ const ActionPlanPage = () => {
               <TableHeader className="bg-slate-50/80">
                 <TableRow className="hover:bg-transparent border-b border-slate-200">
                   <TableHead className="w-[60px] text-[10px] font-black uppercase tracking-widest text-slate-500 px-8 py-5">NA</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Msafara (Route)</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Regions</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Receiving Place</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Delivery Date</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Boxes</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Uzito (Tons)</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Msafara </TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mikoa</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mahali Pa Kupokelea</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Siku ya kupokea</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Makasha</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Uzito</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Lori</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Escort</TableHead>
-                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-500 px-8">Actions</TableHead>
+                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-500 px-8">Vitendo</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
