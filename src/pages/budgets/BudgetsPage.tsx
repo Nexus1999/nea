@@ -7,7 +7,6 @@ import {
   PlusCircle, 
   Trash2, 
   ArrowUpDown, 
-  FileText, 
   AlertTriangle,
   Search,
   Settings2,
@@ -110,8 +109,6 @@ const BudgetsPage = () => {
     switch (status) {
       case 'DRAFT':
         return <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 font-medium px-2 py-0 h-5">DRAFT</Badge>;
-      case 'TEMPLATE_GENERATED':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 font-medium px-2 py-0 h-5">TEMPLATE</Badge>;
       case 'IMPLEMENTED':
         return <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 font-medium px-2 py-0 h-5">IMPLEMENTED</Badge>;
       default:
@@ -142,29 +139,10 @@ const BudgetsPage = () => {
   };
 
   const handleActionPlan = (budget: any) => {
-    // We pass the budget type in the state so the destination page can adapt if needed
     if (budget.type === 'TRANSPORT_EXAMS') {
-      navigate(`/dashboard/budgets/transportation/action-plan/${budget.id}`, { 
-        state: { type: budget.type } 
-      });
+      navigate(`/dashboard/budgets/transportation/action-plan/${budget.id}`);
     } else {
-      // Fallback for other types
-      navigate(`/dashboard/budgets/action-plan/${budget.id}`, { 
-        state: { type: budget.type } 
-      });
-    }
-  };
-
-  const handleTemplate = (budget: any) => {
-    if (budget.type === 'TRANSPORT_EXAMS') {
-      navigate(`/dashboard/budgets/transportation/template/${budget.id}`, { 
-        state: { type: budget.type } 
-      });
-    } else {
-      // Fallback for other types
-      navigate(`/dashboard/budgets/template/${budget.id}`, { 
-        state: { type: budget.type } 
-      });
+      navigate(`/dashboard/budgets/action-plan/${budget.id}`);
     }
   };
 
@@ -252,15 +230,6 @@ const BudgetsPage = () => {
                           onClick={() => handleActionPlan(budget)}
                         >
                           <Settings2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="View Template"
-                          onClick={() => handleTemplate(budget)}
-                        >
-                          <FileText className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
