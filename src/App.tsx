@@ -43,7 +43,7 @@ import AuditLogs from "./pages/security/AuditLogs";
 
 // Budget Module Pages
 import BudgetsPage from "./pages/budgets/BudgetsPage";
-import ActionPlanPage from "./pages/budgets/ActionPlanPage";
+import TransportationActionPlanPage from "./pages/budgets/transportation/ActionPlanPage";
 import TemplatePage from "./pages/budgets/TemplatePage";
 
 const queryClient = new QueryClient();
@@ -121,7 +121,7 @@ const App = () => (
 
               {/* Budget Module Routes */}
               <Route path="budgets" element={<BudgetsPage />} />
-              <Route path="budgets/action-plan/:id" element={<ActionPlanPage />} />
+              <Route path="budgets/transportation/action-plan/:id" element={<TransportationActionPlanPage />} />
               <Route path="budgets/template/:id" element={<TemplatePage />} />
 
               {/* Add more routes as needed */}
