@@ -69,7 +69,7 @@ const ActionPlanPage = () => {
           transportation_route_vehicles(*)
         `)
         .eq('budget_id', budgetId)
-        .order('created_at');
+        .order('id', { ascending: true }); // Changed from created_at to id
 
       if (error) throw error;
       setRoutes(data || []);
@@ -190,8 +190,8 @@ const ActionPlanPage = () => {
     let totalEscorts = 0;
     
     routes.forEach(r => {
-      totalBoxes += r.transportation_route_regions.reduce((sum: number, reg: any) => sum + reg.boxes, 0);
-      totalLorries += r.transportation_route_vehicles.find((v: any) => v.vehicle_type.startsWith('LORRY'))?.quantity || 0;
+      totalBoxes += r.transportation_route_regions?.reduce((sum: number, reg: any) => sum + reg.boxes, 0) || 0;
+      totalLorries += r.transportation_route_vehicles?.find((v: any) => v.vehicle_type.startsWith('LORRY'))?.quantity || 0;
       totalEscorts += 1;
     });
 
@@ -320,7 +320,7 @@ const ActionPlanPage = () => {
                 ) : (
                   routes.map((route, routeIdx) => (
                     <React.Fragment key={route.id}>
-                      {route.transportation_route_regions.map((region: any, regionIdx: number) => (
+                      {route.transportation_route_regions?.map((region: any, regionIdx: number) => (
                         <TableRow key={region.id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
                           <TableCell className="px-8 py-4 text-xs font-bold text-slate-400">
                             {routeIdx + 1}.{regionIdx + 1}
@@ -371,7 +371,7 @@ const ActionPlanPage = () => {
                                     <Truck className="w-4 h-4" />
                                   </div>
                                   <span className="text-lg font-black text-slate-900">
-                                    {route.transportation_route_vehicles.find((v: any) => v.vehicle_type.startsWith('LORRY'))?.quantity || 0}
+                                    {route.transportation_route_vehicles?.find((v: any) => v.vehicle_type.startsWith('LORRY'))?.quantity || 0}
                                   </span>
                                 </div>
                               </TableCell>
