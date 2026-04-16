@@ -32,6 +32,7 @@ import Subjects from "./pages/settings/Subjects";
 import Examinations from "./pages/settings/Examinations";
 import Regions from "./pages/settings/Regions";
 import Districts from "./pages/settings/Districts";
+import RegionalDistances from "./pages/settings/RegionalDistances";
 
 // Security Module Pages
 import SecurityOverview from "./pages/security/SecurityOverview";
@@ -118,6 +119,7 @@ const App = () => (
               <Route path="settings/examinations" element={<Examinations />} />
               <Route path="settings/regions" element={<Regions />} />
               <Route path="settings/districts" element={<Districts />} />
+              <Route path="settings/regional-distances" element={<RegionalDistances />} />
 
               {/* Budget Module Routes */}
               <Route path="budgets" element={<BudgetsPage />} />

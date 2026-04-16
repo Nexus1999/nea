@@ -5,7 +5,7 @@ import { useLocation, useNavigate, Link, Outlet } from "react-router-dom";
 import {
   Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags, Shield, FileText, Settings,
   Menu, Bell, User, ChevronDown, LogOut, X, Users, LayoutDashboard,
-  Globe, MapPin, BookOpen, GraduationCap
+  Globe, MapPin, BookOpen, GraduationCap, Navigation
 } from "lucide-react";
  
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -71,6 +71,7 @@ const navItems = [
     subItems: [
       { path: '/dashboard/settings/regions', label: 'Regions', icon: Globe, key: 'SettingsRegions' },
       { path: '/dashboard/settings/districts', label: 'Districts', icon: MapPin, key: 'SettingsDistricts' },
+      { path: '/dashboard/settings/regional-distances', label: 'Regional Distances', icon: Navigation, key: 'SettingsDistances' },
       { path: '/dashboard/settings/examinations', label: 'Examinations', icon: BookOpen, key: 'SettingsExaminations' },
       { path: '/dashboard/settings/subjects', label: 'Subjects', icon: GraduationCap, key: 'SettingsSubjects' },
     ]
@@ -170,119 +171,6 @@ const DashboardLayout = () => {
           msOverflowStyle: 'none',
           scrollbarWidth: 'none'
         }}
-      >
-        <div className="flex flex-col h-full">
-          <div className="p-6 border-b border-white/10 flex justify-between items-center h-20">
-            <div className={`flex items-center gap-3 ${isDesktopSidebarCollapsed ? 'justify-center w-full' : ''}`}>
-              <div className="p-2.5 bg-gradient-to-br from-red-500 via-orange-500 to-yellow-400 rounded-xl shadow-lg ring-2 ring-white/20">
-                <NectaLogo className="w-6 h-6" />
-              </div>
-              {!isDesktopSidebarCollapsed && (
-                <div>
-                  <h1 className="text-white font-black text-lg">NEAS</h1>
-                  <p className="text-xs text-gray-400 font-medium">Admin System</p>
-                </div>
-              )}
-            </div>
-            <button onClick={() => setIsMobileSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white">
-              <X size={24} />
-            </button>
-          </div>
-
-          <nav className="flex-1 p-4 space-y-2">
-            {filteredNavItems.map((item) => {
-              const isActive = location.pathname === item.path || (item.subItems && location.pathname.startsWith(item.path));
-              
-              if (item.subItems) {
-                const isSubMenuOpen =
-                  item.key === 'Security' ? isSecuritySubMenuOpen :
-                  item.key === 'Settings' ? isSettingsSubMenuOpen :
-                  item.key === 'Institutions' ? isInstitutionsSubMenuOpen :
-                  item.key === 'Miscellaneous' ? isMiscellaneousSubMenuOpen : false;
-
-                const setIsSubMenuOpen =
-                  item.key === 'Security' ? setIsSecuritySubMenuOpen :
-                  item.key === 'Settings' ? setIsSettingsSubMenuOpen :
-                  item.key === 'Institutions' ? setIsInstitutionsSubMenuOpen :
-                  item.key === 'Miscellaneous' ? setIsMiscellaneousSubMenuOpen : () => {};
-
-                return (
-                  <Collapsible key={item.key} open={isSubMenuOpen} onOpenChange={setIsSubMenuOpen} className="space-y-2">
-                    <CollapsibleTrigger asChild>
-                      <motion.div
-                        whileHover={{ x: 2 }}
-                        className={`flex items-center justify-between gap-3 p-3 rounded-lg transition-colors cursor-pointer ${
-                          isActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
-                        } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <item.icon className="h-5 w-5" />
-                          {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">{item.label}</span>}
-                        </div>
-                        {!isDesktopSidebarCollapsed && (
-                          <ChevronDown className={`h-4 w-4 transition-transform ${isSubMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
-                        )}
-                      </motion.div>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="ml-4 space-y-1">
-                      {item.subItems.map((subItem) => {
-                        const isSubItemActive = location.pathname === subItem.path;
-                        return (
-                          <Link key={subItem.key} to={subItem.path} onClick={() => setIsMobileSidebarOpen(false)}>
-                            <motion.div
-                              whileHover={{ x: 2 }}
-                              className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                                isSubItemActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
-                              } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
-                            >
-                              <subItem.icon className="h-5 w-5" />
-                              {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">{subItem.label}</span>}
-                            </motion.div>
-                          </Link>
-                        );
-                      })}
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              }
-
-              return (
-                <Link key={item.key} to={item.path} onClick={() => setIsMobileSidebarOpen(false)}>
-                  <motion.div
-                    whileHover={{ x: 2 }}
-                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                      isActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
-                    } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">{item.label}</span>}
-                  </motion.div>
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="p-4 border-t border-white/10 space-y-2">
-            <div className={`flex items-center gap-3 p-2 bg-white/5 rounded-lg ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}>
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center ring-2 ring-white/20">
-                <User className="w-5 h-5 text-white" />
-              </div>
-              {!isDesktopSidebarCollapsed && (
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-white truncate">{user?.email || "User"}</p>
-                  <p className="text-xs text-gray-400">{userRole || "Loading Role..."}</p>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={handleLogout}
-              className={`w-full flex items-center justify-start text-gray-300 hover:bg-white/10 hover:text-white p-3 rounded-lg transition-colors ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
-            >
-              <LogOut className={`h-5 w-5 ${!isDesktopSidebarCollapsed ? 'mr-3' : ''}`} />
-              {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">Logout</span>}
-            </button>
-          </div>
-        </div>
       </motion.aside>
 
       <div className="flex-1 flex flex-col">
