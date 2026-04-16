@@ -69,7 +69,7 @@ const ActionPlanPage = () => {
           transportation_route_vehicles(*)
         `)
         .eq('budget_id', budgetId)
-        .order('id', { ascending: true }); // Changed from created_at to id
+        .order('id', { ascending: true });
 
       if (error) throw error;
       setRoutes(data || []);
@@ -122,10 +122,11 @@ const ActionPlanPage = () => {
           receiving_place: r.receivingPlace
         })));
 
-        await supabase.from('transportation_route_vehicles').insert([
-          { route_id: editingRoute.id, vehicle_type: `LORRY_${formData.lorryType}`, quantity: formData.lorryCount },
-          { route_id: editingRoute.id, vehicle_type: `ESCORT_${formData.escortType}`, quantity: 1 }
-        ]);
+        await supabase.from('transportation_route_vehicles').insert(formData.vehicles.map((v: any) => ({
+          route_id: editingRoute.id,
+          vehicle_type: v.type,
+          quantity: v.quantity
+        })));
 
         showSuccess("Route updated successfully");
       } else {
@@ -150,10 +151,11 @@ const ActionPlanPage = () => {
           receiving_place: r.receivingPlace
         })));
 
-        await supabase.from('transportation_route_vehicles').insert([
-          { route_id: routeData.id, vehicle_type: `LORRY_${formData.lorryType}`, quantity: formData.lorryCount },
-          { route_id: routeData.id, vehicle_type: `ESCORT_${formData.escortType}`, quantity: 1 }
-        ]);
+        await supabase.from('transportation_route_vehicles').insert(formData.vehicles.map((v: any) => ({
+          route_id: routeData.id,
+          vehicle_type: v.type,
+          quantity: v.quantity
+        })));
 
         showSuccess("New route added successfully");
       }
@@ -191,8 +193,8 @@ const ActionPlanPage = () => {
     
     routes.forEach(r => {
       totalBoxes += r.transportation_route_regions?.reduce((sum: number, reg: any) => sum + reg.boxes, 0) || 0;
-      totalLorries += r.transportation_route_vehicles?.find((v: any) => v.vehicle_type.startsWith('LORRY'))?.quantity || 0;
-      totalEscorts += 1;
+      totalLorries += r.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('LORRY')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0;
+      totalEscorts += r.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('ESCORT')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0;
     });
 
     return {
@@ -210,8 +212,13 @@ const ActionPlanPage = () => {
     <div className="space-y-6 pb-12">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-           
-           
+          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/budgets')} className="rounded-full">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Transportation Action Plan</h1>
+            <p className="text-sm text-slate-500">Manage distribution routes and logistics</p>
+          </div>
         </div>
         <Button size="sm" className="h-9 gap-1 bg-slate-900 hover:bg-slate-800" onClick={handleAddRoute} disabled={loading}>
           <PlusCircle className="h-4 w-4" />
@@ -291,21 +298,22 @@ const ActionPlanPage = () => {
               <TableHeader className="bg-slate-50/80">
                 <TableRow className="hover:bg-transparent border-b border-slate-200">
                   <TableHead className="w-[60px] text-[10px] font-black uppercase tracking-widest text-slate-500 px-8 py-5">NA</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Msafara </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mikoa</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mahali Pa Kupokelea</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Siku ya kupokea</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Makasha</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Uzito</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Msafara (Route)</TableHead>
+                  <TableHead className="w-[60px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">NA</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Regions</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Receiving Place</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Delivery Date</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Boxes</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Uzito (Tons)</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Lori</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Escort</TableHead>
-                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-500 px-8">Vitendo</TableHead>
+                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-500 px-8">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {routes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="h-64 text-center">
+                    <TableCell colSpan={11} className="h-64 text-center">
                       <div className="flex flex-col items-center justify-center text-slate-300">
                         <Truck className="w-12 h-12 mb-4 opacity-20" />
                         <p className="text-[10px] font-black uppercase tracking-widest">No routes defined in action plan</p>
@@ -317,9 +325,11 @@ const ActionPlanPage = () => {
                     <React.Fragment key={route.id}>
                       {route.transportation_route_regions?.map((region: any, regionIdx: number) => (
                         <TableRow key={region.id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
-                          <TableCell className="px-8 py-4 text-xs font-bold text-slate-400">
-                            {routeIdx + 1}.{regionIdx + 1}
-                          </TableCell>
+                          {regionIdx === 0 && (
+                            <TableCell rowSpan={route.transportation_route_regions.length} className="px-8 py-4 text-xs font-black text-slate-900 border-r border-slate-100 text-center align-middle">
+                              {routeIdx + 1}
+                            </TableCell>
+                          )}
 
                           {regionIdx === 0 && (
                             <TableCell rowSpan={route.transportation_route_regions.length} className="bg-white border-r border-slate-100 align-top pt-4">
@@ -336,6 +346,10 @@ const ActionPlanPage = () => {
                               </div>
                             </TableCell>
                           )}
+
+                          <TableCell className="text-center text-[10px] font-bold text-slate-400 border-r border-slate-100">
+                            {regionIdx + 1}
+                          </TableCell>
 
                           <TableCell className="font-bold text-slate-700 text-sm">
                             <div className="flex items-center gap-2">
@@ -366,7 +380,7 @@ const ActionPlanPage = () => {
                                     <Truck className="w-4 h-4" />
                                   </div>
                                   <span className="text-lg font-black text-slate-900">
-                                    {route.transportation_route_vehicles?.find((v: any) => v.vehicle_type.startsWith('LORRY'))?.quantity || 0}
+                                    {route.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('LORRY')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0}
                                   </span>
                                 </div>
                               </TableCell>
@@ -375,7 +389,9 @@ const ActionPlanPage = () => {
                                   <div className="w-8 h-8 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center mx-auto">
                                     <Shield className="w-4 h-4" />
                                   </div>
-                                  <span className="text-lg font-black text-slate-900">1</span>
+                                  <span className="text-lg font-black text-slate-900">
+                                    {route.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('ESCORT')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0}
+                                  </span>
                                 </div>
                               </TableCell>
                               <TableCell rowSpan={route.transportation_route_regions.length} className="bg-white px-8 text-right align-middle">

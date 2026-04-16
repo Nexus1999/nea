@@ -14,7 +14,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags, Shield, FileText,
   Settings, Users, LayoutDashboard, Globe, MapPin, BookOpen, GraduationCap, Accessibility,
-  UserCheck, User
+  UserCheck, User, Truck
 } from "lucide-react";
 
 // ── Icon map ──────────────────────────────────────────────────────────────
@@ -22,6 +22,8 @@ const iconMap: Record<string, React.ReactNode> = {
   dashboard: <Home className="h-4 w-4" />,
   timetables: <Clock className="h-4 w-4" />,
   budgets: <DollarSign className="h-4 w-4" />,
+  transportation: <Truck className="h-4 w-4" />,
+  'action-plan': <LayoutDashboard className="h-4 w-4" />,
   mastersummaries: <Database className="h-4 w-4" />,
   stationeries: <PenLine className="h-4 w-4" />,
   supervisors: <UserCog className="h-4 w-4" />,
@@ -56,6 +58,8 @@ const labelMap: Record<string, string> = {
   dashboard: "Dashboard",
   timetables: "Timetables",
   budgets: "Budgets",
+  transportation: "Budgets", // Map transportation to Budgets label
+  'action-plan': "Action Plan",
   mastersummaries: "Master Summaries",
   'special-needs': "Special Needs",
   stationeries: "Stationeries",
@@ -101,13 +105,11 @@ const DynamicBreadcrumbs = () => {
   const location = useLocation();
   const pathnames = location.pathname.split('/').filter(Boolean);
 
-  // Skip if on root /dashboard
   if (pathnames.length <= 1) return null;
 
   return (
     <Breadcrumb className="text-sm">
       <BreadcrumbList className="flex flex-wrap items-center gap-1.5">
-        {/* Dashboard */}
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
             <Link 
@@ -123,24 +125,18 @@ const DynamicBreadcrumbs = () => {
         {pathnames.slice(1).map((value, index) => {
           const actualIndex = index + 1;
           
-          // Skip numeric/UUID IDs or special need codes
           if (isSkippable(value)) {
             return null;
           }
 
-          // Check if this is the last VISIBLE segment
-          // It's the last if all subsequent segments are skippable
           const remainingSegments = pathnames.slice(actualIndex + 1);
           const isLastVisible = remainingSegments.every(seg => isSkippable(seg));
 
           let to = `/${pathnames.slice(0, actualIndex + 1).join('/')}`;
           
-          // Special handling for "Special Needs" link to include the ID if it follows
-          if (value === 'special-needs' && pathnames[actualIndex + 1]) {
-            const nextSegment = pathnames[actualIndex + 1];
-            if (/^\d+$/.test(nextSegment)) {
-              to = `/${pathnames.slice(0, actualIndex + 2).join('/')}`;
-            }
+          // Redirect transportation to budgets
+          if (value === 'transportation') {
+            to = '/dashboard/budgets';
           }
 
           const displayName = labelMap[value] || 

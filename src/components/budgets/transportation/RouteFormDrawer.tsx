@@ -22,7 +22,6 @@ import {
   MapPin, 
   Package, 
   Calendar,
-  Hash,
   Loader2
 } from "lucide-react";
 import {
@@ -39,9 +38,10 @@ const routeSchema = z.object({
   name: z.string().min(1, "Required"),
   loadingDate: z.string().min(1, "Required"),
   startDate: z.string().min(1, "Required"),
-  lorryType: z.enum(["HORSE", "HORSE AND TRAILER"]),
-  lorryCount: z.coerce.number().min(1).max(3),
-  escortType: z.enum(["HARDTOP", "COASTER"]),
+  vehicles: z.array(z.object({
+    type: z.string().min(1, "Required"),
+    quantity: z.coerce.number().min(1)
+  })).min(1, "At least one vehicle required"),
   regions: z.array(z.object({
     name: z.string().min(1, "Required"),
     boxes: z.coerce.number().min(1),
@@ -60,6 +60,13 @@ interface RouteFormDrawerProps {
   budgetId: string;
 }
 
+const VEHICLE_TYPES = [
+  { value: "LORRY_HORSE", label: "LORRY (HORSE)" },
+  { value: "LORRY_HORSE_AND_TRAILER", label: "LORRY (HORSE AND TRAILER)" },
+  { value: "ESCORT_HARDTOP", label: "ESCORT (HARDTOP)" },
+  { value: "ESCORT_COASTER", label: "ESCORT (COASTER)" },
+];
+
 const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDrawerProps) => {
   const [loading, setLoading] = useState(false);
   const [regionsList, setRegionsList] = useState<any[]>([]);
@@ -70,16 +77,19 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
       name: "",
       loadingDate: "",
       startDate: "",
-      lorryType: "HORSE",
-      lorryCount: 1,
-      escortType: "HARDTOP",
+      vehicles: [{ type: "LORRY_HORSE", quantity: 1 }],
       regions: [{ name: "", boxes: 0, deliveryDate: "", receivingPlace: "" }]
     }
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: regionFields, append: appendRegion, remove: removeRegion } = useFieldArray({
     control,
     name: "regions"
+  });
+
+  const { fields: vehicleFields, append: appendVehicle, remove: removeVehicle } = useFieldArray({
+    control,
+    name: "vehicles"
   });
 
   useEffect(() => {
@@ -93,22 +103,19 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
 
   useEffect(() => {
     if (initialData) {
-      // Map DB structure to form structure
-      const lorries = initialData.transportation_route_vehicles?.find((v: any) => v.vehicle_type.startsWith('LORRY'));
-      const escort = initialData.transportation_route_vehicles?.find((v: any) => v.vehicle_type.startsWith('ESCORT'));
-      
       reset({
         name: initialData.name,
         loadingDate: initialData.loading_date,
         startDate: initialData.start_date,
-        lorryType: lorries?.vehicle_type.replace('LORRY_', '') as any || "HORSE",
-        lorryCount: lorries?.quantity || 1,
-        escortType: escort?.vehicle_type.replace('ESCORT_', '') as any || "HARDTOP",
+        vehicles: initialData.transportation_route_vehicles?.map((v: any) => ({
+          type: v.vehicle_type,
+          quantity: v.quantity
+        })) || [{ type: "LORRY_HORSE", quantity: 1 }],
         regions: initialData.transportation_route_regions?.map((r: any) => ({
           name: r.region,
           boxes: r.boxes,
           deliveryDate: r.expected_delivery_date,
-          receivingPlace: r.receiving_place
+          receiving_place: r.receiving_place
         })) || [{ name: "", boxes: 0, deliveryDate: "", receivingPlace: "" }]
       });
     } else {
@@ -116,13 +123,35 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
         name: "",
         loadingDate: "",
         startDate: "",
-        lorryType: "HORSE",
-        lorryCount: 1,
-        escortType: "HARDTOP",
+        vehicles: [{ type: "LORRY_HORSE", quantity: 1 }],
         regions: [{ name: "", boxes: 0, deliveryDate: "", receivingPlace: "" }]
       });
     }
   }, [initialData, reset, isOpen]);
+
+  const handleMsafaraChange = (regionName: string) => {
+    setValue("name", regionName);
+    const regionData = regionsList.find(r => r.region_name === regionName);
+    
+    // Auto-add to regions list if not already there
+    const currentRegions = watch("regions");
+    const exists = currentRegions.some(r => r.name === regionName);
+    
+    if (!exists && regionData) {
+      // If the first region is empty, replace it, otherwise append
+      if (currentRegions.length === 1 && !currentRegions[0].name) {
+        setValue(`regions.0.name`, regionName);
+        setValue(`regions.0.receivingPlace`, regionData.town || "");
+      } else {
+        appendRegion({
+          name: regionName,
+          boxes: 0,
+          deliveryDate: watch("startDate") || "",
+          receivingPlace: regionData.town || ""
+        });
+      }
+    }
+  };
 
   const handleRegionChange = (index: number, regionName: string) => {
     const regionData = regionsList.find(r => r.region_name === regionName);
@@ -166,7 +195,7 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
               <Label className="text-slate-700 font-semibold flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-slate-400" /> Msafara (Destination Region)
               </Label>
-              <Select onValueChange={(val) => setValue("name", val)} value={watch("name")}>
+              <Select onValueChange={handleMsafaraChange} value={watch("name")}>
                 <SelectTrigger className="h-11 rounded-xl border-slate-200">
                   <SelectValue placeholder="Select destination region" />
                 </SelectTrigger>
@@ -176,7 +205,6 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
                   ))}
                 </SelectContent>
               </Select>
-              {errors.name && <p className="text-red-500 text-[10px] font-bold uppercase">{errors.name.message}</p>}
             </div>
 
             <div className="space-y-2">
@@ -196,67 +224,53 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
 
           {/* Vehicles Section */}
           <div className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 flex items-center gap-2">
-              <Truck className="w-4 h-4 text-blue-600" /> Vehicle Specification
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-semibold">Lorry Type</Label>
-                <Select onValueChange={(val: any) => setValue("lorryType", val)} value={watch("lorryType")}>
-                  <SelectTrigger className="h-11 rounded-xl bg-white border-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="HORSE">HORSE</SelectItem>
-                    <SelectItem value="HORSE AND TRAILER">HORSE AND TRAILER</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-semibold">Lorry Count</Label>
-                <Select onValueChange={(val) => setValue("lorryCount", parseInt(val))} value={watch("lorryCount").toString()}>
-                  <SelectTrigger className="h-11 rounded-xl bg-white border-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 Lorry</SelectItem>
-                    <SelectItem value="2">2 Lorries</SelectItem>
-                    <SelectItem value="3">3 Lorries</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-semibold">Escort Type</Label>
-                <Select onValueChange={(val: any) => setValue("escortType", val)} value={watch("escortType")}>
-                  <SelectTrigger className="h-11 rounded-xl bg-white border-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="HARDTOP">HARDTOP</SelectItem>
-                    <SelectItem value="COASTER">COASTER</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-semibold">Escort Count</Label>
-                <Input value="1" disabled className="h-11 rounded-xl bg-slate-100 border-slate-200 font-bold" />
-              </div>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 flex items-center gap-2">
+                <Truck className="w-4 h-4 text-blue-600" /> Vehicle Specification
+              </h3>
+              <Button type="button" variant="ghost" size="sm" onClick={() => appendVehicle({ type: "LORRY_HORSE", quantity: 1 })} className="h-7 text-blue-600 font-bold uppercase text-[9px] tracking-widest">
+                <Plus className="w-3 h-3 mr-1" /> Add Vehicle
+              </Button>
+            </div>
+            
+            <div className="space-y-3">
+              {vehicleFields.map((field, index) => (
+                <div key={field.id} className="flex items-end gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                  <div className="flex-1 space-y-1.5">
+                    <Label className="text-[9px] font-black uppercase text-slate-400">Vehicle Type</Label>
+                    <Select onValueChange={(val) => setValue(`vehicles.${index}.type`, val)} value={watch(`vehicles.${index}.type`)}>
+                      <SelectTrigger className="h-9 rounded-lg border-slate-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VEHICLE_TYPES.map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-24 space-y-1.5">
+                    <Label className="text-[9px] font-black uppercase text-slate-400">Count</Label>
+                    <Input type="number" {...register(`vehicles.${index}.quantity`)} className="h-9 rounded-lg border-slate-200" />
+                  </div>
+                  {vehicleFields.length > 1 && (
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeVehicle(index)} className="h-9 w-9 text-slate-300 hover:text-red-600">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Regions Section */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-blue-600" /> Regions & Delivery
-              </h3>
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ name: "", boxes: 0, deliveryDate: "", receivingPlace: "" })} className="h-8 rounded-lg border-slate-200 text-slate-600 font-bold uppercase text-[9px] tracking-widest">
-                <Plus className="w-3 h-3 mr-1" /> Add Region
-              </Button>
-            </div>
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-blue-600" /> Regions & Delivery
+            </h3>
 
             <div className="space-y-4">
-              {fields.map((field, index) => (
+              {regionFields.map((field, index) => (
                 <div key={field.id} className="p-5 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-4 relative group">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
@@ -288,14 +302,18 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
                       <Input {...register(`regions.${index}.receivingPlace`)} className="h-9 rounded-lg border-slate-200" />
                     </div>
                   </div>
-                  {fields.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-white border border-slate-100 text-slate-300 hover:text-red-600 shadow-sm">
+                  {regionFields.length > 1 && (
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeRegion(index)} className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-white border border-slate-100 text-slate-300 hover:text-red-600 shadow-sm">
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   )}
                 </div>
               ))}
             </div>
+
+            <Button type="button" variant="outline" onClick={() => appendRegion({ name: "", boxes: 0, deliveryDate: "", receivingPlace: "" })} className="w-full h-11 rounded-xl border-dashed border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 hover:text-blue-600 hover:border-blue-200 transition-all">
+              <Plus className="w-4 h-4 mr-2" /> Add Another Region
+            </Button>
           </div>
         </form>
 
