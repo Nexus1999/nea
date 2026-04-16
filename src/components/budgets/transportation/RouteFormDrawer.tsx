@@ -22,7 +22,9 @@ import {
   MapPin, 
   Package, 
   Calendar,
-  Loader2
+  Loader2,
+  Navigation,
+  ArrowRight
 } from "lucide-react";
 import {
   Select,
@@ -36,6 +38,7 @@ import { showError } from "@/utils/toast";
 
 const routeSchema = z.object({
   name: z.string().min(1, "Required"),
+  startingPoint: z.string().min(1, "Required"),
   loadingDate: z.string().min(1, "Required"),
   startDate: z.string().min(1, "Required"),
   vehicles: z.array(z.object({
@@ -75,6 +78,7 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
     resolver: zodResolver(routeSchema),
     defaultValues: {
       name: "",
+      startingPoint: "Dar es Salaam",
       loadingDate: "",
       startDate: "",
       vehicles: [{ type: "LORRY_HORSE", quantity: 1 }],
@@ -105,6 +109,7 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
     if (initialData) {
       reset({
         name: initialData.name,
+        startingPoint: initialData.starting_point || "Dar es Salaam",
         loadingDate: initialData.loading_date,
         startDate: initialData.start_date,
         vehicles: initialData.transportation_route_vehicles?.map((v: any) => ({
@@ -115,12 +120,13 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
           name: r.region,
           boxes: r.boxes,
           deliveryDate: r.expected_delivery_date,
-          receiving_place: r.receiving_place
+          receivingPlace: r.receiving_place
         })) || [{ name: "", boxes: 0, deliveryDate: "", receivingPlace: "" }]
       });
     } else {
       reset({
         name: "",
+        startingPoint: "Dar es Salaam",
         loadingDate: "",
         startDate: "",
         vehicles: [{ type: "LORRY_HORSE", quantity: 1 }],
@@ -133,12 +139,10 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
     setValue("name", regionName);
     const regionData = regionsList.find(r => r.region_name === regionName);
     
-    // Auto-add to regions list if not already there
     const currentRegions = watch("regions");
     const exists = currentRegions.some(r => r.name === regionName);
     
     if (!exists && regionData) {
-      // If the first region is empty, replace it, otherwise append
       if (currentRegions.length === 1 && !currentRegions[0].name) {
         setValue(`regions.0.name`, regionName);
         setValue(`regions.0.receivingPlace`, regionData.town || "");
@@ -173,31 +177,64 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
     }
   };
 
+  const currentPath = watch("regions");
+  const startPoint = watch("startingPoint");
+
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent className="sm:max-w-[650px] p-0 flex flex-col bg-white border-none shadow-2xl">
         <div className="bg-slate-900 text-white p-6">
           <SheetHeader>
             <SheetTitle className="text-xl font-bold flex items-center gap-2 text-white">
-              <Truck className="h-5 w-5 text-blue-400" />
-              {initialData ? 'Edit Route' : 'Add New Route'}
+              <Navigation className="h-5 w-5 text-blue-400" />
+              {initialData ? 'Edit Route Path' : 'Plan New Route Path'}
             </SheetTitle>
             <SheetDescription className="text-slate-400">
-              Define the route destination, schedule, and vehicle requirements.
+              Define the sequence of stops and logistics for this distribution route.
             </SheetDescription>
           </SheetHeader>
         </div>
 
         <form onSubmit={handleSubmit(onFormSubmit)} className="flex-1 overflow-y-auto p-6 space-y-8">
+          {/* Path Preview */}
+          <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 space-y-3">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-600 flex items-center gap-2">
+              <Navigation className="w-3 h-3" /> Journey Sequence
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="bg-white text-slate-600 border-slate-200">{startPoint}</Badge>
+              <ArrowRight className="w-3 h-3 text-slate-300" />
+              {currentPath.map((r, idx) => (
+                <React.Fragment key={idx}>
+                  {r.name && (
+                    <>
+                      <Badge className={idx === currentPath.length - 1 ? "bg-blue-600" : "bg-slate-800"}>
+                        {r.name}
+                      </Badge>
+                      {idx < currentPath.length - 1 && currentPath[idx+1].name && <ArrowRight className="w-3 h-3 text-slate-300" />}
+                    </>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
           {/* Route Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <Label className="text-slate-700 font-semibold flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-slate-400" /> Msafara (Destination Region)
+                <MapPin className="h-4 w-4 text-slate-400" /> Starting Point
+              </Label>
+              <Input {...register("startingPoint")} className="h-11 rounded-xl border-slate-200" placeholder="e.g. Dar es Salaam" />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-700 font-semibold flex items-center gap-2">
+                <Navigation className="h-4 w-4 text-slate-400" /> Msafara (Destination)
               </Label>
               <Select onValueChange={handleMsafaraChange} value={watch("name")}>
                 <SelectTrigger className="h-11 rounded-xl border-slate-200">
-                  <SelectValue placeholder="Select destination region" />
+                  <SelectValue placeholder="Select destination" />
                 </SelectTrigger>
                 <SelectContent>
                   {regionsList.map((r) => (
@@ -266,12 +303,15 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
           {/* Regions Section */}
           <div className="space-y-4">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-blue-600" /> Regions & Delivery
+              <MapPin className="w-4 h-4 text-blue-600" /> Path Stops (In Order)
             </h3>
 
             <div className="space-y-4">
               {regionFields.map((field, index) => (
                 <div key={field.id} className="p-5 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-4 relative group">
+                  <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-900 text-white text-[10px] font-black flex items-center justify-center shadow-lg">
+                    {index + 1}
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-[9px] font-black uppercase text-slate-400">Region Name</Label>
@@ -312,7 +352,7 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
             </div>
 
             <Button type="button" variant="outline" onClick={() => appendRegion({ name: "", boxes: 0, deliveryDate: "", receivingPlace: "" })} className="w-full h-11 rounded-xl border-dashed border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 hover:text-blue-600 hover:border-blue-200 transition-all">
-              <Plus className="w-4 h-4 mr-2" /> Add Another Region
+              <Plus className="w-4 h-4 mr-2" /> Add Next Stop
             </Button>
           </div>
         </form>
@@ -320,7 +360,7 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData }: RouteFormDr
         <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3">
           <Button variant="ghost" onClick={onClose} disabled={loading} className="rounded-xl font-bold uppercase text-[10px] tracking-widest">Cancel</Button>
           <Button onClick={handleSubmit(onFormSubmit)} disabled={loading} className="bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl h-11 min-w-[140px]">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (initialData ? 'Update Route' : 'Save Route')}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (initialData ? 'Update Path' : 'Save Path')}
           </Button>
         </div>
       </SheetContent>

@@ -15,7 +15,9 @@ import {
   AlertTriangle,
   Package,
   Weight,
-  ArrowLeft
+  ArrowLeft,
+  Navigation,
+  ArrowRight
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,7 +74,16 @@ const ActionPlanPage = () => {
         .order('id', { ascending: true });
 
       if (error) throw error;
-      setRoutes(data || []);
+      
+      // Sort regions by sequence_order if it exists, otherwise by id
+      const processedData = data?.map(route => ({
+        ...route,
+        transportation_route_regions: route.transportation_route_regions.sort((a: any, b: any) => 
+          (a.sequence_order || 0) - (b.sequence_order || 0)
+        )
+      }));
+
+      setRoutes(processedData || []);
     } catch (err: any) {
       showError(err.message || "Failed to fetch routes");
     } finally {
@@ -105,7 +116,8 @@ const ActionPlanPage = () => {
           .update({
             name: formData.name,
             loading_date: formData.loadingDate,
-            start_date: formData.startDate
+            start_date: formData.startDate,
+            starting_point: formData.startingPoint || 'Dar es Salaam'
           })
           .eq('id', editingRoute.id);
 
@@ -114,12 +126,13 @@ const ActionPlanPage = () => {
         await supabase.from('transportation_route_regions').delete().eq('route_id', editingRoute.id);
         await supabase.from('transportation_route_vehicles').delete().eq('route_id', editingRoute.id);
 
-        await supabase.from('transportation_route_regions').insert(formData.regions.map((r: any) => ({
+        await supabase.from('transportation_route_regions').insert(formData.regions.map((r: any, idx: number) => ({
           route_id: editingRoute.id,
           region: r.name,
           boxes: r.boxes,
           expected_delivery_date: r.deliveryDate,
-          receiving_place: r.receivingPlace
+          receiving_place: r.receivingPlace,
+          sequence_order: idx
         })));
 
         await supabase.from('transportation_route_vehicles').insert(formData.vehicles.map((v: any) => ({
@@ -136,19 +149,21 @@ const ActionPlanPage = () => {
             budget_id: parseInt(budgetId),
             name: formData.name,
             loading_date: formData.loadingDate,
-            start_date: formData.startDate
+            start_date: formData.startDate,
+            starting_point: formData.startingPoint || 'Dar es Salaam'
           })
           .select()
           .single();
 
         if (routeError) throw routeError;
 
-        await supabase.from('transportation_route_regions').insert(formData.regions.map((r: any) => ({
+        await supabase.from('transportation_route_regions').insert(formData.regions.map((r: any, idx: number) => ({
           route_id: routeData.id,
           region: r.name,
           boxes: r.boxes,
           expected_delivery_date: r.deliveryDate,
-          receiving_place: r.receivingPlace
+          receiving_place: r.receivingPlace,
+          sequence_order: idx
         })));
 
         await supabase.from('transportation_route_vehicles').insert(formData.vehicles.map((v: any) => ({
@@ -190,11 +205,14 @@ const ActionPlanPage = () => {
     let totalBoxes = 0;
     let totalLorries = 0;
     let totalEscorts = 0;
+    let totalDistance = 0;
     
     routes.forEach(r => {
       totalBoxes += r.transportation_route_regions?.reduce((sum: number, reg: any) => sum + reg.boxes, 0) || 0;
       totalLorries += r.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('LORRY')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0;
       totalEscorts += r.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('ESCORT')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0;
+      // Placeholder for distance calculation
+      totalDistance += 0; 
     });
 
     return {
@@ -202,7 +220,8 @@ const ActionPlanPage = () => {
       boxes: totalBoxes,
       weight: (totalBoxes * 34) / 1000,
       lorries: totalLorries,
-      escorts: totalEscorts
+      escorts: totalEscorts,
+      distance: totalDistance
     };
   }, [routes]);
 
@@ -298,7 +317,7 @@ const ActionPlanPage = () => {
               <TableHeader className="bg-slate-50/80">
                 <TableRow className="hover:bg-transparent border-b border-slate-200">
                   <TableHead className="w-[60px] text-[10px] font-black uppercase tracking-widest text-slate-500 px-8 py-5">NA</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Msafara (Route)</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Msafara (Route Path)</TableHead>
                   <TableHead className="w-[60px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">NA</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Regions</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Receiving Place</TableHead>
@@ -332,16 +351,35 @@ const ActionPlanPage = () => {
                           )}
 
                           {regionIdx === 0 && (
-                            <TableCell rowSpan={route.transportation_route_regions.length} className="bg-white border-r border-slate-100 align-top pt-4">
-                              <div className="space-y-1">
-                                <p className="font-black text-sm text-slate-900 uppercase tracking-tight">{route.name}</p>
-                                <div className="flex flex-col gap-1">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                                    <Calendar className="w-2.5 h-2.5" /> Load: {route.loading_date}
-                                  </span>
-                                  <span className="text-[9px] font-bold text-blue-600 uppercase flex items-center gap-1">
-                                    <Truck className="w-2.5 h-2.5" /> Start: {route.start_date}
-                                  </span>
+                            <TableCell rowSpan={route.transportation_route_regions.length} className="bg-white border-r border-slate-100 align-top pt-4 min-w-[200px]">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="font-black text-sm text-slate-900 uppercase tracking-tight">{route.name}</p>
+                                  <div className="flex flex-col gap-1 mt-1">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                                      <Calendar className="w-2.5 h-2.5" /> Load: {route.loading_date}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-blue-600 uppercase flex items-center gap-1">
+                                      <Truck className="w-2.5 h-2.5" /> Start: {route.start_date}
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {/* Path Visualization */}
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
+                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Route Path</p>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[9px] font-bold text-slate-500">{route.starting_point || 'Dar'}</span>
+                                    <ArrowRight className="w-2 h-2 text-slate-300" />
+                                    {route.transportation_route_regions.map((r: any, idx: number) => (
+                                      <React.Fragment key={r.id}>
+                                        <span className={`text-[9px] font-black ${idx === route.transportation_route_regions.length - 1 ? 'text-blue-600' : 'text-slate-700'}`}>
+                                          {r.region}
+                                        </span>
+                                        {idx < route.transportation_route_regions.length - 1 && <ArrowRight className="w-2 h-2 text-slate-300" />}
+                                      </React.Fragment>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                             </TableCell>
