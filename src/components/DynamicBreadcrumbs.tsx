@@ -144,8 +144,11 @@ const DynamicBreadcrumbs = () => {
 
           const icon = iconMap[value] || <FileText className="h-4 w-4" />;
 
+          // Use a unique key combining index and value to avoid duplicates
+          const itemKey = `breadcrumb-${actualIndex}-${value}`;
+
           return (
-            <React.Fragment key={to}>
+            <React.Fragment key={itemKey}>
               <BreadcrumbSeparator>
                 <ChevronRight className="h-4 w-4 text-gray-400" />
               </BreadcrumbSeparator>
