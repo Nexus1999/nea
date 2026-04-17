@@ -141,10 +141,10 @@ const RouteFormDrawer: React.FC<RouteFormDrawerProps> = ({
           type: v.vehicle_type,
           quantity: v.quantity,
         })) || [{ type: "LORRY_HORSE_AND_TRAILER", quantity: 1 }],
-        regions: initialData.transportation_route_regions?.map((r: any) => ({
-          name: r.region,
-          boxes: r.boxes,
-          deliveryDate: r.expected_delivery_date,
+        regions: initialData.transportation_route_stops?.map((r: any) => ({
+          name: r.region_name,
+          boxes: r.boxes_count,
+          deliveryDate: r.delivery_date,
           receivingPlace: r.receiving_place,
         })) || [{ name: "", boxes: 0, deliveryDate: "", receivingPlace: "" }],
       });
