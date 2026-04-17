@@ -7,11 +7,11 @@ import { Truck, MapPin, Calendar, Package, ArrowRight, Info } from "lucide-react
 import { SuggestedMsafara } from "@/utils/intelligentRoutePlanner";
 
 interface SmartRouteSuggesterProps {
-  routes: SuggestedMsafara[];
+  routes?: SuggestedMsafara[];
 }
 
-const SmartRouteSuggester: React.FC<SmartRouteSuggesterProps> = ({ routes }) => {
-  if (routes.length === 0) return null;
+const SmartRouteSuggester: React.FC<SmartRouteSuggesterProps> = ({ routes = [] }) => {
+  if (!routes || routes.length === 0) return null;
 
   return (
     <div className="space-y-6">
