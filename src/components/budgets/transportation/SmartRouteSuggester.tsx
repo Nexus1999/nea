@@ -9,6 +9,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   Sparkles, 
   Truck, 
@@ -17,7 +19,8 @@ import {
   ArrowRight, 
   Loader2,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  RefreshCw
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { generateIntelligentRoutes, SuggestedMsafara, RegionDemand } from "@/utils/intelligentRoutePlanner";
@@ -36,23 +39,23 @@ const SmartRouteSuggester: React.FC<SmartRouteSuggesterProps> = ({
   isOpen,
   onClose,
   onSelect,
-  loadingDate,
+  loadingDate: initialLoadingDate,
   budgetId,
 }) => {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestedMsafara[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(initialLoadingDate || "");
 
-  const fetchAndPlan = async () => {
-    if (!loadingDate) {
-      setError("Please select a loading date in the form first.");
+  const fetchAndPlan = async (dateToUse: string) => {
+    if (!dateToUse) {
+      setError("Please select a loading date to generate suggestions.");
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch demands from the new table
       const { data, error: fetchError } = await supabase
         .from('transportation_region_boxes')
         .select('region_name, boxes_count')
@@ -67,14 +70,12 @@ const SmartRouteSuggester: React.FC<SmartRouteSuggesterProps> = ({
         return;
       }
 
-      // 2. Map to the planner interface
       const demands: RegionDemand[] = data.map(d => ({
         region: d.region_name,
         boxes: d.boxes_count
       }));
 
-      // 3. Generate intelligent routes
-      const plannedRoutes = generateIntelligentRoutes(demands, loadingDate);
+      const plannedRoutes = generateIntelligentRoutes(demands, dateToUse);
       setSuggestions(plannedRoutes);
     } catch (err: any) {
       setError(err.message || "Failed to generate suggestions");
@@ -85,9 +86,12 @@ const SmartRouteSuggester: React.FC<SmartRouteSuggesterProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      fetchAndPlan();
+      setSelectedDate(initialLoadingDate || "");
+      if (initialLoadingDate) {
+        fetchAndPlan(initialLoadingDate);
+      }
     }
-  }, [isOpen, loadingDate, budgetId]);
+  }, [isOpen, initialLoadingDate]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -103,9 +107,29 @@ const SmartRouteSuggester: React.FC<SmartRouteSuggesterProps> = ({
               </DialogTitle>
             </div>
             <DialogDescription className="text-slate-400 text-base">
-              Based on your <span className="text-indigo-400 font-bold">Regional Demands</span>, we've optimized the logistics for maximum efficiency.
+              Plan your logistics sequence based on real-time regional demands.
             </DialogDescription>
           </DialogHeader>
+
+          <div className="mt-6 flex items-end gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
+            <div className="flex-1 space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Loading Date</Label>
+              <Input 
+                type="date" 
+                value={selectedDate} 
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-white/10 border-white/20 text-white h-11 rounded-xl focus:ring-indigo-500"
+              />
+            </div>
+            <Button 
+              onClick={() => fetchAndPlan(selectedDate)} 
+              disabled={loading || !selectedDate}
+              className="h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest px-6 rounded-xl"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              Generate Suggestions
+            </Button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-hidden bg-slate-50">
@@ -121,13 +145,14 @@ const SmartRouteSuggester: React.FC<SmartRouteSuggesterProps> = ({
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-2">Action Required</h3>
               <p className="text-slate-500 max-w-md">{error}</p>
-              <Button 
-                variant="outline" 
-                className="mt-6 rounded-xl border-slate-200 font-bold uppercase text-[10px] tracking-widest"
-                onClick={onClose}
-              >
-                Close & Fix
-              </Button>
+            </div>
+          ) : suggestions.length === 0 ? (
+            <div className="h-[400px] flex flex-col items-center justify-center p-12 text-center">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                <Calendar className="h-8 w-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Ready to Plan</h3>
+              <p className="text-slate-500 max-w-md">Select a loading date above to see optimized route suggestions.</p>
             </div>
           ) : (
             <ScrollArea className="h-[500px] p-6">

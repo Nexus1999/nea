@@ -1,100 +1,75 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  PlusCircle, 
-  Trash2, 
-  Edit2,
+  ChevronLeft, 
+  Plus, 
   Truck, 
-  Shield,
-  LayoutDashboard,
-  MapPin,
-  Calendar,
-  RefreshCw,
-  AlertTriangle,
+  Calendar, 
+  MapPin, 
   Package,
-  Weight,
-  ArrowLeft,
+  Edit,
+  Trash2,
+  ArrowRight,
   Navigation,
-  ArrowRight
+  AlertCircle,
+  Loader2,
+  Save
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
-import RouteFormDrawer from "@/components/budgets/transportation/RouteFormDrawer";
+import { showSuccess, showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
+import RouteFormDrawer from "@/components/budgets/transportation/RouteFormDrawer";
 
 const ActionPlanPage = () => {
-  const { id: budgetId } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
-  
-  const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [budget, setBudget] = useState<any>(null);
+  const [routes, setRoutes] = useState<any[]>([]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingRoute, setEditingRoute] = useState<any>(null);
-  const [deleteConfig, setDeleteConfig] = useState<{ open: boolean; id: string | null; name: string }>({
-    open: false,
-    id: null,
-    name: ''
-  });
 
-  const fetchRoutes = useCallback(async () => {
-    if (!budgetId) return;
+  const fetchPlanData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1. Fetch Budget Info
+      const { data: budgetData, error: bError } = await supabase
+        .from('budgets')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (bError) throw bError;
+      setBudget(budgetData);
+
+      // 2. Fetch Routes with Vehicles and STOPS (using the correct relationship)
+      const { data: routesData, error: rError } = await supabase
         .from('transportation_routes')
         .select(`
           *,
-          transportation_route_regions(*),
-          transportation_route_vehicles(*)
+          transportation_route_vehicles (*),
+          transportation_route_stops (*)
         `)
-        .eq('budget_id', budgetId)
-        .order('id', { ascending: true });
+        .eq('budget_id', id)
+        .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      
-      // Sort regions by sequence_order if it exists, otherwise by id
-      const processedData = data?.map(route => ({
-        ...route,
-        transportation_route_regions: route.transportation_route_regions.sort((a: any, b: any) => 
-          (a.sequence_order || 0) - (b.sequence_order || 0)
-        )
-      }));
-
-      setRoutes(processedData || []);
+      if (rError) throw rError;
+      setRoutes(routesData || []);
     } catch (err: any) {
-      showError(err.message || "Failed to fetch routes");
+      showError(err.message || "Failed to load action plan");
     } finally {
       setLoading(false);
     }
-  }, [budgetId]);
+  }, [id]);
 
   useEffect(() => {
-    document.title = "Action Plan | NEAS";
-    fetchRoutes();
-  }, [fetchRoutes]);
+    fetchPlanData();
+  }, [fetchPlanData]);
 
   const handleAddRoute = () => {
     setEditingRoute(null);
@@ -106,407 +81,210 @@ const ActionPlanPage = () => {
     setIsDrawerOpen(true);
   };
 
-  const handleFormSubmit = async (formData: any) => {
-    if (!budgetId) return;
-
-    try {
-      if (editingRoute) {
-        const { error: routeError } = await supabase
-          .from('transportation_routes')
-          .update({
-            name: formData.name,
-            loading_date: formData.loadingDate,
-            start_date: formData.startDate,
-            starting_point: formData.startingPoint || 'Dar es Salaam'
-          })
-          .eq('id', editingRoute.id);
-
-        if (routeError) throw routeError;
-
-        await supabase.from('transportation_route_regions').delete().eq('route_id', editingRoute.id);
-        await supabase.from('transportation_route_vehicles').delete().eq('route_id', editingRoute.id);
-
-        await supabase.from('transportation_route_regions').insert(formData.regions.map((r: any, idx: number) => ({
-          route_id: editingRoute.id,
-          region: r.name,
-          boxes: r.boxes,
-          expected_delivery_date: r.deliveryDate,
-          receiving_place: r.receivingPlace,
-          sequence_order: idx
-        })));
-
-        await supabase.from('transportation_route_vehicles').insert(formData.vehicles.map((v: any) => ({
-          route_id: editingRoute.id,
-          vehicle_type: v.type,
-          quantity: v.quantity
-        })));
-
-        showSuccess("Route updated successfully");
-      } else {
-        const { data: routeData, error: routeError } = await supabase
-          .from('transportation_routes')
-          .insert({
-            budget_id: parseInt(budgetId),
-            name: formData.name,
-            loading_date: formData.loadingDate,
-            start_date: formData.startDate,
-            starting_point: formData.startingPoint || 'Dar es Salaam'
-          })
-          .select()
-          .single();
-
-        if (routeError) throw routeError;
-
-        await supabase.from('transportation_route_regions').insert(formData.regions.map((r: any, idx: number) => ({
-          route_id: routeData.id,
-          region: r.name,
-          boxes: r.boxes,
-          expected_delivery_date: r.deliveryDate,
-          receiving_place: r.receivingPlace,
-          sequence_order: idx
-        })));
-
-        await supabase.from('transportation_route_vehicles').insert(formData.vehicles.map((v: any) => ({
-          route_id: routeData.id,
-          vehicle_type: v.type,
-          quantity: v.quantity
-        })));
-
-        showSuccess("New route added successfully");
-      }
-      fetchRoutes();
-    } catch (err: any) {
-      showError(err.message || "Failed to save route");
-      throw err;
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteConfig.id) return;
-    setLoading(true);
+  const handleDeleteRoute = async (routeId: string) => {
+    if (!confirm("Are you sure you want to delete this route?")) return;
+    
     try {
       const { error } = await supabase
         .from('transportation_routes')
         .delete()
-        .eq('id', deleteConfig.id);
+        .eq('id', routeId);
 
       if (error) throw error;
-      showSuccess("Route deleted successfully");
-      fetchRoutes();
+      showSuccess("Route deleted");
+      fetchPlanData();
     } catch (err: any) {
-      showError(err.message || "Failed to delete route");
-    } finally {
-      setLoading(false);
-      setDeleteConfig({ open: false, id: null, name: '' });
+      showError(err.message);
     }
   };
 
-  const stats = useMemo(() => {
-    let totalBoxes = 0;
-    let totalLorries = 0;
-    let totalEscorts = 0;
-    let totalDistance = 0;
-    
-    routes.forEach(r => {
-      totalBoxes += r.transportation_route_regions?.reduce((sum: number, reg: any) => sum + reg.boxes, 0) || 0;
-      totalLorries += r.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('LORRY')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0;
-      totalEscorts += r.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('ESCORT')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0;
-      // Placeholder for distance calculation
-      totalDistance += 0; 
-    });
+  const handleSaveRoute = async (formData: any) => {
+    try {
+      const routePayload = {
+        budget_id: id,
+        name: formData.name,
+        starting_point: formData.startingPoint,
+        loading_date: formData.loadingDate,
+        start_date: formData.startDate,
+        total_boxes: formData.regions.reduce((sum: number, r: any) => sum + Number(r.boxes), 0),
+        total_tons: (formData.regions.reduce((sum: number, r: any) => sum + Number(r.boxes), 0) * 34) / 1000,
+      };
 
-    return {
-      routes: routes.length,
-      boxes: totalBoxes,
-      weight: (totalBoxes * 34) / 1000,
-      lorries: totalLorries,
-      escorts: totalEscorts,
-      distance: totalDistance
-    };
-  }, [routes]);
+      let routeId = editingRoute?.id;
 
-  const calculateWeight = (boxes: number) => (boxes * 34) / 1000;
+      if (editingRoute) {
+        const { error } = await supabase
+          .from('transportation_routes')
+          .update(routePayload)
+          .eq('id', editingRoute.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('transportation_routes')
+          .insert(routePayload)
+          .select()
+          .single();
+        if (error) throw error;
+        routeId = data.id;
+      }
+
+      // Clear existing vehicles and stops if editing
+      if (editingRoute) {
+        await supabase.from('transportation_route_vehicles').delete().eq('route_id', routeId);
+        await supabase.from('transportation_route_stops').delete().eq('route_id', routeId);
+      }
+
+      // Insert Vehicles
+      const vehiclePayload = formData.vehicles.map((v: any) => ({
+        route_id: routeId,
+        vehicle_type: v.type,
+        quantity: v.quantity
+      }));
+      await supabase.from('transportation_route_vehicles').insert(vehiclePayload);
+
+      // Insert Stops
+      const stopPayload = formData.regions.map((r: any, idx: number) => ({
+        route_id: routeId,
+        region_name: r.name,
+        receiving_place: r.receivingPlace,
+        boxes_count: r.boxes,
+        delivery_date: r.deliveryDate,
+        sequence_order: idx
+      }));
+      await supabase.from('transportation_route_stops').insert(stopPayload);
+
+      showSuccess("Route saved successfully");
+      fetchPlanData();
+    } catch (err: any) {
+      showError(err.message);
+      throw err;
+    }
+  };
+
+  if (loading) return <div className="h-screen flex items-center justify-center"><Spinner size="lg" /></div>;
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/budgets')} className="rounded-full">
-            <ArrowLeft className="h-5 w-5" />
+            <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Transportation Action Plan</h1>
-            <p className="text-sm text-slate-500">Manage distribution routes and logistics</p>
+            <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">Transportation Action Plan</h1>
+            <p className="text-sm text-slate-500 font-medium">{budget?.title} • FY {budget?.year}</p>
           </div>
         </div>
-        <Button size="sm" className="h-9 gap-1 bg-slate-900 hover:bg-slate-800" onClick={handleAddRoute} disabled={loading}>
-          <PlusCircle className="h-4 w-4" />
-          <span>Add New Route</span>
+        <Button onClick={handleAddRoute} className="bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest h-11 px-6 rounded-xl">
+          <Plus className="w-4 h-4 mr-2" /> Plan New Route
         </Button>
       </div>
 
-      {/* Summary Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-              <LayoutDashboard size={20} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Routes</p>
-              <p className="text-xl font-black text-slate-900">{stats.routes}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-              <Package size={20} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Boxes</p>
-              <p className="text-xl font-black text-slate-900">{stats.boxes}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-              <Weight size={20} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Weight</p>
-              <p className="text-xl font-black text-slate-900">{stats.weight.toFixed(2)} <span className="text-xs font-bold text-slate-400">Tons</span></p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-              <Truck size={20} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lorries</p>
-              <p className="text-xl font-black text-slate-900">{stats.lorries}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
-              <Shield size={20} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Escorts</p>
-              <p className="text-xl font-black text-slate-900">{stats.escorts}</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-6">
+        {routes.length === 0 ? (
+          <Card className="border-dashed border-2 border-slate-200 bg-slate-50/50">
+            <CardContent className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
+                <Navigation className="w-8 h-8 text-slate-300" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">No Routes Planned Yet</h3>
+              <p className="text-slate-500 max-w-xs mt-2">Start by planning your first transportation route for this budget.</p>
+              <Button onClick={handleAddRoute} variant="outline" className="mt-6 rounded-xl font-bold uppercase text-[10px] tracking-widest">
+                Create First Route
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          routes.map((route) => (
+            <Card key={route.id} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="bg-slate-50/50 border-b py-4 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100">
+                    <Truck className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-black uppercase tracking-tight">{route.name}</CardTitle>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                        <Calendar className="w-3 h-3" /> Starts: {route.start_date}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> From: {route.starting_point}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" onClick={() => handleEditRoute(route)} className="h-8 w-8 text-slate-400 hover:text-indigo-600">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteRoute(route.id)} className="h-8 w-8 text-slate-400 hover:text-red-600">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2 space-y-6">
+                    <div className="space-y-3">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Route Sequence</p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 font-bold px-3 py-1">
+                          {route.starting_point}
+                        </Badge>
+                        {route.transportation_route_stops?.sort((a: any, b: any) => a.sequence_order - b.sequence_order).map((stop: any, idx: number) => (
+                          <React.Fragment key={stop.id}>
+                            <ArrowRight className="w-3 h-3 text-slate-300" />
+                            <div className="flex flex-col items-center">
+                              <Badge className="bg-indigo-600 text-white font-bold px-3 py-1">
+                                {stop.region_name}
+                              </Badge>
+                              <span className="text-[8px] font-bold text-slate-400 mt-1">{stop.delivery_date}</span>
+                            </div>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      {route.transportation_route_vehicles?.map((v: any) => (
+                        <div key={v.id} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl border border-blue-100">
+                          <Truck className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-black uppercase tracking-widest">{v.quantity}x {v.vehicle_type.replace(/_/g, ' ')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900 rounded-2xl p-6 text-white flex flex-col justify-center">
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Total Load</p>
+                        <div className="flex items-baseline gap-2">
+                          <h4 className="text-3xl font-black tracking-tighter">{route.total_boxes}</h4>
+                          <span className="text-xs font-bold text-slate-400 uppercase">Boxes</span>
+                        </div>
+                      </div>
+                      <div className="pt-4 border-t border-white/10">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Estimated Weight</p>
+                        <h4 className="text-xl font-black tracking-tight">{route.total_tons} Tons</h4>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
-      <Card className="relative min-h-[400px] border-none shadow-sm rounded-2xl overflow-hidden">
-        {loading && (
-          <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
-            <Spinner label="Loading routes..." size="lg" />
-          </div>
-        )}
-
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-50/80">
-                <TableRow className="hover:bg-transparent border-b border-slate-200">
-                  <TableHead className="w-[60px] text-[10px] font-black uppercase tracking-widest text-slate-500 px-8 py-5">NA</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Msafara (Route Path)</TableHead>
-                  <TableHead className="w-[60px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">NA</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Regions</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Receiving Place</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Delivery Date</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Boxes</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Uzito (Tons)</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Lori</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Escort</TableHead>
-                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-500 px-8">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {routes.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={11} className="h-64 text-center">
-                      <div className="flex flex-col items-center justify-center text-slate-300">
-                        <Truck className="w-12 h-12 mb-4 opacity-20" />
-                        <p className="text-[10px] font-black uppercase tracking-widest">No routes defined in action plan</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  routes.map((route, routeIdx) => (
-                    <React.Fragment key={route.id}>
-                      {route.transportation_route_regions?.map((region: any, regionIdx: number) => (
-                        <TableRow key={region.id} className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
-                          {regionIdx === 0 && (
-                            <TableCell rowSpan={route.transportation_route_regions.length} className="px-8 py-4 text-xs font-black text-slate-900 border-r border-slate-100 text-center align-middle">
-                              {routeIdx + 1}
-                            </TableCell>
-                          )}
-
-                          {regionIdx === 0 && (
-                            <TableCell rowSpan={route.transportation_route_regions.length} className="bg-white border-r border-slate-100 align-top pt-4 min-w-[200px]">
-                              <div className="space-y-3">
-                                <div>
-                                  <p className="font-black text-sm text-slate-900 uppercase tracking-tight">{route.name}</p>
-                                  <div className="flex flex-col gap-1 mt-1">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                                      <Calendar className="w-2.5 h-2.5" /> Load: {route.loading_date}
-                                    </span>
-                                    <span className="text-[9px] font-bold text-blue-600 uppercase flex items-center gap-1">
-                                      <Truck className="w-2.5 h-2.5" /> Start: {route.start_date}
-                                    </span>
-                                  </div>
-                                </div>
-                                
-                                {/* Path Visualization */}
-                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
-                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Route Path</p>
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-[9px] font-bold text-slate-500">{route.starting_point || 'Dar'}</span>
-                                    <ArrowRight className="w-2 h-2 text-slate-300" />
-                                    {route.transportation_route_regions.map((r: any, idx: number) => (
-                                      <React.Fragment key={r.id}>
-                                        <span className={`text-[9px] font-black ${idx === route.transportation_route_regions.length - 1 ? 'text-blue-600' : 'text-slate-700'}`}>
-                                          {r.region}
-                                        </span>
-                                        {idx < route.transportation_route_regions.length - 1 && <ArrowRight className="w-2 h-2 text-slate-300" />}
-                                      </React.Fragment>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                          )}
-
-                          <TableCell className="text-center text-[10px] font-bold text-slate-400 border-r border-slate-100">
-                            {regionIdx + 1}
-                          </TableCell>
-
-                          <TableCell className="font-bold text-slate-700 text-sm">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="w-3 h-3 text-blue-400" />
-                              {region.region}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-xs text-slate-500 font-medium">{region.receiving_place}</TableCell>
-                          <TableCell className="text-xs text-slate-500 font-medium">{region.expected_delivery_date}</TableCell>
-                          
-                          <TableCell className="text-center">
-                            <Badge variant="outline" className="rounded-lg border-slate-200 font-black text-xs px-3 py-1">
-                              {region.boxes}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex flex-col items-center">
-                              <span className="text-xs font-black text-slate-900">{calculateWeight(region.boxes).toFixed(2)}</span>
-                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Tons</span>
-                            </div>
-                          </TableCell>
-
-                          {regionIdx === 0 && (
-                            <>
-                              <TableCell rowSpan={route.transportation_route_regions.length} className="bg-white border-x border-slate-100 text-center align-middle">
-                                <div className="flex flex-col items-center gap-1">
-                                  <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center mx-auto">
-                                    <Truck className="w-4 h-4" />
-                                  </div>
-                                  <span className="text-lg font-black text-slate-900">
-                                    {route.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('LORRY')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell rowSpan={route.transportation_route_regions.length} className="bg-white border-r border-slate-100 text-center align-middle">
-                                <div className="flex flex-col items-center gap-1">
-                                  <div className="w-8 h-8 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center mx-auto">
-                                    <Shield className="w-4 h-4" />
-                                  </div>
-                                  <span className="text-lg font-black text-slate-900">
-                                    {route.transportation_route_vehicles?.filter((v: any) => v.vehicle_type.startsWith('ESCORT')).reduce((sum: number, v: any) => sum + v.quantity, 0) || 0}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell rowSpan={route.transportation_route_regions.length} className="bg-white px-8 text-right align-middle">
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="icon" onClick={() => handleEditRoute(route)} className="h-9 w-9 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50">
-                                    <Edit2 className="w-4 h-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" onClick={() => setDeleteConfig({ open: true, id: route.id, name: route.name })} className="h-9 w-9 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50">
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </>
-                          )}
-                        </TableRow>
-                      ))}
-                    </React.Fragment>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <RouteFormDrawer 
+      <RouteFormDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        onSubmit={handleFormSubmit}
+        onSubmit={handleSaveRoute}
         initialData={editingRoute}
-        budgetId={budgetId || ""}
+        budgetId={id!}
       />
-
-      <AlertDialog
-        open={deleteConfig.open}
-        onOpenChange={(open) => setDeleteConfig(prev => ({ ...prev, open }))}
-      >
-        <AlertDialogContent className="max-w-[420px] rounded-2xl border border-slate-200 shadow-2xl p-6">
-          <AlertDialogHeader>
-            <div className="flex flex-col items-center text-center mb-2">
-              <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
-                <AlertTriangle className="h-7 w-7" />
-              </div>
-              <AlertDialogTitle className="font-black text-xl uppercase tracking-tight text-slate-900">
-                Are you sure?
-              </AlertDialogTitle>
-            </div>
-            <AlertDialogDescription className="text-base text-slate-700 text-center font-medium leading-relaxed mt-3">
-              Are you sure you want to delete the route{" "}
-              <span className="font-bold text-red-700">
-                "{deleteConfig.name}"
-              </span>
-              ? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter className="flex flex-row items-center gap-3 mt-8">
-            <AlertDialogCancel className="flex-1 h-11 font-bold uppercase text-xs tracking-wider rounded-xl">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              disabled={loading}
-              className="flex-[1.5] h-11 font-black uppercase text-xs tracking-wider rounded-xl bg-red-600 hover:bg-red-700 text-white"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Deleting...
-                </span>
-              ) : (
-                "Yes, Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };
