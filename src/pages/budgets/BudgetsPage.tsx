@@ -10,7 +10,8 @@ import {
   AlertTriangle,
   Search,
   Settings2,
-  RefreshCw
+  RefreshCw,
+  Package
 } from "lucide-react";
 import {
   Table,
@@ -36,6 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import Spinner from "@/components/Spinner";
 import PaginationControls from "@/components/ui/pagination-controls";
 import AddBudgetDrawer from "@/components/budgets/AddBudgetDrawer";
+import RegionalDemandsDrawer from "@/components/budgets/RegionalDemandsDrawer";
 import { cn } from "@/lib/utils";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,6 +47,8 @@ const BudgetsPage = () => {
   const [budgets, setBudgets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isDemandsOpen, setIsDemandsOpen] = useState(false);
+  const [selectedBudget, setSelectedBudget] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [orderBy, setOrderBy] = useState<string>('created_at');
   const [order, setOrder] = useState<'desc' | 'asc'>('desc');
@@ -146,6 +150,11 @@ const BudgetsPage = () => {
     }
   };
 
+  const handleOpenDemands = (budget: any) => {
+    setSelectedBudget(budget);
+    setIsDemandsOpen(true);
+  };
+
   return (
     <Card className="relative min-h-[600px]">
       {loading && (
@@ -226,6 +235,15 @@ const BudgetsPage = () => {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                          title="Regional Demands"
+                          onClick={() => handleOpenDemands(budget)}
+                        >
+                          <Package className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
                           title="Action Plan"
                           onClick={() => handleActionPlan(budget)}
                         >
@@ -263,6 +281,15 @@ const BudgetsPage = () => {
         onClose={() => setIsDrawerOpen(false)}
         onSuccess={fetchBudgets}
       />
+
+      {selectedBudget && (
+        <RegionalDemandsDrawer
+          isOpen={isDemandsOpen}
+          onClose={() => setIsDemandsOpen(false)}
+          budgetId={selectedBudget.id}
+          budgetTitle={selectedBudget.title}
+        />
+      )}
 
       <AlertDialog
         open={deleteConfig.open}

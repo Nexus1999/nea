@@ -24,7 +24,7 @@ const RegionalDemandsTable: React.FC<RegionalDemandsTableProps> = ({ budgetId, o
       setLoading(true);
       try {
         const { data, error } = await supabase
-          .from('budget_regional_demands')
+          .from('transportation_region_boxes')
           .select('region_name, boxes_count')
           .eq('budget_id', budgetId);
 
@@ -63,7 +63,7 @@ const RegionalDemandsTable: React.FC<RegionalDemandsTableProps> = ({ budgetId, o
       }));
 
       const { error } = await supabase
-        .from('budget_regional_demands')
+        .from('transportation_region_boxes')
         .upsert(upsertData, { onConflict: 'budget_id,region_name' });
 
       if (error) throw error;

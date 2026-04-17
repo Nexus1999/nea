@@ -30,10 +30,10 @@ const HUBS: Record<string, string> = {
   "MARA": "MWANZA",
   "SIMIYU": "SHINYANGA",
   "RUVUMA": "NJOMBE",
-  "KATAVI": "TABORA", // Default preference (paved road)
+  "KATAVI": "TABORA", 
 };
 
-export const CLUSTERS = [
+export const GEO_CLUSTERS = [
   { name: "Lake Zone", regions: ["KAGERA", "GEITA", "MARA", "SIMIYU", "SHINYANGA", "MWANZA"] },
   { name: "Southern Highlands", regions: ["IRINGA", "NJOMBE", "RUVUMA", "MBEYA", "SONGWE", "RUKWA", "KATAVI"] },
   { name: "Western", regions: ["KIGOMA", "TABORA", "SINGIDA", "DODOMA", "MOROGORO"] },
@@ -52,10 +52,9 @@ export function generateIntelligentRoutes(
   let msafaraCounter = 1;
   let currentDate = new Date(loadingDate);
 
-  // Filter only regions with boxes
   let activeDemands = demands.filter(d => d.boxes > 0);
 
-  for (const cluster of CLUSTERS) {
+  for (const cluster of GEO_CLUSTERS) {
     let clusterDemands = activeDemands.filter(d => cluster.regions.includes(d.region));
     if (clusterDemands.length === 0) continue;
 
@@ -65,11 +64,9 @@ export function generateIntelligentRoutes(
       let currentGroup: RegionDemand[] = [];
       let currentBoxes = 0;
 
-      // Smart grouping with special rules
       for (let i = 0; i < remaining.length; i++) {
         const item = remaining[i];
         
-        // Special Katavi logic: Prefer Tabora (Western)
         if (item.region === "KATAVI" && cluster.name !== "Western" && cluster.name !== "Southern Highlands") {
           continue;
         }
@@ -91,9 +88,8 @@ export function generateIntelligentRoutes(
       const routeRegions = currentGroup.map((d, idx) => {
         let receiving = HUBS[d.region] || d.region;
         
-        // Special receiving logic
         if (d.region === "RUVUMA" && !currentGroup.some(r => ["MBEYA", "SONGWE", "RUKWA"].includes(r.region))) {
-          receiving = "RUVUMA"; // Direct if ending here
+          receiving = "RUVUMA"; 
         }
         if (d.region === "KATAVI" && currentGroup.some(r => r.region === "TABORA")) {
           receiving = "TABORA";
@@ -125,7 +121,6 @@ export function generateIntelligentRoutes(
       });
     }
 
-    // Stagger cluster batches
     currentDate = new Date(currentDate.getTime() + 2 * 86400000);
   }
 
