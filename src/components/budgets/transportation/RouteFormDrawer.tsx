@@ -411,6 +411,7 @@ const RouteFormDrawer: React.FC<RouteFormDrawerProps> = ({
         onClose={() => setShowSuggester(false)}
         onSelect={handleUseSuggestion}
         loadingDate={watch("loadingDate")}
+        budgetId={budgetId}
       />
     </>
   );
