@@ -17,42 +17,26 @@ export interface SuggestedMsafara {
     deliveryDate: string;
     boxes: number;
   }>;
-  vehicles: Array<{ type: string; quantity: number }>;
+  vehicles: Array<{ type: string; quantity: number; label: string }>;
   totalBoxes: number;
   totalTons: number;
   totalKm: number;
   notes: string;
+  pathDisplay: string[];
 }
 
-export const ALL_TANZANIAN_REGIONS = [
-  "ARUSHA", "DAR ES SALAAM", "DODOMA", "GEITA", "IRINGA", "KAGERA", "KATAVI", 
-  "KIGOMA", "KILIMANJARO", "LINDI", "MANYARA", "MARA", "MBEYA", "MOROGORO", 
-  "MTWARA", "MWANZA", "NJOMBE", "PWANI", "RUKWA", "RUVUMA", "SHINYANGA", 
-  "SIMIYU", "SINGIDA", "SONGWE", "TABORA", "TANGA"
-];
+const MAX_BOXES_PER_TT = 880; // Truck and Trailer
+const MAX_BOXES_PER_T = 400;  // Standard Truck
 
-const CORRIDORS = [
-  { name: "Lake Zone-1", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "GEITA", "KAGERA"], branches: ["SIMIYU", "MARA"] },
-  { name: "Lake Zone-2", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "MARA", "SIMIYU"], branches: ["KAGERA", "GEITA"] },
-  { name: "Lake Zone-3 (Direct)", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "GEITA", "KAGERA"], branches: [] },
-  { name: "Lake Zone-4 (Via Tabora)", path: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "GEITA", "KAGERA"], branches: [] },
-  { name: "Lake Zone-5 (Via Tabora)", path: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "SHINYANGA", "MWANZA"], branches: [] },
-  { name: "Western (Kigoma Anchor)", path: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KIGOMA"], branches: ["KATAVI"] },
-  { name: "Southern-1 (Katavi Anchor)", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE", "RUKWA", "KATAVI"], branches: ["RUVUMA"] },
-  { name: "Southern-2 (Rukwa Anchor)", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE", "RUKWA"], branches: ["RUVUMA"] },
-  { name: "Southern-3", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE"], branches: ["RUVUMA"] },
-  { name: "Southern-4 (Ruvuma Focus)", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "RUVUMA"], branches: [] },
-  { name: "Coastal to South", path: ["PWANI", "LINDI", "MTWARA"], branches: ["RUVUMA"] },
-  { name: "Northern-1", path: ["PWANI", "TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"], branches: [] },
-  { name: "Northern-2", path: ["KILIMANJARO", "ARUSHA", "MANYARA"], branches: ["TANGA"] },
-  { name: "Northern-3 (Via Dodoma)", path: ["PWANI", "MOROGORO", "DODOMA", "MANYARA"], branches: [] }
+const DESTINATION_REGIONS = [
+  "KAGERA", "GEITA", "MWANZA", "MARA", "SIMIYU", "TABORA", 
+  "SONGWE", "RUKWA", "NJOMBE", "MTWARA", "MANYARA", "ARUSHA", "KIGOMA"
 ];
 
 const HUB_RULES: Record<string, string> = {
-  "SIMIYU": "SHINYANGA", "MARA": "MWANZA", "KAGERA": "MWANZA", "GEITA": "MWANZA", "KATAVI": "TABORA", "RUVUMA": "NJOMBE",
+  "SIMIYU": "SHINYANGA", "MARA": "MWANZA", "KAGERA": "MWANZA", "GEITA": "MWANZA", 
+  "KATAVI": "TABORA", "RUVUMA": "NJOMBE", "TANGA": "SEGERA / TANGA TOWN"
 };
-
-const MAX_BOXES = 880;
 
 export function generateIntelligentRoutes(demands: RegionDemand[], loadingDate: string, distances: any[] = []): SuggestedMsafara[] {
   const routes: SuggestedMsafara[] = [];
@@ -60,90 +44,179 @@ export function generateIntelligentRoutes(demands: RegionDemand[], loadingDate: 
   distances.forEach(d => distanceMap.set(`${d.from_region_name.toUpperCase()}|${d.to_region_name.toUpperCase()}`, parseFloat(d.distance_km)));
 
   let remainingDemands = demands.filter(d => d.boxes > 0).map(d => ({ ...d, region: d.region.toUpperCase() }));
-  const getDistFromDar = (reg: string) => distanceMap.get(`DAR ES SALAAM|${reg}`) || 0;
-
   let msafaraCounter = 1;
-  let safety = 0;
 
-  while (remainingDemands.length > 0 && safety < 100) {
-    safety++;
-    remainingDemands.sort((a, b) => getDistFromDar(b.region) - getDistFromDar(a.region));
-    const target = remainingDemands[0];
+  const getDemand = (reg: string) => remainingDemands.find(d => d.region === reg);
+  const removeDemands = (regs: string[]) => {
+    remainingDemands = remainingDemands.filter(d => !regs.includes(d.region));
+  };
 
-    // Find all corridors that can reach this target
-    const possibleCorridors = CORRIDORS.filter(c => c.path.includes(target.region) || c.branches.includes(target.region));
+  // 1. NORTHERN PRIORITIZATION
+  const northernRegs = ["PWANI", "TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"];
+  const northDemands = northernRegs.map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
+  
+  if (northDemands.length > 0) {
+    const totalNorthBoxes = northDemands.reduce((sum, d) => sum + d.boxes, 0);
     
-    // Pick the corridor that accommodates the most boxes from remainingDemands
-    let bestCorridor = possibleCorridors[0] || CORRIDORS[0];
-    let maxLoad = 0;
+    // Northern-1: All fit in one TT
+    if (totalNorthBoxes <= MAX_BOXES_PER_TT) {
+      routes.push(createRoute(msafaraCounter++, "Northern-1", northernRegs, northDemands, loadingDate, distanceMap, [{ type: "TT", quantity: 1, label: "Truck & Trailer" }]));
+      removeDemands(northDemands.map(d => d.region));
+    } 
+    // Northern-2: Kili, Arusha, Manyara fit in TT, Tanga gets separate Truck
+    else {
+      const coreNorth = ["KILIMANJARO", "ARUSHA", "MANYARA"];
+      const coreDemands = coreNorth.map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
+      const tangaDemand = getDemand("TANGA");
+      const pwaniDemand = getDemand("PWANI");
 
-    possibleCorridors.forEach(corridor => {
-      const load = remainingDemands
-        .filter(d => corridor.path.includes(d.region) || corridor.branches.includes(d.region))
-        .reduce((sum, d) => sum + d.boxes, 0);
-      if (load > maxLoad && load <= MAX_BOXES) {
-        maxLoad = load;
-        bestCorridor = corridor;
-      }
-    });
+      if (coreDemands.length > 0 && coreDemands.reduce((sum, d) => sum + d.boxes, 0) <= MAX_BOXES_PER_TT) {
+        const combinedDemands = [...coreDemands];
+        if (tangaDemand) combinedDemands.push(tangaDemand);
+        if (pwaniDemand) combinedDemands.push(pwaniDemand);
 
-    // Collect items for this corridor
-    let currentGroup: RegionDemand[] = [];
-    let currentBoxes = 0;
-    const itemsInCorridor = remainingDemands.filter(d => bestCorridor.path.includes(d.region) || bestCorridor.branches.includes(d.region));
-
-    for (const item of itemsInCorridor) {
-      if (currentBoxes + item.boxes <= MAX_BOXES) {
-        currentGroup.push(item);
-        currentBoxes += item.boxes;
+        routes.push(createRoute(
+          msafaraCounter++, 
+          "Northern-2 (Multi-Vehicle)", 
+          northernRegs, 
+          combinedDemands, 
+          loadingDate, 
+          distanceMap, 
+          [
+            { type: "TT", quantity: 1, label: "Truck & Trailer (Core)" },
+            { type: "T", quantity: 1, label: "Truck (Tanga)" }
+          ]
+        ));
+        removeDemands(combinedDemands.map(d => d.region));
       }
     }
-
-    if (currentGroup.length === 0) { remainingDemands.shift(); continue; }
-
-    // Remove selected
-    const selectedIds = currentGroup.map(g => g.region);
-    remainingDemands = remainingDemands.filter(r => !selectedIds.includes(r.region));
-
-    // UI SEQUENCE: We filter the bestCorridor.path to show only the regions we are actually visiting
-    const visitedInPath = bestCorridor.path.filter(reg => currentGroup.some(g => g.region === reg));
-    const visitedInBranches = bestCorridor.branches.filter(reg => currentGroup.some(g => g.region === reg));
-    
-    // Delivery Order: Path items first (in order), then branches
-    const deliveryOrder = [...visitedInPath, ...visitedInBranches];
-
-    const routeRegions = deliveryOrder.map((regName, idx) => {
-      const demandItem = currentGroup.find(g => g.region === regName)!;
-      return {
-        name: regName,
-        receivingPlace: regName === "TANGA" ? "SEGERA / TANGA TOWN" : (HUB_RULES[regName] || regName),
-        deliveryDate: new Date(new Date(loadingDate).getTime() + (idx + 1) * 86400000).toISOString().split('T')[0],
-        boxes: demandItem.boxes
-      };
-    });
-
-    const tons = (currentBoxes * 34) / 1000;
-    let totalKm = 0;
-    let lastPoint = "DAR ES SALAAM";
-    routeRegions.forEach(r => {
-      totalKm += (distanceMap.get(`${lastPoint}|${r.name}`) || 0);
-      lastPoint = r.name;
-    });
-
-    routes.push({
-      msafaraNumber: msafaraCounter++,
-      name: `Msafara: ${bestCorridor.name}`,
-      loadingDate, startDate: loadingDate, startingPoint: "DAR ES SALAAM",
-      regions: routeRegions,
-      totalBoxes: currentBoxes,
-      totalTons: Math.round(tons * 100) / 100,
-      totalKm: Math.round(totalKm),
-      vehicles: [
-        { type: "LORRY_HORSE_AND_TRAILER", quantity: Math.ceil(tons / 15) },
-        { type: "ESCORT_COASTER", quantity: 1 }
-      ],
-      notes: `Strict Route: ${bestCorridor.path.join(" -> ")}`
-    });
   }
+
+  // 2. GEITA & KAGERA LARGE LOAD SPLITTING
+  const kagera = getDemand("KAGERA");
+  const geita = getDemand("GEITA");
+
+  if (kagera && kagera.boxes > 400) {
+    const helpers = ["DODOMA", "SINGIDA", "TABORA"].map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
+    const selectedHelper = helpers[0]; // Take one helper if available
+    const routeRegs = selectedHelper ? ["PWANI", "MOROGORO", selectedHelper.region, "KAGERA"] : ["PWANI", "MOROGORO", "KAGERA"];
+    const routeDemands = [kagera];
+    if (selectedHelper) routeDemands.push(selectedHelper);
+    
+    routes.push(createRoute(msafaraCounter++, "Kagera Direct", routeRegs, routeDemands, loadingDate, distanceMap));
+    removeDemands(routeDemands.map(d => d.region));
+  }
+
+  if (geita && geita.boxes > 400) {
+    const helpers = ["DODOMA", "SINGIDA", "TABORA"].map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
+    const selectedHelper = helpers[0];
+    const routeRegs = selectedHelper ? ["PWANI", "MOROGORO", selectedHelper.region, "GEITA"] : ["PWANI", "MOROGORO", "GEITA"];
+    const routeDemands = [geita];
+    if (selectedHelper) routeDemands.push(selectedHelper);
+
+    routes.push(createRoute(msafaraCounter++, "Geita Direct", routeRegs, routeDemands, loadingDate, distanceMap));
+    removeDemands(routeDemands.map(d => d.region));
+  }
+
+  // 3. KATAVI / WESTERN PRIORITIZATION
+  const katavi = getDemand("KATAVI");
+  if (katavi) {
+    const westernPath = ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KIGOMA", "KATAVI"];
+    const westernDemands = westernPath.map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
+    if (westernDemands.reduce((sum, d) => sum + d.boxes, 0) <= MAX_BOXES_PER_TT) {
+      routes.push(createRoute(msafaraCounter++, "Western (Katavi Focus)", westernPath, westernDemands, loadingDate, distanceMap));
+      removeDemands(westernDemands.map(d => d.region));
+    }
+  }
+
+  // 4. REMAINING CORRIDORS (Lake Zone 1/2 only if they fit)
+  const corridors = [
+    { name: "Lake Zone-1", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "GEITA", "KAGERA"], branches: ["SIMIYU", "MARA"] },
+    { name: "Lake Zone-2", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "MARA", "SIMIYU"], branches: ["KAGERA", "GEITA"] },
+    { name: "Southern-1", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE", "RUKWA"], branches: ["RUVUMA"] },
+    { name: "Southern-2 (Ruvuma)", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "RUVUMA"], branches: [] },
+    { name: "Coastal South", path: ["PWANI", "LINDI", "MTWARA"], branches: [] }
+  ];
+
+  for (const corridor of corridors) {
+    const possible = [...corridor.path, ...corridor.branches].map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
+    if (possible.length === 0) continue;
+
+    const totalBoxes = possible.reduce((sum, d) => sum + d.boxes, 0);
+    
+    // For Lake Zone 1 & 2, only use if ALL fit
+    if (corridor.name.startsWith("Lake Zone")) {
+      if (totalBoxes <= MAX_BOXES_PER_TT) {
+        routes.push(createRoute(msafaraCounter++, corridor.name, [...corridor.path, ...corridor.branches], possible, loadingDate, distanceMap));
+        removeDemands(possible.map(d => d.region));
+      }
+    } else {
+      // Standard greedy for other corridors
+      let currentGroup: RegionDemand[] = [];
+      let currentSum = 0;
+      for (const p of possible) {
+        if (currentSum + p.boxes <= MAX_BOXES_PER_TT) {
+          currentGroup.push(p);
+          currentSum += p.boxes;
+        }
+      }
+      if (currentGroup.length > 0) {
+        routes.push(createRoute(msafaraCounter++, corridor.name, [...corridor.path, ...corridor.branches], currentGroup, loadingDate, distanceMap));
+        removeDemands(currentGroup.map(d => d.region));
+      }
+    }
+  }
+
+  // 5. CLEANUP: Any leftover regions
+  while (remainingDemands.length > 0) {
+    const target = remainingDemands[0];
+    routes.push(createRoute(msafaraCounter++, "Direct/Special", [target.region], [target], loadingDate, distanceMap));
+    remainingDemands.shift();
+  }
+
   return routes;
+}
+
+function createRoute(
+  num: number, 
+  name: string, 
+  path: string[], 
+  demands: RegionDemand[], 
+  loadingDate: string, 
+  distanceMap: Map<string, number>,
+  customVehicles?: any[]
+): SuggestedMsafara {
+  const visited = path.filter(p => demands.some(d => d.region === p));
+  const totalBoxes = demands.reduce((sum, d) => sum + d.boxes, 0);
+  const tons = (totalBoxes * 34) / 1000;
+
+  let totalKm = 0;
+  let lastPoint = "DAR ES SALAAM";
+  const routeRegions = visited.map((reg, idx) => {
+    const d = demands.find(dem => dem.region === reg)!;
+    totalKm += (distanceMap.get(`${lastPoint}|${reg}`) || 0);
+    lastPoint = reg;
+    return {
+      name: reg,
+      receivingPlace: HUB_RULES[reg] || reg,
+      deliveryDate: new Date(new Date(loadingDate).getTime() + (idx + 1) * 86400000).toISOString().split('T')[0],
+      boxes: d.boxes
+    };
+  });
+
+  return {
+    msafaraNumber: num,
+    name: `Msafara ${num}: ${name}`,
+    loadingDate, startDate: loadingDate, startingPoint: "DAR ES SALAAM",
+    regions: routeRegions,
+    totalBoxes,
+    totalTons: Math.round(tons * 100) / 100,
+    totalKm: Math.round(totalKm),
+    vehicles: customVehicles || [
+      { type: "TT", quantity: 1, label: "Truck & Trailer" },
+      { type: "ESCORT", quantity: 1, label: "Escort Vehicle" }
+    ],
+    notes: `Destination: ${visited[visited.length - 1]}`,
+    pathDisplay: ["DAR", ...visited]
+  };
 }
