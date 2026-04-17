@@ -36,7 +36,7 @@ const CORRIDORS = [
   { name: "Lake Zone-2", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "MARA", "SIMIYU"], branches: ["KAGERA", "GEITA"] },
   { name: "Lake Zone-3 (Direct)", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "GEITA", "KAGERA"], branches: [] },
   { name: "Lake Zone-4 (Via Tabora)", path: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "GEITA", "KAGERA"], branches: [] },
-  { name: "Lake Zone- (Via Tabora)", path: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "SHINYANGA", "MWANZA"], branches: [] },
+  { name: "Lake Zone-5 (Via Tabora)", path: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "SHINYANGA", "MWANZA"], branches: [] },
   { name: "Western (Kigoma Anchor)", path: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KIGOMA"], branches: ["KATAVI"] },
   { name: "Southern-1 (Katavi Anchor)", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE", "RUKWA", "KATAVI"], branches: ["RUVUMA"] },
   { name: "Southern-2 (Rukwa Anchor)", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE", "RUKWA"], branches: ["RUVUMA"] },
