@@ -4,15 +4,17 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ChevronLeft, 
-  Plus, 
   Wand2,
   Truck,
   Calendar,
   Save,
-  RefreshCw
+  RefreshCw,
+  Info
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
@@ -25,6 +27,7 @@ const ActionPlanPage = () => {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [budget, setBudget] = useState<any>(null);
+  const [loadingDate, setLoadingDate] = useState(new Date().toISOString().split('T')[0]);
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedMsafara[]>([]);
 
   useEffect(() => {
@@ -50,18 +53,23 @@ const ActionPlanPage = () => {
   };
 
   const handleGenerateRoutes = async () => {
+    if (!loadingDate) {
+      showError("Please select a loading date first.");
+      return;
+    }
+
     setGenerating(true);
     try {
-      // 1. Fetch Regional Demands for this budget
+      // 1. Fetch Regional Demands using the correct table name
       const { data: demands, error: demandsError } = await supabase
-        .from('regional_demands')
-        .select('region_name, box_count')
+        .from('transportation_region_boxes')
+        .select('region_name, boxes_count')
         .eq('budget_id', id);
 
       if (demandsError) throw demandsError;
 
-      if (!demands || demands.length === 0) {
-        showError("No regional demands found. Please add box counts first.");
+      if (!demands || demands.length === 0 || demands.every(d => d.boxes_count === 0)) {
+        showError("No regional demands found. Please add box counts in the Regional Demands drawer first.");
         return;
       }
 
@@ -73,13 +81,14 @@ const ActionPlanPage = () => {
       if (distError) throw distError;
 
       // 3. Format demands for the planner
-      const formattedDemands = demands.map(d => ({
-        region: d.region_name,
-        boxes: d.box_count || 0
-      }));
+      const formattedDemands = demands
+        .filter(d => d.boxes_count > 0)
+        .map(d => ({
+          region: d.region_name,
+          boxes: d.boxes_count || 0
+        }));
 
       // 4. Generate Routes
-      const loadingDate = new Date().toISOString().split('T')[0];
       const routes = generateIntelligentRoutes(formattedDemands, loadingDate, distances || []);
       
       setSuggestedRoutes(routes);
@@ -123,10 +132,30 @@ const ActionPlanPage = () => {
 
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
+          <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+            <CardHeader className="bg-slate-50/50 border-b py-4">
+              <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5" /> Logistics Configuration
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="max-w-xs space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Loading Start Date</Label>
+                <Input 
+                  type="date" 
+                  value={loadingDate} 
+                  onChange={(e) => setLoadingDate(e.target.value)}
+                  className="h-10 rounded-xl border-slate-200 font-bold text-sm"
+                />
+                <p className="text-[9px] text-slate-400 italic">All route delivery dates will be calculated from this date.</p>
+              </div>
+            </CardContent>
+          </Card>
+
           {suggestedRoutes.length > 0 ? (
             <SmartRouteSuggester routes={suggestedRoutes} />
           ) : (
-            <Card className="border-dashed border-2 bg-slate-50/50">
+            <Card className="border-dashed border-2 bg-slate-50/50 rounded-2xl">
               <CardContent className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4">
                   <Truck className="w-8 h-8 text-slate-300" />
@@ -165,17 +194,15 @@ const ActionPlanPage = () => {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl shadow-sm border-slate-200 bg-indigo-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Calendar className="w-5 h-5 text-indigo-200" />
-                <h3 className="font-black uppercase tracking-tight text-sm">Logistics Timeline</h3>
-              </div>
-              <p className="text-xs text-indigo-100 leading-relaxed">
-                The generated plan assumes loading starts on the current date. Delivery dates are estimated based on one region per day transit time.
+          <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3">
+            <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-amber-800">Important Note</p>
+              <p className="text-[11px] text-amber-700 leading-relaxed">
+                Ensure you have entered the box counts for each region in the <strong>Regional Demands</strong> drawer on the Budgets page before generating routes.
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
     </div>

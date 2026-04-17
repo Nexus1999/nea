@@ -1,65 +1,69 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Save, Loader2, Package } from "lucide-react";
+import { Save, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { showSuccess, showError } from "@/utils/toast";
+import { showError, showSuccess } from "@/utils/toast";
+import Spinner from "@/components/Spinner";
 import { ALL_TANZANIAN_REGIONS } from "@/utils/intelligentRoutePlanner";
 
 interface RegionalDemandsTableProps {
   budgetId: string;
-  onDataChange?: (demands: Record<string, number>) => void;
 }
 
-const RegionalDemandsTable: React.FC<RegionalDemandsTableProps> = ({ budgetId, onDataChange }) => {
-  const [demands, setDemands] = useState<Record<string, number>>({});
+const RegionalDemandsTable: React.FC<RegionalDemandsTableProps> = ({ budgetId }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [demands, setDemands] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const fetchDemands = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('transportation_region_boxes')
-          .select('region_name, boxes_count')
-          .eq('budget_id', budgetId);
-
-        if (error) throw error;
-
-        const demandMap: Record<string, number> = {};
-        data?.forEach(d => {
-          demandMap[d.region_name] = d.boxes_count;
-        });
-        setDemands(demandMap);
-        onDataChange?.(demandMap);
-      } catch (err: any) {
-        showError("Failed to load regional demands");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (budgetId) fetchDemands();
+    fetchDemands();
   }, [budgetId]);
 
-  const handleBoxChange = (region: string, value: string) => {
-    const count = parseInt(value) || 0;
-    const newDemands = { ...demands, [region]: count };
-    setDemands(newDemands);
-    onDataChange?.(newDemands);
+  const fetchDemands = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('transportation_region_boxes')
+        .select('region_name, boxes_count')
+        .eq('budget_id', budgetId);
+
+      if (error) throw error;
+
+      const demandMap: Record<string, number> = {};
+      data?.forEach(item => {
+        demandMap[item.region_name] = item.boxes_count;
+      });
+      setDemands(demandMap);
+    } catch (err: any) {
+      showError(err.message || "Failed to load demands");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateCount = (region: string, count: string) => {
+    const val = parseInt(count) || 0;
+    setDemands(prev => ({ ...prev, [region]: val }));
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const upsertData = ALL_TANZANIAN_REGIONS.map(region => ({
-        budget_id: budgetId,
+      const upsertData = Object.entries(demands).map(([region, count]) => ({
+        budget_id: parseInt(budgetId),
         region_name: region,
-        boxes_count: demands[region] || 0
+        boxes_count: count
       }));
 
       const { error } = await supabase
@@ -67,7 +71,7 @@ const RegionalDemandsTable: React.FC<RegionalDemandsTableProps> = ({ budgetId, o
         .upsert(upsertData, { onConflict: 'budget_id,region_name' });
 
       if (error) throw error;
-      showSuccess("Regional demands saved successfully");
+      showSuccess("Regional demands updated successfully");
     } catch (err: any) {
       showError(err.message || "Failed to save demands");
     } finally {
@@ -75,49 +79,44 @@ const RegionalDemandsTable: React.FC<RegionalDemandsTableProps> = ({ budgetId, o
     }
   };
 
-  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-slate-400" /></div>;
+  if (loading) return <div className="flex justify-center py-10"><Spinner /></div>;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
-          <Package className="w-4 h-4 text-indigo-600" /> Regional Box Demands
-        </h3>
+      <div className="flex justify-between items-center">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+          Total Regions: {ALL_TANZANIAN_REGIONS.length}
+        </p>
         <Button 
           size="sm" 
           onClick={handleSave} 
           disabled={saving}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 rounded-lg text-[10px] font-black uppercase tracking-widest"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase text-[10px] tracking-widest h-8"
         >
-          {saving ? <Loader2 className="animate-spin h-3 w-3 mr-2" /> : <Save className="h-3 w-3 mr-2" />}
-          Save Demands
+          {saving ? <RefreshCw className="w-3 h-3 mr-2 animate-spin" /> : <Save className="w-3 h-3 mr-2" />}
+          Save All
         </Button>
       </div>
 
-      <div className="border rounded-xl overflow-hidden shadow-sm bg-white">
+      <div className="border rounded-xl overflow-hidden">
         <Table>
           <TableHeader className="bg-slate-50">
             <TableRow>
-              <TableHead className="text-[10px] font-black uppercase tracking-widest">Region</TableHead>
-              <TableHead className="text-[10px] font-black uppercase tracking-widest w-32">Boxes</TableHead>
-              <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Est. Weight (Tons)</TableHead>
+              <TableHead className="text-[9px] font-black uppercase tracking-widest">Region</TableHead>
+              <TableHead className="text-[9px] font-black uppercase tracking-widest w-[120px]">Box Count</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {ALL_TANZANIAN_REGIONS.map(region => (
+            {ALL_TANZANIAN_REGIONS.map((region) => (
               <TableRow key={region} className="hover:bg-slate-50/50">
-                <TableCell className="font-bold text-slate-700 text-xs">{region}</TableCell>
+                <TableCell className="text-xs font-bold text-slate-700">{region}</TableCell>
                 <TableCell>
                   <Input 
                     type="number" 
-                    value={demands[region] || ""} 
-                    onChange={(e) => handleBoxChange(region, e.target.value)}
-                    className="h-8 text-xs rounded-lg border-slate-200"
-                    placeholder="0"
+                    value={demands[region] || 0} 
+                    onChange={(e) => handleUpdateCount(region, e.target.value)}
+                    className="h-8 text-xs font-bold text-indigo-600 border-slate-200 focus:ring-indigo-500"
                   />
-                </TableCell>
-                <TableCell className="text-right text-xs text-slate-500 font-medium">
-                  {(((demands[region] || 0) * 34) / 1000).toFixed(2)} t
                 </TableCell>
               </TableRow>
             ))}
