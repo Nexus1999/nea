@@ -25,13 +25,15 @@ export interface SuggestedMsafara {
   pathDisplay: string[];
 }
 
+export const ALL_TANZANIAN_REGIONS = [
+  "ARUSHA", "DAR ES SALAAM", "DODOMA", "GEITA", "IRINGA", "KAGERA", "KATAVI", 
+  "KIGOMA", "KILIMANJARO", "LINDI", "MANYARA", "MARA", "MBEYA", "MOROGORO", 
+  "MTWARA", "MWANZA", "NJOMBE", "PWANI", "RUKWA", "RUVUMA", "SHINYANGA", 
+  "SIMIYU", "SINGIDA", "SONGWE", "TABORA", "TANGA"
+];
+
 const MAX_BOXES_PER_TT = 880; // Truck and Trailer
 const MAX_BOXES_PER_T = 400;  // Standard Truck
-
-const DESTINATION_REGIONS = [
-  "KAGERA", "GEITA", "MWANZA", "MARA", "SIMIYU", "TABORA", 
-  "SONGWE", "RUKWA", "NJOMBE", "MTWARA", "MANYARA", "ARUSHA", "KIGOMA"
-];
 
 const HUB_RULES: Record<string, string> = {
   "SIMIYU": "SHINYANGA", "MARA": "MWANZA", "KAGERA": "MWANZA", "GEITA": "MWANZA", 
@@ -58,12 +60,10 @@ export function generateIntelligentRoutes(demands: RegionDemand[], loadingDate: 
   if (northDemands.length > 0) {
     const totalNorthBoxes = northDemands.reduce((sum, d) => sum + d.boxes, 0);
     
-    // Northern-1: All fit in one TT
     if (totalNorthBoxes <= MAX_BOXES_PER_TT) {
       routes.push(createRoute(msafaraCounter++, "Northern-1", northernRegs, northDemands, loadingDate, distanceMap, [{ type: "TT", quantity: 1, label: "Truck & Trailer" }]));
       removeDemands(northDemands.map(d => d.region));
     } 
-    // Northern-2: Kili, Arusha, Manyara fit in TT, Tanga gets separate Truck
     else {
       const coreNorth = ["KILIMANJARO", "ARUSHA", "MANYARA"];
       const coreDemands = coreNorth.map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
@@ -98,7 +98,7 @@ export function generateIntelligentRoutes(demands: RegionDemand[], loadingDate: 
 
   if (kagera && kagera.boxes > 400) {
     const helpers = ["DODOMA", "SINGIDA", "TABORA"].map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
-    const selectedHelper = helpers[0]; // Take one helper if available
+    const selectedHelper = helpers[0];
     const routeRegs = selectedHelper ? ["PWANI", "MOROGORO", selectedHelper.region, "KAGERA"] : ["PWANI", "MOROGORO", "KAGERA"];
     const routeDemands = [kagera];
     if (selectedHelper) routeDemands.push(selectedHelper);
@@ -129,7 +129,7 @@ export function generateIntelligentRoutes(demands: RegionDemand[], loadingDate: 
     }
   }
 
-  // 4. REMAINING CORRIDORS (Lake Zone 1/2 only if they fit)
+  // 4. REMAINING CORRIDORS
   const corridors = [
     { name: "Lake Zone-1", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "GEITA", "KAGERA"], branches: ["SIMIYU", "MARA"] },
     { name: "Lake Zone-2", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "MARA", "SIMIYU"], branches: ["KAGERA", "GEITA"] },
@@ -144,14 +144,12 @@ export function generateIntelligentRoutes(demands: RegionDemand[], loadingDate: 
 
     const totalBoxes = possible.reduce((sum, d) => sum + d.boxes, 0);
     
-    // For Lake Zone 1 & 2, only use if ALL fit
     if (corridor.name.startsWith("Lake Zone")) {
       if (totalBoxes <= MAX_BOXES_PER_TT) {
         routes.push(createRoute(msafaraCounter++, corridor.name, [...corridor.path, ...corridor.branches], possible, loadingDate, distanceMap));
         removeDemands(possible.map(d => d.region));
       }
     } else {
-      // Standard greedy for other corridors
       let currentGroup: RegionDemand[] = [];
       let currentSum = 0;
       for (const p of possible) {
@@ -167,7 +165,6 @@ export function generateIntelligentRoutes(demands: RegionDemand[], loadingDate: 
     }
   }
 
-  // 5. CLEANUP: Any leftover regions
   while (remainingDemands.length > 0) {
     const target = remainingDemands[0];
     routes.push(createRoute(msafaraCounter++, "Direct/Special", [target.region], [target], loadingDate, distanceMap));
