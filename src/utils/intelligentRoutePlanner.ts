@@ -1,12 +1,8 @@
 "use client";
 
-// PURPOSE: Given a list of regions and their box counts, automatically group
-// them into Msafara (routes) that respect vehicle capacity limits and
-// geographic proximity.
-
 export interface RegionDemand {
-  region: string;   // Region name in ALL CAPS (e.g., "KAGERA")
-  boxes: number;    // Total number of boxes
+  region: string;
+  boxes: number;
 }
 
 export interface SuggestedMsafara {
@@ -21,157 +17,119 @@ export interface SuggestedMsafara {
     deliveryDate: string;
     boxes: number;
   }>;
-  vehicles: Array<{
-    type: string;
-    quantity: number;
-  }>;
+  vehicles: Array<{ type: string; quantity: number }>;
   totalBoxes: number;
   totalTons: number;
-  estimatedLorries: number;
-  estimatedEscorts: number;
   notes: string;
+  estimatedExtraKm?: number;
 }
 
-const HUB_MAP: Record<string, string> = {
+const HUBS: Record<string, string> = {
   "KAGERA": "MWANZA",
   "GEITA": "MWANZA",
   "MARA": "MWANZA",
   "SIMIYU": "SHINYANGA",
   "RUVUMA": "NJOMBE",
-  "KATAVI": "RUKWA",
+  "KATAVI": "TABORA", // Default preference (paved road)
 };
 
-export const GEO_CLUSTERS: Array<{ name: string; regions: string[] }> = [
-  {
-    name: "Lake Zone",
-    regions: ["SINGIDA", "SHINYANGA", "MWANZA", "GEITA", "KAGERA", "MARA", "SIMIYU"]
-  },
-  {
-    name: "Southern Highlands",
-    regions: ["IRINGA", "NJOMBE", "RUVUMA", "MBEYA", "SONGWE", "RUKWA", "KATAVI"]
-  },
-  {
-    name: "Western / Central",
-    regions: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KIGOMA"]
-  },
-  {
-    name: "Northern Zone",
-    regions: ["TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"]
-  },
-  {
-    name: "South Coast",
-    regions: ["LINDI", "MTWARA"]
-  },
+export const CLUSTERS = [
+  { name: "Lake Zone", regions: ["KAGERA", "GEITA", "MARA", "SIMIYU", "SHINYANGA", "MWANZA"] },
+  { name: "Southern Highlands", regions: ["IRINGA", "NJOMBE", "RUVUMA", "MBEYA", "SONGWE", "RUKWA", "KATAVI"] },
+  { name: "Western", regions: ["KIGOMA", "TABORA", "SINGIDA", "DODOMA", "MOROGORO"] },
+  { name: "Northern", regions: ["MANYARA", "ARUSHA", "KILIMANJARO", "TANGA"] },
+  { name: "South Coast", regions: ["LINDI", "MTWARA"] },
+  { name: "Near DSM", regions: ["PWANI"] },
 ];
 
-const BOX_WEIGHT_KG = 34;
-const SINGLE_LORRY_TONS = 15;
-const TRAILER_LORRY_TONS = 30;
 const MAX_BOXES_PER_MSAFARA = 880;
-
-function boxesToTons(boxes: number): number {
-  return Math.round((boxes * BOX_WEIGHT_KG) / 1000 * 100) / 100;
-}
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-}
-
-function assignVehicles(totalTons: number): { vehicles: Array<{ type: string; quantity: number }>; lorries: number; escorts: number } {
-  let lorries: number;
-  let vehicleType: string;
-
-  if (totalTons <= SINGLE_LORRY_TONS) {
-    lorries = 1;
-    vehicleType = "LORRY_HORSE";
-  } else if (totalTons <= TRAILER_LORRY_TONS) {
-    lorries = 1;
-    vehicleType = "LORRY_HORSE_AND_TRAILER";
-  } else {
-    lorries = Math.ceil(totalTons / TRAILER_LORRY_TONS);
-    vehicleType = "LORRY_HORSE_AND_TRAILER";
-  }
-
-  const escorts = Math.max(1, Math.ceil(lorries * 0.7));
-
-  return {
-    vehicles: [
-      { type: vehicleType, quantity: lorries },
-      { type: "ESCORT_COASTER", quantity: escorts }
-    ],
-    lorries,
-    escorts
-  };
-}
 
 export function generateIntelligentRoutes(
   demands: RegionDemand[],
   loadingDate: string
 ): SuggestedMsafara[] {
-  const results: SuggestedMsafara[] = [];
+  const routes: SuggestedMsafara[] = [];
   let msafaraCounter = 1;
-  let batchOffset = 0;
+  let currentDate = new Date(loadingDate);
 
-  for (const cluster of GEO_CLUSTERS) {
-    const clusterDemands = cluster.regions
-      .map(region => demands.find(d => d.region === region && d.boxes > 0))
-      .filter(Boolean) as RegionDemand[];
+  // Filter only regions with boxes
+  let activeDemands = demands.filter(d => d.boxes > 0);
 
+  for (const cluster of CLUSTERS) {
+    let clusterDemands = activeDemands.filter(d => cluster.regions.includes(d.region));
     if (clusterDemands.length === 0) continue;
 
-    const remaining = [...clusterDemands];
+    let remaining = [...clusterDemands];
 
     while (remaining.length > 0) {
-      const currentGroup: RegionDemand[] = [];
+      let currentGroup: RegionDemand[] = [];
       let currentBoxes = 0;
 
-      for (let i = remaining.length - 1; i >= 0; i--) {
-        if (currentBoxes + remaining[i].boxes <= MAX_BOXES_PER_MSAFARA) {
-          currentGroup.unshift(remaining[i]);
-          currentBoxes += remaining[i].boxes;
-          remaining.splice(i, 1);
+      // Smart grouping with special rules
+      for (let i = 0; i < remaining.length; i++) {
+        const item = remaining[i];
+        
+        // Special Katavi logic: Prefer Tabora (Western)
+        if (item.region === "KATAVI" && cluster.name !== "Western" && cluster.name !== "Southern Highlands") {
+          continue;
+        }
+
+        if (currentBoxes + item.boxes <= MAX_BOXES_PER_MSAFARA) {
+          currentGroup.push(item);
+          currentBoxes += item.boxes;
         }
       }
 
-      if (currentGroup.length === 0) {
-        currentGroup.push(remaining.shift()!);
-        currentBoxes = currentGroup[0].boxes;
-      }
+      if (currentGroup.length === 0) break;
 
-      const currentLoadDate = addDays(loadingDate, batchOffset);
-      const currentStartDate = addDays(loadingDate, batchOffset + 1);
-      const totalTons = boxesToTons(currentBoxes);
-      const { vehicles, lorries, escorts } = assignVehicles(totalTons);
+      remaining = remaining.filter(r => !currentGroup.some(g => g.region === r.region));
 
-      const routeRegions = currentGroup.map((demand, idx) => ({
-        name: demand.region,
-        receivingPlace: HUB_MAP[demand.region] || demand.region,
-        deliveryDate: addDays(currentStartDate, idx),
-        boxes: demand.boxes,
-      }));
+      const totalTons = (currentBoxes * 34) / 1000;
+      const lorries = Math.ceil(totalTons / 15);
+      const escorts = Math.max(1, Math.ceil(lorries * 0.7));
 
-      results.push({
+      const routeRegions = currentGroup.map((d, idx) => {
+        let receiving = HUBS[d.region] || d.region;
+        
+        // Special receiving logic
+        if (d.region === "RUVUMA" && !currentGroup.some(r => ["MBEYA", "SONGWE", "RUKWA"].includes(r.region))) {
+          receiving = "RUVUMA"; // Direct if ending here
+        }
+        if (d.region === "KATAVI" && currentGroup.some(r => r.region === "TABORA")) {
+          receiving = "TABORA";
+        }
+
+        return {
+          name: d.region,
+          receivingPlace: receiving,
+          deliveryDate: new Date(currentDate.getTime() + (1 + idx) * 86400000)
+            .toISOString().split('T')[0],
+          boxes: d.boxes
+        };
+      });
+
+      routes.push({
         msafaraNumber: msafaraCounter++,
-        name: `Msafara ${msafaraCounter - 1} — ${cluster.name}`,
-        loadingDate: currentLoadDate,
-        startDate: currentStartDate,
+        name: `Msafara ${msafaraCounter - 1} - ${cluster.name}`,
+        loadingDate,
+        startDate: new Date(currentDate.getTime() + 86400000).toISOString().split('T')[0],
         startingPoint: "DAR ES SALAAM",
         regions: routeRegions,
-        vehicles,
+        vehicles: [
+          { type: "LORRY_HORSE_AND_TRAILER", quantity: lorries },
+          { type: "ESCORT_COASTER", quantity: escorts }
+        ],
         totalBoxes: currentBoxes,
-        totalTons,
-        estimatedLorries: lorries,
-        estimatedEscorts: escorts,
-        notes: `${currentGroup.length} stop${currentGroup.length > 1 ? 's' : ''} • ${totalTons} tons • ${lorries} lorry unit(s)`,
+        totalTons: Math.round(totalTons * 100) / 100,
+        notes: `${currentGroup.length} regions • ${lorries} Lorry unit(s)`,
       });
     }
 
-    batchOffset += 2;
+    // Stagger cluster batches
+    currentDate = new Date(currentDate.getTime() + 2 * 86400000);
   }
 
-  return results;
+  return routes;
 }
 
 export const ALL_TANZANIAN_REGIONS = [
