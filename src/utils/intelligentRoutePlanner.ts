@@ -1,222 +1,189 @@
 "use client";
 
-export interface RegionDemand {
-  region: string;
-  boxes: number;
-}
-
-export interface SuggestedMsafara {
-  msafaraNumber: number;
-  name: string;
-  loadingDate: string;
-  startDate: string;
-  startingPoint: string;
-  regions: Array<{
-    name: string;
-    receivingPlace: string;
-    deliveryDate: string;
-    boxes: number;
-  }>;
-  vehicles: Array<{ type: string; quantity: number; label: string }>;
-  totalBoxes: number;
-  totalTons: number;
-  totalKm: number;
-  notes: string;
-  pathDisplay: string[];
-}
-
-const MAX_BOXES_PER_TT = 880; // Truck and Trailer
-const MAX_BOXES_PER_T = 400;  // Standard Truck
-
-const DESTINATION_REGIONS = [
-  "KAGERA", "GEITA", "MWANZA", "MARA", "SIMIYU", "TABORA", 
-  "SONGWE", "RUKWA", "NJOMBE", "MTWARA", "MANYARA", "ARUSHA", "KIGOMA"
+/**
+ * 1. OFFICIAL CORRIDORS WITH ANCHOR DESTINATIONS
+ * The last item in 'path' is the primary destination.
+ */
+const CORRIDORS = [
+  {
+    name: "Lake Zone (Direct Kagera via Mwanza)",
+    path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "GEITA", "KAGERA"],
+    branches: ["SIMIYU", "MARA"]
+  },
+  {
+    name: "Lake Zone (Mara/Simiyu Focus)",
+    path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "MARA", "SIMIYU"],
+    branches: ["KAGERA", "GEITA"]
+  },
+  {
+    name: "Lake Zone (Short Geita/Kagera)",
+    path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "GEITA", "KAGERA"],
+    branches: []
+  },
+  {
+    name: "Lake Zone (Via Tabora)",
+    path: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "GEITA", "KAGERA"],
+    branches: []
+  },
+  {
+    name: "Western (Kigoma)",
+    path: ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KIGOMA"],
+    branches: ["KATAVI"]
+  },
+  {
+    name: "Southern Highlands (Katavi Anchor)",
+    path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE", "RUKWA", "KATAVI"],
+    branches: ["RUVUMA"]
+  },
+  {
+    name: "Southern Highlands (Rukwa Anchor)",
+    path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE", "RUKWA"],
+    branches: ["RUVUMA"]
+  },
+  {
+    name: "Southern Highlands (Highlands Focus)",
+    path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE"],
+    branches: ["RUVUMA"]
+  },
+  {
+    name: "Southern Highlands (Ruvuma Focus)",
+    path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "RUVUMA"],
+    branches: []
+  },
+  {
+    name: "South Coast",
+    path: ["PWANI", "LINDI", "MTWARA"],
+    branches: ["RUVUMA"]
+  },
+  {
+    name: "Northern (Manyara Anchor)",
+    path: ["TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"],
+    branches: []
+  },
+  {
+    name: "Northern (Manyara via Dodoma)",
+    path: ["PWANI", "MOROGORO", "DODOMA", "MANYARA"],
+    branches: []
+  }
 ];
 
 const HUB_RULES: Record<string, string> = {
-  "SIMIYU": "SHINYANGA", "MARA": "MWANZA", "KAGERA": "MWANZA", "GEITA": "MWANZA", 
-  "KATAVI": "TABORA", "RUVUMA": "NJOMBE", "TANGA": "SEGERA / TANGA TOWN"
+  "SIMIYU": "SHINYANGA",
+  "MARA": "MWANZA",
+  "KAGERA": "MWANZA",
+  "GEITA": "MWANZA",
+  "KATAVI": "TABORA", 
+  "RUVUMA": "NJOMBE",
 };
 
-export function generateIntelligentRoutes(demands: RegionDemand[], loadingDate: string, distances: any[] = []): SuggestedMsafara[] {
-  const routes: SuggestedMsafara[] = [];
-  const distanceMap = new Map();
-  distances.forEach(d => distanceMap.set(`${d.from_region_name.toUpperCase()}|${d.to_region_name.toUpperCase()}`, parseFloat(d.distance_km)));
+const MAX_BOXES = 880;
 
-  let remainingDemands = demands.filter(d => d.boxes > 0).map(d => ({ ...d, region: d.region.toUpperCase() }));
+export function generateIntelligentRoutes(
+  demands: { region: string; boxes: number }[],
+  loadingDate: string,
+  distances: any[] = []
+): any[] {
+  const routes: any[] = [];
   let msafaraCounter = 1;
-
-  const getDemand = (reg: string) => remainingDemands.find(d => d.region === reg);
-  const removeDemands = (regs: string[]) => {
-    remainingDemands = remainingDemands.filter(d => !regs.includes(d.region));
-  };
-
-  // 1. NORTHERN PRIORITIZATION
-  const northernRegs = ["PWANI", "TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"];
-  const northDemands = northernRegs.map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
+  const distanceMap = new Map();
   
-  if (northDemands.length > 0) {
-    const totalNorthBoxes = northDemands.reduce((sum, d) => sum + d.boxes, 0);
-    
-    // Northern-1: All fit in one TT
-    if (totalNorthBoxes <= MAX_BOXES_PER_TT) {
-      routes.push(createRoute(msafaraCounter++, "Northern-1", northernRegs, northDemands, loadingDate, distanceMap, [{ type: "TT", quantity: 1, label: "Truck & Trailer" }]));
-      removeDemands(northDemands.map(d => d.region));
-    } 
-    // Northern-2: Kili, Arusha, Manyara fit in TT, Tanga gets separate Truck
-    else {
-      const coreNorth = ["KILIMANJARO", "ARUSHA", "MANYARA"];
-      const coreDemands = coreNorth.map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
-      const tangaDemand = getDemand("TANGA");
-      const pwaniDemand = getDemand("PWANI");
+  distances.forEach(d => {
+    distanceMap.set(`${d.from_region_name.toUpperCase()}|${d.to_region_name.toUpperCase()}`, parseFloat(d.distance_km));
+  });
 
-      if (coreDemands.length > 0 && coreDemands.reduce((sum, d) => sum + d.boxes, 0) <= MAX_BOXES_PER_TT) {
-        const combinedDemands = [...coreDemands];
-        if (tangaDemand) combinedDemands.push(tangaDemand);
-        if (pwaniDemand) combinedDemands.push(pwaniDemand);
+  let remainingDemands = demands
+    .filter(d => d.boxes > 0)
+    .map(d => ({ ...d, region: d.region.toUpperCase() }));
 
-        routes.push(createRoute(
-          msafaraCounter++, 
-          "Northern-2 (Multi-Vehicle)", 
-          northernRegs, 
-          combinedDemands, 
-          loadingDate, 
-          distanceMap, 
-          [
-            { type: "TT", quantity: 1, label: "Truck & Trailer (Core)" },
-            { type: "T", quantity: 1, label: "Truck (Tanga)" }
-          ]
-        ));
-        removeDemands(combinedDemands.map(d => d.region));
-      }
-    }
-  }
+  // Helper to get distance from Dar
+  const getDist = (reg: string) => distanceMap.get(`DAR ES SALAAM|${reg}`) || 0;
 
-  // 2. GEITA & KAGERA LARGE LOAD SPLITTING
-  const kagera = getDemand("KAGERA");
-  const geita = getDemand("GEITA");
+  // 1. SORT ALL DEMANDS BY DISTANCE (Farthest regions first)
+  remainingDemands.sort((a, b) => getDist(b.region) - getDist(a.region));
 
-  if (kagera && kagera.boxes > 400) {
-    const helpers = ["DODOMA", "SINGIDA", "TABORA"].map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
-    const selectedHelper = helpers[0]; // Take one helper if available
-    const routeRegs = selectedHelper ? ["PWANI", "MOROGORO", selectedHelper.region, "KAGERA"] : ["PWANI", "MOROGORO", "KAGERA"];
-    const routeDemands = [kagera];
-    if (selectedHelper) routeDemands.push(selectedHelper);
-    
-    routes.push(createRoute(msafaraCounter++, "Kagera Direct", routeRegs, routeDemands, loadingDate, distanceMap));
-    removeDemands(routeDemands.map(d => d.region));
-  }
-
-  if (geita && geita.boxes > 400) {
-    const helpers = ["DODOMA", "SINGIDA", "TABORA"].map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
-    const selectedHelper = helpers[0];
-    const routeRegs = selectedHelper ? ["PWANI", "MOROGORO", selectedHelper.region, "GEITA"] : ["PWANI", "MOROGORO", "GEITA"];
-    const routeDemands = [geita];
-    if (selectedHelper) routeDemands.push(selectedHelper);
-
-    routes.push(createRoute(msafaraCounter++, "Geita Direct", routeRegs, routeDemands, loadingDate, distanceMap));
-    removeDemands(routeDemands.map(d => d.region));
-  }
-
-  // 3. KATAVI / WESTERN PRIORITIZATION
-  const katavi = getDemand("KATAVI");
-  if (katavi) {
-    const westernPath = ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KIGOMA", "KATAVI"];
-    const westernDemands = westernPath.map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
-    if (westernDemands.reduce((sum, d) => sum + d.boxes, 0) <= MAX_BOXES_PER_TT) {
-      routes.push(createRoute(msafaraCounter++, "Western (Katavi Focus)", westernPath, westernDemands, loadingDate, distanceMap));
-      removeDemands(westernDemands.map(d => d.region));
-    }
-  }
-
-  // 4. REMAINING CORRIDORS (Lake Zone 1/2 only if they fit)
-  const corridors = [
-    { name: "Lake Zone-1", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "GEITA", "KAGERA"], branches: ["SIMIYU", "MARA"] },
-    { name: "Lake Zone-2", path: ["PWANI", "MOROGORO", "DODOMA", "SINGIDA", "SHINYANGA", "MWANZA", "MARA", "SIMIYU"], branches: ["KAGERA", "GEITA"] },
-    { name: "Southern-1", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "MBEYA", "SONGWE", "RUKWA"], branches: ["RUVUMA"] },
-    { name: "Southern-2 (Ruvuma)", path: ["PWANI", "MOROGORO", "IRINGA", "NJOMBE", "RUVUMA"], branches: [] },
-    { name: "Coastal South", path: ["PWANI", "LINDI", "MTWARA"], branches: [] }
-  ];
-
-  for (const corridor of corridors) {
-    const possible = [...corridor.path, ...corridor.branches].map(r => getDemand(r)).filter(Boolean) as RegionDemand[];
-    if (possible.length === 0) continue;
-
-    const totalBoxes = possible.reduce((sum, d) => sum + d.boxes, 0);
-    
-    // For Lake Zone 1 & 2, only use if ALL fit
-    if (corridor.name.startsWith("Lake Zone")) {
-      if (totalBoxes <= MAX_BOXES_PER_TT) {
-        routes.push(createRoute(msafaraCounter++, corridor.name, [...corridor.path, ...corridor.branches], possible, loadingDate, distanceMap));
-        removeDemands(possible.map(d => d.region));
-      }
-    } else {
-      // Standard greedy for other corridors
-      let currentGroup: RegionDemand[] = [];
-      let currentSum = 0;
-      for (const p of possible) {
-        if (currentSum + p.boxes <= MAX_BOXES_PER_TT) {
-          currentGroup.push(p);
-          currentSum += p.boxes;
-        }
-      }
-      if (currentGroup.length > 0) {
-        routes.push(createRoute(msafaraCounter++, corridor.name, [...corridor.path, ...corridor.branches], currentGroup, loadingDate, distanceMap));
-        removeDemands(currentGroup.map(d => d.region));
-      }
-    }
-  }
-
-  // 5. CLEANUP: Any leftover regions
   while (remainingDemands.length > 0) {
-    const target = remainingDemands[0];
-    routes.push(createRoute(msafaraCounter++, "Direct/Special", [target.region], [target], loadingDate, distanceMap));
-    remainingDemands.shift();
+    const farthestTarget = remainingDemands[0];
+    
+    // 2. FIND BEST CORRIDOR for the farthest target
+    const bestCorridor = CORRIDORS.find(c => 
+        c.path[c.path.length - 1] === farthestTarget.region || 
+        c.path.includes(farthestTarget.region) || 
+        c.branches.includes(farthestTarget.region)
+    ) || CORRIDORS[0];
+
+    let currentGroup: any[] = [];
+    let currentBoxes = 0;
+
+    // 3. FILL TRUCK with regions strictly on this path or its branches
+    // We prioritize the farthest target, then look for others in the corridor
+    const potentialItems = remainingDemands.filter(d => 
+        bestCorridor.path.includes(d.region) || bestCorridor.branches.includes(d.region)
+    );
+
+    for (const item of potentialItems) {
+      if (currentBoxes + item.boxes <= MAX_BOXES) {
+        currentGroup.push(item);
+        currentBoxes += item.boxes;
+      }
+    }
+
+    // Remove selected from total pool
+    const selectedIds = currentGroup.map(g => g.region);
+    remainingDemands = remainingDemands.filter(r => !selectedIds.includes(r.region));
+
+    // 4. SEQUENCE THE ROUTE (Dar -> Stop 1 -> Stop 2 -> Farthest)
+    // We sort the current group by distance from Dar (ascending)
+    currentGroup.sort((a, b) => getDist(a.region) - getDist(b.region));
+
+    const routeRegions = currentGroup.map((d, idx) => {
+      let receiving = d.region;
+      
+      // If region is a branch or specifically listed in HUB_RULES, it's a "Receive At"
+      const isBranch = bestCorridor.branches.includes(d.region);
+      if (isBranch || HUB_RULES[d.region]) {
+        receiving = HUB_RULES[d.region] || d.region;
+      }
+
+      // Special Tanga Logic
+      if (d.region === "TANGA") {
+        receiving = "SEGERA / TANGA TOWN";
+      }
+
+      return {
+        name: d.region,
+        receivingPlace: receiving,
+        deliveryDate: new Date(new Date(loadingDate).getTime() + (idx + 1) * 86400000).toISOString().split('T')[0],
+        boxes: d.boxes
+      };
+    });
+
+    // 5. CALCULATE KMS
+    let totalKm = 0;
+    let lastPoint = "DAR ES SALAAM";
+    routeRegions.forEach(r => {
+      totalKm += distanceMap.get(`${lastPoint}|${r.name}`) || 0;
+      lastPoint = r.name;
+    });
+
+    const totalTons = (currentBoxes * 34) / 1000;
+
+    routes.push({
+      msafaraNumber: msafaraCounter++,
+      name: `Msafara - Destination ${farthestTarget.region}`,
+      loadingDate,
+      startDate: loadingDate,
+      startingPoint: "DAR ES SALAAM",
+      regions: routeRegions,
+      totalBoxes: currentBoxes,
+      totalTons: Math.round(totalTons * 100) / 100,
+      totalKm: Math.round(totalKm),
+      vehicles: [
+        { type: "LORRY_HORSE_AND_TRAILER", quantity: Math.ceil(totalTons / 15) },
+        { type: "ESCORT_COASTER", quantity: 1 }
+      ],
+      notes: `Path: ${bestCorridor.name}. Farthest point: ${farthestTarget.region}`
+    });
   }
 
   return routes;
-}
-
-function createRoute(
-  num: number, 
-  name: string, 
-  path: string[], 
-  demands: RegionDemand[], 
-  loadingDate: string, 
-  distanceMap: Map<string, number>,
-  customVehicles?: any[]
-): SuggestedMsafara {
-  const visited = path.filter(p => demands.some(d => d.region === p));
-  const totalBoxes = demands.reduce((sum, d) => sum + d.boxes, 0);
-  const tons = (totalBoxes * 34) / 1000;
-
-  let totalKm = 0;
-  let lastPoint = "DAR ES SALAAM";
-  const routeRegions = visited.map((reg, idx) => {
-    const d = demands.find(dem => dem.region === reg)!;
-    totalKm += (distanceMap.get(`${lastPoint}|${reg}`) || 0);
-    lastPoint = reg;
-    return {
-      name: reg,
-      receivingPlace: HUB_RULES[reg] || reg,
-      deliveryDate: new Date(new Date(loadingDate).getTime() + (idx + 1) * 86400000).toISOString().split('T')[0],
-      boxes: d.boxes
-    };
-  });
-
-  return {
-    msafaraNumber: num,
-    name: `Msafara ${num}: ${name}`,
-    loadingDate, startDate: loadingDate, startingPoint: "DAR ES SALAAM",
-    regions: routeRegions,
-    totalBoxes,
-    totalTons: Math.round(tons * 100) / 100,
-    totalKm: Math.round(totalKm),
-    vehicles: customVehicles || [
-      { type: "TT", quantity: 1, label: "Truck & Trailer" },
-      { type: "ESCORT", quantity: 1, label: "Escort Vehicle" }
-    ],
-    notes: `Destination: ${visited[visited.length - 1]}`,
-    pathDisplay: ["DAR", ...visited]
-  };
 }
