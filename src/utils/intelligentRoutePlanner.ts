@@ -24,6 +24,13 @@ export interface SuggestedMsafara {
   notes: string;
 }
 
+export const ALL_TANZANIAN_REGIONS = [
+  "ARUSHA", "DAR ES SALAAM", "DODOMA", "GEITA", "IRINGA", "KAGERA", "KATAVI", 
+  "KIGOMA", "KILIMANJARO", "LINDI", "MANYARA", "MARA", "MBEYA", "MOROGORO", 
+  "MTWARA", "MWANZA", "NJOMBE", "PWANI", "RUKWA", "RUVUMA", "SHINYANGA", 
+  "SIMIYU", "SINGIDA", "SONGWE", "TABORA", "TANGA"
+];
+
 // Special single-truck regions (as specified)
 const SINGLE_TRUCK_REGIONS = ["PWANI", "MOROGORO", "DODOMA", "TANGA"];
 
@@ -95,8 +102,6 @@ export function generateIntelligentRoutes(
 
         // Katavi prefers Tabora (Western)
         if (item.region.toUpperCase() === "KATAVI" && cluster.name !== "Western") {
-          // Check if Western route is already full or if we should force it here
-          // For now, we skip it in other clusters to let Western pick it up
           continue;
         }
 
@@ -107,8 +112,6 @@ export function generateIntelligentRoutes(
       }
 
       if (currentGroup.length === 0) {
-        // If we couldn't add anything (e.g. Katavi was skipped), 
-        // but there are still items, we might need to force them
         if (remaining.length > 0) {
            const forcedItem = remaining[0];
            currentGroup.push(forcedItem);
@@ -124,7 +127,6 @@ export function generateIntelligentRoutes(
       let lorries = Math.ceil(totalTons / 15);
       let escorts = Math.max(1, Math.ceil(lorries * 0.7));
 
-      // Single-truck rule for PWANI, MOROGORO, DODOMA, TANGA
       const isSingleTruckRegion = currentGroup.length === 1 && SINGLE_TRUCK_REGIONS.includes(currentGroup[0].region.toUpperCase());
       if (isSingleTruckRegion) {
         lorries = 1;
@@ -134,7 +136,6 @@ export function generateIntelligentRoutes(
       const routeRegions = currentGroup.map((d, idx) => {
         let receiving = HUBS[d.region.toUpperCase()] || d.region.toUpperCase();
 
-        // Ruvuma special rule
         if (d.region.toUpperCase() === "RUVUMA") {
           const continuesSouth = currentGroup.some(r => ["MBEYA", "SONGWE", "RUKWA"].includes(r.region.toUpperCase()));
           receiving = continuesSouth ? "NJOMBE" : "RUVUMA";
@@ -169,7 +170,6 @@ export function generateIntelligentRoutes(
       });
     }
 
-    // Increment date for next cluster to avoid congestion
     currentDate = new Date(currentDate.getTime() + 2 * 86400000);
   }
 
