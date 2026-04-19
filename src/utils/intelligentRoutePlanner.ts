@@ -150,8 +150,8 @@ export function generateIntelligentRoutes(
 
       } else {
         // ── Step 2: two-group split ──────────────────────────────────────────
-        const grpA_regs = ["SHINYANGA", "MWANZA", "MARA", "SIMIYU"];
-        const grpB_regs = ["GEITA", "KAGERA"];
+        const grpA_regs = ["MWANZA", "SHINYANGA", "SIMIYU", "MARA"];
+        const grpB_regs = ["KAGERA", "GEITA"];
 
         const grpA    = grpA_regs.map(r => demand(r)).filter(Boolean) as RegionDemand[];
         const grpB    = grpB_regs.map(r => demand(r)).filter(Boolean) as RegionDemand[];
@@ -295,21 +295,44 @@ export function generateIntelligentRoutes(
   // CLUSTER 2 — WESTERN CORRIDOR
   //   Path: PWANI → MOROGORO → DODOMA → TABORA → KATAVI → KIGOMA
   //
+  //  KEY RULE: Before consuming MOROGORO here, check whether Southern Highlands
+  //  needs it for Priority 2 (MOROGORO+NJOMBE+RUVUMA). If SH Priority 2 is
+  //  viable AND it's a better use of MOROGORO, leave it for SH and proceed
+  //  with Western using PWANI only in the near-west slot.
+  //
   //  • DODOMA always stays with the Kigoma group (far-west), never solo.
-  //  • PWANI: try to put in western route if it fits; else pair with MOROGORO.
+  //  • PWANI: try to include in western route; else pair with remaining regions.
   //  • KIGOMA is always the endpoint; TABORA and KATAVI always go with it.
   //  • If all fit in one TT → single route.
   //  • Otherwise → far-west (DODOMA+TABORA+KATAVI+KIGOMA) + near-west (PWANI+MOROGORO).
   // =========================================================================
   {
+    // ── Pre-check: should MOROGORO be reserved for Southern Highlands P2? ──
+    // SH Priority 2 needs: MOROGORO + NJOMBE + RUVUMA all still in pool AND fitting in TT.
+    // If yes, mark MOROGORO as reserved so Western doesn't consume it.
+    const morInPool   = demand("MOROGORO");
+    const njombeCheck = demand("NJOMBE");
+    const ruvimaCheck = demand("RUVUMA");
+    const shEastP2Viable =
+      !!morInPool && !!njombeCheck && !!ruvimaCheck &&
+      morInPool.boxes + njombeCheck.boxes + ruvimaCheck.boxes <= MAX_BOXES_PER_TT;
+    // Also check that the SH west group (IRINGA+MBEYA+SONGWE+RUKWA) fits on its own
+    const iringaCheck = demand("IRINGA");
+    const mbeyaCheck  = demand("MBEYA");
+    const songweCheck = demand("SONGWE");
+    const rukwaCheck  = demand("RUKWA");
+    const shWestP2List = [iringaCheck, mbeyaCheck, songweCheck, rukwaCheck].filter(Boolean) as RegionDemand[];
+    const shWestP2Viable = shWestP2List.length > 0 && sum(shWestP2List) <= MAX_BOXES_PER_TT;
+    // Reserve MOROGORO for SH only when BOTH halves of SH P2 work
+    const reserveMorogoroForSH = shEastP2Viable && shWestP2Viable;
+
     const pwani    = demand("PWANI");
-    const morogoro = demand("MOROGORO");
+    const morogoro = reserveMorogoroForSH ? undefined : demand("MOROGORO");
     const dodoma   = demand("DODOMA");
     const tabora   = demand("TABORA");
     const katavi   = demand("KATAVI");
     const kigoma   = demand("KIGOMA");
 
-    // Try PWANI in the western group first
     const western = [pwani, morogoro, dodoma, tabora, katavi, kigoma].filter(Boolean) as RegionDemand[];
 
     if (western.length > 0) {
@@ -319,17 +342,16 @@ export function generateIntelligentRoutes(
         stage("Western Corridor", ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KATAVI", "KIGOMA"], western, 2, TT_ONLY);
 
       } else {
-        // Try without PWANI first (PWANI is the most optional here)
+        // Try without PWANI (PWANI most optional in western group)
         const westernNoPwani = [morogoro, dodoma, tabora, katavi, kigoma].filter(Boolean) as RegionDemand[];
         const noPwaniTotal   = sum(westernNoPwani);
 
         if (noPwaniTotal <= MAX_BOXES_PER_TT) {
-          // Fits without PWANI → western route, PWANI handled separately below
           stage("Western Corridor", ["MOROGORO", "DODOMA", "TABORA", "KATAVI", "KIGOMA"], westernNoPwani, 2, TT_ONLY);
+          // PWANI pairs with whatever is left
           const pwaniLeft = demand("PWANI");
           if (pwaniLeft) {
-            // Pair PWANI with any remaining region that fits
-            const partner = demand("MOROGORO") ?? demand("DODOMA");
+            const partner = demand("DODOMA"); // MOROGORO already consumed above
             const pList   = partner && pwaniLeft.boxes + partner.boxes <= MAX_BOXES_PER_TT
               ? [pwaniLeft, partner] : [pwaniLeft];
             stage("Pwani Route", pList.map(d => d.region), pList, 2, TT_ONLY);
@@ -343,7 +365,7 @@ export function generateIntelligentRoutes(
           if (far.length > 0 && farSum <= MAX_BOXES_PER_TT) {
             stage("Western (Kigoma Focus)", ["DODOMA", "TABORA", "KATAVI", "KIGOMA"], far, 2, TT_ONLY);
           } else {
-            // Far group still too heavy — DODOMA must not be solo
+            // Far still too heavy — keep TABORA+KATAVI+KIGOMA together; DODOMA pairs separately
             const kigGroup = [tabora, katavi, kigoma].filter(Boolean) as RegionDemand[];
             if (kigGroup.length > 0 && sum(kigGroup) <= MAX_BOXES_PER_TT) {
               stage("Western (Kigoma)", ["TABORA", "KATAVI", "KIGOMA"], kigGroup, 2, TT_ONLY);
@@ -353,20 +375,19 @@ export function generateIntelligentRoutes(
             // DODOMA — never solo
             const dod = demand("DODOMA");
             if (dod) {
-              const p   = demand("PWANI") ?? demand("MOROGORO");
+              const p     = demand("PWANI") ?? demand("MOROGORO");
               const dList = p && dod.boxes + p.boxes <= MAX_BOXES_PER_TT ? [p, dod] : [dod];
               stage("Dodoma Route", dList.map(d => d.region), dList, 2, TT_ONLY);
             }
           }
 
-          // Near-west: PWANI + MOROGORO
-          const near    = [pwani, morogoro].filter(Boolean).map(d => demand(d!.region)).filter(Boolean) as RegionDemand[];
-          const nearSum = sum(near);
-          if (near.length > 0) {
-            if (nearSum <= MAX_BOXES_PER_TT) {
-              stage("Western (Near)", ["PWANI", "MOROGORO"], near, 2, TT_ONLY);
+          // Near-west: PWANI + MOROGORO (re-read from pool in case not yet consumed)
+          const nearList = [demand("PWANI"), demand("MOROGORO")].filter(Boolean) as RegionDemand[];
+          if (nearList.length > 0) {
+            if (sum(nearList) <= MAX_BOXES_PER_TT) {
+              stage("Western (Near)", nearList.map(d => d.region), nearList, 2, TT_ONLY);
             } else {
-              near.forEach(nd => stage(`${nd.region} Route`, [nd.region], [nd], 2, TT_ONLY));
+              nearList.forEach(nd => stage(`${nd.region} Route`, [nd.region], [nd], 2, TT_ONLY));
             }
           }
         }
@@ -377,17 +398,20 @@ export function generateIntelligentRoutes(
   // =========================================================================
   // CLUSTER 3 — SOUTHERN HIGHLANDS
   //   Regions: IRINGA, NJOMBE, RUVUMA, MBEYA, SONGWE, RUKWA
-  //   (MOROGORO may join NJOMBE+RUVUMA if still available)
+  //   MOROGORO may join here if it was reserved (not consumed by Western).
   //
-  //  Priority 1 — All six fit in one TT → single route.
-  //  Priority 2 — Group with MOROGORO (if available):
-  //      West: IRINGA + MBEYA + SONGWE + RUKWA
-  //      East: MOROGORO + NJOMBE + RUVUMA
-  //      (MOROGORO must NOT be attached to LINDI/MTWARA)
-  //  Priority 3 — Classic split (no MOROGORO):
+  //  Priority 1 — All six core regions fit in one TT → single route.
+  //
+  //  Priority 2 — MOROGORO is still in pool AND both halves fit:
+  //      West: IRINGA + MBEYA + SONGWE + RUKWA  (fits in TT)
+  //      East: MOROGORO + NJOMBE + RUVUMA        (fits in TT)
+  //      MOROGORO must NOT go to Lindi/Mtwara or any non-SH route.
+  //
+  //  Priority 3 — Classic split (MOROGORO not available / P2 doesn't fit):
   //      West: MBEYA + SONGWE + RUKWA
   //      East: IRINGA + NJOMBE + RUVUMA
-  //  If any sub-group is still too heavy → send individually.
+  //
+  //  If any sub-group is still too heavy → send those regions individually.
   // =========================================================================
   {
     const iringa = demand("IRINGA");
@@ -402,8 +426,8 @@ export function generateIntelligentRoutes(
     if (allSH.length > 0) {
       const total = sum(allSH);
 
+      // ── Priority 1: all six fit ────────────────────────────────────────────
       if (total <= MAX_BOXES_PER_TT) {
-        // Priority 1: all fit
         stage(
           "Southern Highlands (Full)",
           ["IRINGA", "NJOMBE", "RUVUMA", "MBEYA", "SONGWE", "RUKWA"],
@@ -413,25 +437,41 @@ export function generateIntelligentRoutes(
         );
 
       } else {
-        // Priority 2: IRINGA+MBEYA+SONGWE+RUKWA / MOROGORO+NJOMBE+RUVUMA
-        const westP2 = [iringa, mbeya, songwe, rukwa].filter(Boolean) as RegionDemand[];
-        const morogoro = demand("MOROGORO"); // may still be in pool
-        const eastP2WithMor = [morogoro, njombe, ruvuma].filter(Boolean) as RegionDemand[];
-        const eastP2WithoutMor = [njombe, ruvuma].filter(Boolean) as RegionDemand[];
+        // ── Priority 2: MOROGORO-assisted split ───────────────────────────────
+        // MOROGORO may be in the pool if Western reserved it or didn't need it.
+        const morogoro = demand("MOROGORO");
 
+        const westP2     = [iringa, mbeya, songwe, rukwa].filter(Boolean) as RegionDemand[];
+        const eastP2     = [morogoro, njombe, ruvuma].filter(Boolean) as RegionDemand[];
         const westP2fits = westP2.length > 0 && sum(westP2) <= MAX_BOXES_PER_TT;
-        const eastP2MorFits =
-          morogoro &&
-          eastP2WithMor.length > 1 && // at least morogoro + one other
-          sum(eastP2WithMor) <= MAX_BOXES_PER_TT;
+        // East P2 requires MOROGORO + at least one SH region
+        const eastP2fits =
+          !!morogoro &&
+          eastP2.length >= 2 &&
+          sum(eastP2) <= MAX_BOXES_PER_TT;
 
-        if (westP2fits && eastP2MorFits) {
-          // Priority 2 works
-          stage("Southern Highlands (West)", ["IRINGA", "MBEYA", "SONGWE", "RUKWA"], westP2, 3, TT_ONLY);
-          stage("Southern Highlands (East+Morogoro)", eastP2WithMor.map(d => d.region), eastP2WithMor, 3, TT_ONLY);
+        if (westP2fits && eastP2fits) {
+          // Priority 2 — both halves fit
+          stage(
+            "Southern Highlands (West)",
+            ["IRINGA", "MBEYA", "SONGWE", "RUKWA"],
+            westP2,
+            3,
+            TT_ONLY
+          );
+          stage(
+            "Southern Highlands (East + Morogoro)",
+            eastP2.map(d => d.region),
+            eastP2,
+            3,
+            TT_ONLY
+          );
 
         } else {
-          // Priority 3: classic split
+          // ── Priority 3: classic split ──────────────────────────────────────
+          // If MOROGORO is in the pool but P2 didn't work, keep it available
+          // for catch-all — DO NOT attach to Lindi/Mtwara.
+
           const westP3 = [mbeya, songwe, rukwa].filter(Boolean) as RegionDemand[];
           const eastP3 = [iringa, njombe, ruvuma].filter(Boolean) as RegionDemand[];
 
