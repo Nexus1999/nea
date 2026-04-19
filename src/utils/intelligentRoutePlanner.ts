@@ -45,9 +45,6 @@ const HUB_RULES: Record<string, string> = {
   "TANGA":   "SEGERA / TANGA TOWN",
 };
 
-// ---------------------------------------------------------------------------
-// VEHICLE CONFIG HELPERS
-// ---------------------------------------------------------------------------
 const TT_ONLY = [
   { type: "TT",     quantity: 1, label: "Truck & Trailer" },
   { type: "ESCORT", quantity: 1, label: "Escort Vehicle"  },
@@ -61,27 +58,20 @@ function ttPlusExtraTruck(extraLabel: string) {
   ];
 }
 
-// ---------------------------------------------------------------------------
-// STAGED ROUTE TYPE (pre-numbered)
-// ---------------------------------------------------------------------------
 type StagedRoute = {
   name:     string;
   path:     string[];
   list:     RegionDemand[];
   vehicles: typeof TT_ONLY;
-  cluster:  number; // sort order: 1=Lake, 2=Western, 3=SouthernHighlands, 4=Northern, 5=SouthCoast, 6=Islands, 7=DSM, 99=misc
+  cluster:  number; 
 };
 
-// ---------------------------------------------------------------------------
-// MAIN EXPORT
-// ---------------------------------------------------------------------------
 export function generateIntelligentRoutes(
   demands:     RegionDemand[],
   loadingDate: string,
   distances:   any[] = []
 ): SuggestedMsafara[] {
 
-  // Build distance lookup (bidirectional)
   const distanceMap = new Map<string, number>();
   distances.forEach(d => {
     const a  = d.from_region_name.toUpperCase();
@@ -91,7 +81,6 @@ export function generateIntelligentRoutes(
     distanceMap.set(`${b}|${a}`, km);
   });
 
-  // Pool — every region deleted once assigned; guarantees nothing is skipped
   const pool = new Map<string, number>(
     demands
       .filter(d => d.boxes > 0)
@@ -100,7 +89,6 @@ export function generateIntelligentRoutes(
 
   const staged: StagedRoute[] = [];
 
-  // ── Pool helpers ──────────────────────────────────────────────────────────
   const demand = (r: string): RegionDemand | undefined =>
     pool.has(r) ? { region: r, boxes: pool.get(r)! } : undefined;
 
@@ -120,23 +108,6 @@ export function generateIntelligentRoutes(
     take(list.map(d => d.region));
   }
 
-  // =========================================================================
-  // CLUSTER 1 — LAKE ZONE
-  //   Regions: KAGERA, GEITA, MWANZA, MARA, SHINYANGA, SIMIYU
-  //
-  //  Step 1: All six fit in one TT → single route.
-  //  Step 2: Split into two groups:
-  //    Group A: MWANZA + SHINYANGA + SIMIYU + MARA   (NO SINGIDA here)
-  //    Group B: KAGERA + GEITA + SINGIDA + MOROGORO  (helpers in that order)
-  //  Step 3: If Group A or B is still too heavy → individual handlers below.
-  //
-  //  Individual handlers (fallback):
-  //   • Kagera/Geita: always try together first; helpers = SINGIDA, MOROGORO
-  //   • Mwanza heavy (≥ MAX_TT): TT for Mwanza + ONE extra Truck for ONE middle region
-  //   • Mwanza normal: pair with MARA (+ SIMIYU if fits), else SHINYANGA
-  //   • Mara/Simiyu: pair together, add SHINYANGA then SINGIDA if space
-  //   • Shinyanga alone: pair with SINGIDA > DODOMA > PWANI > MOROGORO
-  // =========================================================================
   {
     const lakeRegs = ["KAGERA", "GEITA", "MWANZA", "MARA", "SHINYANGA", "SIMIYU"];
     const lakeAll  = lakeRegs.map(r => demand(r)).filter(Boolean) as RegionDemand[];
@@ -144,12 +115,9 @@ export function generateIntelligentRoutes(
     if (lakeAll.length > 0) {
       const lakeTotal = sum(lakeAll);
 
-      // ── Step 1: all fit ───────────────────────────────────────────────────
       if (lakeTotal <= MAX_BOXES_PER_TT) {
         stage("Lake Zone (Full)", lakeRegs, lakeAll, 1, TT_ONLY);
-
       } else {
-        // ── Step 2: two-group split ──────────────────────────────────────────
         const grpA_regs = ["MWANZA", "SHINYANGA", "SIMIYU", "MARA"];
         const grpB_regs = ["KAGERA", "GEITA"];
 
@@ -158,12 +126,10 @@ export function generateIntelligentRoutes(
         const grpASum = sum(grpA);
         const grpBSum = sum(grpB);
 
-        // Group A: MWANZA + SHINYANGA + SIMIYU + MARA  (SINGIDA stays out of this group)
         if (grpA.length > 0 && grpASum <= MAX_BOXES_PER_TT) {
           stage("Lake Zone (Mwanza/Shinyanga/Simiyu/Mara)", grpA_regs, grpA, 1, TT_ONLY);
         }
 
-        // Group B: KAGERA + GEITA + SINGIDA (preferred helper) + MOROGORO (if still fits)
         if (grpB.length > 0 && grpBSum <= MAX_BOXES_PER_TT) {
           const singida  = demand("SINGIDA");
           const morogoro = demand("MOROGORO");
@@ -177,20 +143,15 @@ export function generateIntelligentRoutes(
             listB.unshift(morogoro);
           }
           stage("Kagera/Geita Route", listB.map(d => d.region), listB, 1, TT_ONLY);
-
         } else if (grpB.length > 0) {
-          // Group B too heavy → handle Kagera/Geita individually
           handleKageraGeita();
         }
 
-        // Handle any lake region Group A couldn't absorb
         handleMwanza();
         handleMaraSimiyu();
         handleShinyanga();
       }
     }
-
-    // ── Individual lake handlers ─────────────────────────────────────────────
 
     function handleKageraGeita() {
       const kagera = demand("KAGERA");
@@ -207,7 +168,6 @@ export function generateIntelligentRoutes(
           if (morogoro && cur + morogoro.boxes <= MAX_BOXES_PER_TT) { list.unshift(morogoro); }
           stage("Kagera/Geita Route", list.map(d => d.region), list, 1, TT_ONLY);
         } else {
-          // Split each
           const hK   = demand("SINGIDA") ?? demand("DODOMA");
           const kList = hK && kagera.boxes + hK.boxes <= MAX_BOXES_PER_TT ? [hK, kagera] : [kagera];
           stage("Kagera Direct", kList.map(d => d.region), kList, 1, TT_ONLY);
@@ -232,7 +192,6 @@ export function generateIntelligentRoutes(
       if (!mwanza) return;
 
       if (mwanza.boxes >= MAX_BOXES_PER_TT) {
-        // Heavy Mwanza: TT for Mwanza + ONE extra Truck for ONE middle region
         const mid = demand("SINGIDA") ?? demand("DODOMA") ?? demand("PWANI") ?? demand("MOROGORO");
         if (mid) {
           stage("Mwanza Heavy", [mid.region, "MWANZA"], [mid, mwanza], 1, ttPlusExtraTruck(mid.region));
@@ -268,7 +227,6 @@ export function generateIntelligentRoutes(
       if (shinyanga && total + shinyanga.boxes <= MAX_BOXES_PER_TT) {
         list.unshift(shinyanga); total += shinyanga.boxes;
       }
-      // Add SINGIDA if still space (but NOT if it was already used by Kagera/Geita)
       const singida = demand("SINGIDA");
       if (singida && total + singida.boxes <= MAX_BOXES_PER_TT) {
         list.unshift(singida);
@@ -291,39 +249,19 @@ export function generateIntelligentRoutes(
     }
   }
 
-  // =========================================================================
-  // CLUSTER 2 — WESTERN CORRIDOR
-  //   Path: PWANI → MOROGORO → DODOMA → TABORA → KATAVI → KIGOMA
-  //
-  //  KEY RULE: Before consuming MOROGORO here, check whether Southern Highlands
-  //  needs it for Priority 2 (MOROGORO+NJOMBE+RUVUMA). If SH Priority 2 is
-  //  viable AND it's a better use of MOROGORO, leave it for SH and proceed
-  //  with Western using PWANI only in the near-west slot.
-  //
-  //  • DODOMA always stays with the Kigoma group (far-west), never solo.
-  //  • PWANI: try to include in western route; else pair with remaining regions.
-  //  • KIGOMA is always the endpoint; TABORA and KATAVI always go with it.
-  //  • If all fit in one TT → single route.
-  //  • Otherwise → far-west (DODOMA+TABORA+KATAVI+KIGOMA) + near-west (PWANI+MOROGORO).
-  // =========================================================================
   {
-    // ── Pre-check: should MOROGORO be reserved for Southern Highlands P2? ──
-    // SH Priority 2 needs: MOROGORO + NJOMBE + RUVUMA all still in pool AND fitting in TT.
-    // If yes, mark MOROGORO as reserved so Western doesn't consume it.
     const morInPool   = demand("MOROGORO");
     const njombeCheck = demand("NJOMBE");
     const ruvimaCheck = demand("RUVUMA");
     const shEastP2Viable =
       !!morInPool && !!njombeCheck && !!ruvimaCheck &&
       morInPool.boxes + njombeCheck.boxes + ruvimaCheck.boxes <= MAX_BOXES_PER_TT;
-    // Also check that the SH west group (IRINGA+MBEYA+SONGWE+RUKWA) fits on its own
     const iringaCheck = demand("IRINGA");
     const mbeyaCheck  = demand("MBEYA");
     const songweCheck = demand("SONGWE");
     const rukwaCheck  = demand("RUKWA");
     const shWestP2List = [iringaCheck, mbeyaCheck, songweCheck, rukwaCheck].filter(Boolean) as RegionDemand[];
     const shWestP2Viable = shWestP2List.length > 0 && sum(shWestP2List) <= MAX_BOXES_PER_TT;
-    // Reserve MOROGORO for SH only when BOTH halves of SH P2 work
     const reserveMorogoroForSH = shEastP2Viable && shWestP2Viable;
 
     const pwani    = demand("PWANI");
@@ -340,39 +278,32 @@ export function generateIntelligentRoutes(
 
       if (total <= MAX_BOXES_PER_TT) {
         stage("Western Corridor", ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KATAVI", "KIGOMA"], western, 2, TT_ONLY);
-
       } else {
-        // Try without PWANI (PWANI most optional in western group)
         const westernNoPwani = [morogoro, dodoma, tabora, katavi, kigoma].filter(Boolean) as RegionDemand[];
         const noPwaniTotal   = sum(westernNoPwani);
 
         if (noPwaniTotal <= MAX_BOXES_PER_TT) {
           stage("Western Corridor", ["MOROGORO", "DODOMA", "TABORA", "KATAVI", "KIGOMA"], westernNoPwani, 2, TT_ONLY);
-          // PWANI pairs with whatever is left
           const pwaniLeft = demand("PWANI");
           if (pwaniLeft) {
-            const partner = demand("DODOMA"); // MOROGORO already consumed above
+            const partner = demand("DODOMA"); 
             const pList   = partner && pwaniLeft.boxes + partner.boxes <= MAX_BOXES_PER_TT
               ? [pwaniLeft, partner] : [pwaniLeft];
             stage("Pwani Route", pList.map(d => d.region), pList, 2, TT_ONLY);
           }
-
         } else {
-          // Far-west: DODOMA + TABORA + KATAVI + KIGOMA
           const far    = [dodoma, tabora, katavi, kigoma].filter(Boolean) as RegionDemand[];
           const farSum = sum(far);
 
           if (far.length > 0 && farSum <= MAX_BOXES_PER_TT) {
             stage("Western (Kigoma Focus)", ["DODOMA", "TABORA", "KATAVI", "KIGOMA"], far, 2, TT_ONLY);
           } else {
-            // Far still too heavy — keep TABORA+KATAVI+KIGOMA together; DODOMA pairs separately
             const kigGroup = [tabora, katavi, kigoma].filter(Boolean) as RegionDemand[];
             if (kigGroup.length > 0 && sum(kigGroup) <= MAX_BOXES_PER_TT) {
               stage("Western (Kigoma)", ["TABORA", "KATAVI", "KIGOMA"], kigGroup, 2, TT_ONLY);
             } else {
               kigGroup.forEach(nd => stage(`${nd.region} Direct`, [nd.region], [nd], 2, TT_ONLY));
             }
-            // DODOMA — never solo
             const dod = demand("DODOMA");
             if (dod) {
               const p     = demand("PWANI") ?? demand("MOROGORO");
@@ -381,7 +312,6 @@ export function generateIntelligentRoutes(
             }
           }
 
-          // Near-west: PWANI + MOROGORO (re-read from pool in case not yet consumed)
           const nearList = [demand("PWANI"), demand("MOROGORO")].filter(Boolean) as RegionDemand[];
           if (nearList.length > 0) {
             if (sum(nearList) <= MAX_BOXES_PER_TT) {
@@ -395,24 +325,6 @@ export function generateIntelligentRoutes(
     }
   }
 
-  // =========================================================================
-  // CLUSTER 3 — SOUTHERN HIGHLANDS
-  //   Regions: IRINGA, NJOMBE, RUVUMA, MBEYA, SONGWE, RUKWA
-  //   MOROGORO may join here if it was reserved (not consumed by Western).
-  //
-  //  Priority 1 — All six core regions fit in one TT → single route.
-  //
-  //  Priority 2 — MOROGORO is still in pool AND both halves fit:
-  //      West: IRINGA + MBEYA + SONGWE + RUKWA  (fits in TT)
-  //      East: MOROGORO + NJOMBE + RUVUMA        (fits in TT)
-  //      MOROGORO must NOT go to Lindi/Mtwara or any non-SH route.
-  //
-  //  Priority 3 — Classic split (MOROGORO not available / P2 doesn't fit):
-  //      West: MBEYA + SONGWE + RUKWA
-  //      East: IRINGA + NJOMBE + RUVUMA
-  //
-  //  If any sub-group is still too heavy → send those regions individually.
-  // =========================================================================
   {
     const iringa = demand("IRINGA");
     const njombe = demand("NJOMBE");
@@ -426,7 +338,6 @@ export function generateIntelligentRoutes(
     if (allSH.length > 0) {
       const total = sum(allSH);
 
-      // ── Priority 1: all six fit ────────────────────────────────────────────
       if (total <= MAX_BOXES_PER_TT) {
         stage(
           "Southern Highlands (Full)",
@@ -435,23 +346,18 @@ export function generateIntelligentRoutes(
           3,
           TT_ONLY
         );
-
       } else {
-        // ── Priority 2: MOROGORO-assisted split ───────────────────────────────
-        // MOROGORO may be in the pool if Western reserved it or didn't need it.
         const morogoro = demand("MOROGORO");
 
         const westP2     = [iringa, mbeya, songwe, rukwa].filter(Boolean) as RegionDemand[];
         const eastP2     = [morogoro, njombe, ruvuma].filter(Boolean) as RegionDemand[];
         const westP2fits = westP2.length > 0 && sum(westP2) <= MAX_BOXES_PER_TT;
-        // East P2 requires MOROGORO + at least one SH region
         const eastP2fits =
           !!morogoro &&
           eastP2.length >= 2 &&
           sum(eastP2) <= MAX_BOXES_PER_TT;
 
         if (westP2fits && eastP2fits) {
-          // Priority 2 — both halves fit
           stage(
             "Southern Highlands (West)",
             ["IRINGA", "MBEYA", "SONGWE", "RUKWA"],
@@ -466,12 +372,7 @@ export function generateIntelligentRoutes(
             3,
             TT_ONLY
           );
-
         } else {
-          // ── Priority 3: classic split ──────────────────────────────────────
-          // If MOROGORO is in the pool but P2 didn't work, keep it available
-          // for catch-all — DO NOT attach to Lindi/Mtwara.
-
           const westP3 = [mbeya, songwe, rukwa].filter(Boolean) as RegionDemand[];
           const eastP3 = [iringa, njombe, ruvuma].filter(Boolean) as RegionDemand[];
 
@@ -491,18 +392,6 @@ export function generateIntelligentRoutes(
     }
   }
 
-  // =========================================================================
-  // CLUSTER 4 — NORTHERN
-  //   Regions: TANGA, KILIMANJARO, ARUSHA, MANYARA
-  //
-  //  Scenario A: All four fit in one TT.
-  //  Scenario B: MANYARA+KILI+ARUSHA fit in TT; TANGA gets its own Truck
-  //              in the SAME Msafara.
-  //  Scenario C: Only KILI+ARUSHA fit in TT; TANGA gets its own Truck
-  //              (same Msafara); MANYARA → separate Msafara paired with
-  //              MOROGORO > PWANI > DODOMA.
-  //  Scenario D: Cannot combine → send each individually.
-  // =========================================================================
   {
     const tanga  = demand("TANGA");
     const kili   = demand("KILIMANJARO");
@@ -517,11 +406,8 @@ export function generateIntelligentRoutes(
 
     if (present.length > 0) {
       if (sum(present) <= MAX_BOXES_PER_TT) {
-        // A
         stage("Northern (Full)", ["TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"], present, 4, TT_ONLY);
-
       } else if (coreSum <= MAX_BOXES_PER_TT && tanga && tanga.boxes <= MAX_BOXES_PER_T) {
-        // B
         stage(
           "Northern (Core TT + Tanga Truck)",
           ["TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"],
@@ -529,9 +415,7 @@ export function generateIntelligentRoutes(
           4,
           ttPlusExtraTruck("TANGA")
         );
-
       } else if (akSum <= MAX_BOXES_PER_TT) {
-        // C
         if (tanga) {
           stage(
             "Northern (Arusha/Kili TT + Tanga Truck)",
@@ -543,26 +427,18 @@ export function generateIntelligentRoutes(
         } else {
           stage("Northern (Arusha/Kili)", ["KILIMANJARO", "ARUSHA"], akList, 4, TT_ONLY);
         }
-        // MANYARA → own Msafara with best available middle region
         const manyD = demand("MANYARA");
         if (manyD) {
           const mid      = demand("MOROGORO") ?? demand("PWANI") ?? demand("DODOMA");
           const manyList = mid ? [mid, manyD] : [manyD];
           stage("Manyara Route", manyList.map(d => d.region), manyList, 4, TT_ONLY);
         }
-
       } else {
-        // D
         present.forEach(nd => stage(`${nd.region} Direct`, [nd.region], [nd], 4, TT_ONLY));
       }
     }
   }
 
-  // =========================================================================
-  // CLUSTER 5 — SOUTH COAST
-  //   LINDI + MTWARA — combine if they fit; otherwise split.
-  //   MOROGORO must NEVER be grouped with Lindi/Mtwara.
-  // =========================================================================
   {
     const lindi  = demand("LINDI");
     const mtwara = demand("MTWARA");
@@ -577,11 +453,6 @@ export function generateIntelligentRoutes(
     }
   }
 
-  // =========================================================================
-  // CLUSTER 6 — ISLANDS
-  //   PEMBA  : KASKAZINI PEMBA + KUSINI PEMBA
-  //   UNGUJA : KASKAZINI UNGUJA + KUSINI UNGUJA + MJINI MAGHARIBI
-  // =========================================================================
   {
     const kp = demand("KASKAZINI PEMBA");
     const sp = demand("KUSINI PEMBA");
@@ -596,25 +467,11 @@ export function generateIntelligentRoutes(
     if (ungujaList.length > 0) stage("Unguja", ungujaList.map(d => d.region), ungujaList, 6, TT_ONLY);
   }
 
-  // =========================================================================
-  // CLUSTER 7 — DAR ES SALAAM
-  // =========================================================================
   {
     const dar = demand("DAR ES SALAAM");
     if (dar) stage("Dar es Salaam", ["DAR ES SALAAM"], [dar], 7, TT_ONLY);
   }
 
-  // =========================================================================
-  // CLUSTER 99 — CATCH-ALL
-  //   Any remaining region that hasn't been assigned yet.
-  //   Rules:
-  //   • DODOMA never solo — pair with PWANI first, then any other region.
-  //   • PWANI never solo — pair with MOROGORO or DODOMA.
-  //   • Greedy fill: anchor on first region, pack as many as fit in TT.
-  //   • Never leave a solo route when another remaining region can fill it.
-  // =========================================================================
-
-  // Resolve DODOMA solo prevention first
   {
     const dodoma = demand("DODOMA");
     if (dodoma) {
@@ -631,7 +488,6 @@ export function generateIntelligentRoutes(
     }
   }
 
-  // Greedy catch-all
   while (pool.size > 0) {
     const entries = [...pool.entries()];
     const [firstReg, firstBoxes] = entries[0];
@@ -654,12 +510,6 @@ export function generateIntelligentRoutes(
     );
   }
 
-  // =========================================================================
-  // POST-PROCESSING
-  //  Pass 1: Merge solo-region routes into routes that have spare capacity,
-  //          preferring same-cluster partners.
-  //  Pass 2: Sort by cluster order (1→7→99), then number sequentially.
-  // =========================================================================
   const merged = postProcess(staged);
 
   merged.sort((a, b) => a.cluster - b.cluster);
@@ -669,9 +519,6 @@ export function generateIntelligentRoutes(
   );
 }
 
-// ---------------------------------------------------------------------------
-// POST-PROCESSING: merge solo routes into routes with available capacity
-// ---------------------------------------------------------------------------
 function postProcess(routes: StagedRoute[]): StagedRoute[] {
   const MAX  = 950;
   const sum  = (list: RegionDemand[]) => list.reduce((s, d) => s + d.boxes, 0);
@@ -680,10 +527,9 @@ function postProcess(routes: StagedRoute[]): StagedRoute[] {
   while (changed) {
     changed = false;
     for (let i = 0; i < routes.length; i++) {
-      if (routes[i].list.length !== 1) continue; // only solo routes
+      if (routes[i].list.length !== 1) continue; 
       const solo = routes[i].list[0];
 
-      // Prefer same-cluster partners, then any cluster
       let bestIdx   = -1;
       let bestScore = -1;
 
@@ -691,7 +537,6 @@ function postProcess(routes: StagedRoute[]): StagedRoute[] {
         if (j === i) continue;
         const space = MAX - sum(routes[j].list);
         if (space < solo.boxes) continue;
-        // Score: same cluster = +1000 bonus
         const score = space + (routes[j].cluster === routes[i].cluster ? 1000 : 0);
         if (score > bestScore) { bestScore = score; bestIdx = j; }
       }
@@ -709,9 +554,6 @@ function postProcess(routes: StagedRoute[]): StagedRoute[] {
   return routes;
 }
 
-// ---------------------------------------------------------------------------
-// ROUTE BUILDER
-// ---------------------------------------------------------------------------
 function buildRoute(
   num:           number,
   name:          string,

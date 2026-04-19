@@ -2,23 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Sparkles, 
-  ArrowLeft, 
   RefreshCw, 
   CheckCircle2, 
   Truck, 
   MapPin, 
   ChevronRight,
   Package,
-  Info
+  Save
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
-import { generateIntelligentRoutes } from "@/utils/intelligentRoutePlanner";
+import { generateIntelligentRoutes, SuggestedMsafara } from "@/utils/intelligentRoutePlanner";
 import { Badge } from "@/components/ui/badge";
 
 const AISuggesterPage = () => {
@@ -27,7 +26,7 @@ const AISuggesterPage = () => {
   const [loading, setLoading] = useState(true);
   const [suggesting, setSuggesting] = useState(false);
   const [budget, setBudget] = useState<any>(null);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestedMsafara[]>([]);
 
   useEffect(() => {
     const fetchBudget = async () => {
@@ -51,20 +50,83 @@ const AISuggesterPage = () => {
   const handleGenerate = async () => {
     setSuggesting(true);
     try {
-      const mockDemands = [
-        { region: 'ARUSHA', boxes: 150 },
-        { region: 'KILIMANJARO', boxes: 120 },
-        { region: 'MWANZA', boxes: 300 },
-        { region: 'SHINYANGA', boxes: 200 },
-      ];
+      // 1. Fetch regional boxes for this budget
+      const { data: boxesData, error: boxesError } = await supabase
+        .from('transportation_region_boxes')
+        .select('region_name, boxes_count')
+        .eq('budget_id', id);
+
+      if (boxesError) throw boxesError;
+
+      // 2. Fetch regional distances
+      const { data: distancesData, error: distError } = await supabase
+        .from('regional_distances')
+        .select('*');
+
+      if (distError) throw distError;
+
+      const demands = (boxesData || []).map(b => ({
+        region: b.region_name,
+        boxes: b.boxes_count
+      }));
+
+      const routes = generateIntelligentRoutes(
+        demands, 
+        new Date().toISOString().split('T')[0], 
+        distancesData || []
+      );
       
-      const routes = generateIntelligentRoutes(mockDemands, new Date().toISOString());
       setSuggestions(routes);
-      showSuccess("AI Route suggestions generated");
+      showSuccess("AI Route suggestions generated successfully");
     } catch (err: any) {
-      showError(err.message);
+      showError(err.message || "Failed to generate suggestions");
     } finally {
       setSuggesting(false);
+    }
+  };
+
+  const handleApplySuggestion = async (suggestion: SuggestedMsafara) => {
+    try {
+      // Insert the route
+      const { data: routeData, error: routeError } = await supabase
+        .from('transportation_routes')
+        .insert({
+          budget_id: id,
+          name: suggestion.name,
+          starting_point: suggestion.startingPoint,
+          loading_date: suggestion.loadingDate,
+          start_date: suggestion.startDate,
+          total_boxes: suggestion.totalBoxes,
+          total_tons: suggestion.totalTons
+        })
+        .select()
+        .single();
+
+      if (routeError) throw routeError;
+
+      // Insert vehicles
+      const vehiclePayload = suggestion.vehicles.map(v => ({
+        route_id: routeData.id,
+        vehicle_type: v.type === 'TT' ? 'TRUCK_AND_TRAILER' : v.type === 'T' ? 'STANDARD_TRUCK' : 'ESCORT_VEHICLE',
+        quantity: v.quantity
+      }));
+      await supabase.from('transportation_route_vehicles').insert(vehiclePayload);
+
+      // Insert stops
+      const stopPayload = suggestion.regions.map((r, idx) => ({
+        route_id: routeData.id,
+        region_name: r.name,
+        receiving_place: r.receivingPlace,
+        boxes_count: r.boxes,
+        delivery_date: r.deliveryDate,
+        sequence_order: idx
+      }));
+      await supabase.from('transportation_route_stops').insert(stopPayload);
+
+      showSuccess(`Applied ${suggestion.name} to Action Plan`);
+      navigate(`/dashboard/budgets/action-plan/${id}`);
+    } catch (err: any) {
+      showError(err.message);
     }
   };
 
@@ -78,7 +140,7 @@ const AISuggesterPage = () => {
           <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
             <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate('/dashboard/budgets')}>Budgets</span>
             <ChevronRight className="w-3 h-3" />
-            <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate(`/dashboard/budgets/overview/${id}`)}>Action Plan</span>
+            <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate(`/dashboard/budgets/action-plan/${id}`)}>Action Plan</span>
             <ChevronRight className="w-3 h-3" />
             <span className="text-slate-900">AI Suggester</span>
           </div>
@@ -104,7 +166,7 @@ const AISuggesterPage = () => {
           </div>
           <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Ready to Optimize?</h3>
           <p className="text-slate-500 max-w-md text-center mt-2 font-medium">
-            Our AI engine will analyze regional demands, distances, and vehicle capacities to suggest the most cost-effective routes.
+            Our AI engine will analyze regional demands from your budget, distances, and vehicle capacities to suggest the most cost-effective routes.
           </p>
         </div>
       ) : (
@@ -153,7 +215,21 @@ const AISuggesterPage = () => {
                   </div>
                 </div>
 
-                <Button className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-[10px] tracking-widest gap-2">
+                <div className="space-y-3">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Required Vehicles</p>
+                  <div className="flex flex-wrap gap-2">
+                    {route.vehicles.map((v, vIdx) => (
+                      <Badge key={vIdx} variant="outline" className="px-3 py-1 border-slate-200 text-slate-600 font-bold">
+                        {v.quantity}x {v.label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={() => handleApplySuggestion(route)}
+                  className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-[10px] tracking-widest gap-2"
+                >
                   <CheckCircle2 className="w-4 h-4" /> Apply This Suggestion
                 </Button>
               </CardContent>
