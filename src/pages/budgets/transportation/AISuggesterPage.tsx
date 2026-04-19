@@ -58,9 +58,9 @@ const AISuggesterPage = () => {
 
       if (boxesError) throw boxesError;
 
-      // 2. Fetch regional distances
+      // 2. Fetch regional distances - Corrected table name to region_distances
       const { data: distancesData, error: distError } = await supabase
-        .from('regional_distances')
+        .from('region_distances')
         .select('*');
 
       if (distError) throw distError;
