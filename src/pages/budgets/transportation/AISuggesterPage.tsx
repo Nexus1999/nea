@@ -32,7 +32,6 @@ const AISuggesterPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch Budget
         const { data: budgetData, error: bErr } = await supabase
           .from('budgets')
           .select('*')
@@ -41,7 +40,6 @@ const AISuggesterPage = () => {
         if (bErr) throw bErr;
         setBudget(budgetData);
 
-        // Fetch Regional Demands
         const { data: demandsData, error: dErr } = await supabase
           .from('regional_demands')
           .select('region, boxes')
@@ -66,18 +64,15 @@ const AISuggesterPage = () => {
 
     setSuggesting(true);
     try {
-      // Fetch Distances for better planning
       const { data: distances } = await supabase
         .from('regional_distances')
         .select('*');
 
-      // Format demands for the utility
       const formattedDemands = demands.map(d => ({
         region: d.region,
         boxes: d.boxes
       }));
 
-      // Use the intelligent planner utility
       const routes = generateIntelligentRoutes(
         formattedDemands, 
         budget?.start_date || new Date().toISOString(),
@@ -96,14 +91,12 @@ const AISuggesterPage = () => {
   const handleApplySuggestions = async () => {
     setSuggesting(true);
     try {
-      // 1. Clear existing routes for this budget
       const { error: delErr } = await supabase
         .from('transportation_routes')
         .delete()
         .eq('budget_id', id);
       if (delErr) throw delErr;
 
-      // 2. Insert new routes
       for (const route of suggestions) {
         const { data: newRoute, error: rErr } = await supabase
           .from('transportation_routes')
@@ -121,7 +114,6 @@ const AISuggesterPage = () => {
 
         if (rErr) throw rErr;
 
-        // Insert Vehicles
         const vehiclePayload = route.vehicles.map(v => ({
           route_id: newRoute.id,
           vehicle_type: v.type === 'TT' ? 'TRUCK_AND_TRAILER' : v.type === 'T' ? 'STANDARD_TRUCK' : 'ESCORT_VEHICLE',
@@ -129,7 +121,6 @@ const AISuggesterPage = () => {
         }));
         await supabase.from('transportation_route_vehicles').insert(vehiclePayload);
 
-        // Insert Stops
         const stopPayload = route.regions.map((reg, idx) => ({
           route_id: newRoute.id,
           region_name: reg.name,
@@ -154,7 +145,6 @@ const AISuggesterPage = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-8 space-y-10 max-w-[1700px] mx-auto pb-32">
-      {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
