@@ -10,9 +10,8 @@ import {
   AlertTriangle,
   Search,
   RefreshCw,
-  Package,
-  MapPin,
-  Sparkles,
+  LayoutDashboard,
+  Eye,
   FileText
 } from "lucide-react";
 import {
@@ -39,7 +38,6 @@ import { useNavigate } from 'react-router-dom';
 import Spinner from "@/components/Spinner";
 import PaginationControls from "@/components/ui/pagination-controls";
 import AddBudgetDrawer from "@/components/budgets/AddBudgetDrawer";
-import RegionalDemandsDrawer from "@/components/budgets/RegionalDemandsDrawer";
 import { cn } from "@/lib/utils";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,8 +47,6 @@ const BudgetsPage = () => {
   const [budgets, setBudgets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isDemandsOpen, setIsDemandsOpen] = useState(false);
-  const [selectedBudget, setSelectedBudget] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [orderBy, setOrderBy] = useState<string>('created_at');
   const [order, setOrder] = useState<'desc' | 'asc'>('desc');
@@ -144,11 +140,6 @@ const BudgetsPage = () => {
     }
   };
 
-  const handleOpenDemands = (budget: any) => {
-    setSelectedBudget(budget);
-    setIsDemandsOpen(true);
-  };
-
   return (
     <Card className="relative min-h-[600px]">
       {loading && (
@@ -167,17 +158,14 @@ const BudgetsPage = () => {
 
       <CardContent>
         <div className="mb-4">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search budgets..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9"
-              disabled={loading}
-            />
-          </div>
+          <Input
+            type="text"
+            placeholder="Search budgets..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="max-w-sm"
+            disabled={loading}
+          />
         </div>
 
         <div className="border rounded-lg overflow-hidden">
@@ -228,41 +216,21 @@ const BudgetsPage = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                          title="Regional Demands"
-                          onClick={() => handleOpenDemands(budget)}
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="View Overview"
+                          onClick={() => navigate(`/dashboard/budgets/overview/${budget.id}`)}
                         >
-                          <Package className="h-4 w-4" />
+                          <LayoutDashboard className="h-4 w-4" />
                         </Button>
                         
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="Route Planner"
-                          onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${budget.id}`)}
-                        >
-                          <MapPin className="h-4 w-4" />
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
                           className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                          title="AI Suggester"
-                          onClick={() => navigate(`/dashboard/budgets/transportation/ai-suggester/${budget.id}`)}
-                        >
-                          <Sparkles className="h-4 w-4" />
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                          title="Budget Template"
+                          title="View Details"
                           onClick={() => navigate(`/dashboard/budgets/template/${budget.id}`)}
                         >
-                          <FileText className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
 
                         <Button
@@ -297,15 +265,6 @@ const BudgetsPage = () => {
         onClose={() => setIsDrawerOpen(false)}
         onSuccess={fetchBudgets}
       />
-
-      {selectedBudget && (
-        <RegionalDemandsDrawer
-          isOpen={isDemandsOpen}
-          onClose={() => setIsDemandsOpen(false)}
-          budgetId={selectedBudget.id}
-          budgetTitle={selectedBudget.title}
-        />
-      )}
 
       <AlertDialog
         open={deleteConfig.open}

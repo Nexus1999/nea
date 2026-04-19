@@ -4,11 +4,22 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, ArrowLeft, RefreshCw, CheckCircle2, Truck, MapPin } from "lucide-react";
+import { 
+  Sparkles, 
+  ArrowLeft, 
+  RefreshCw, 
+  CheckCircle2, 
+  Truck, 
+  MapPin, 
+  ChevronRight,
+  Package,
+  Info
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
 import { generateIntelligentRoutes } from "@/utils/intelligentRoutePlanner";
+import { Badge } from "@/components/ui/badge";
 
 const AISuggesterPage = () => {
   const { id } = useParams();
@@ -40,7 +51,6 @@ const AISuggesterPage = () => {
   const handleGenerate = async () => {
     setSuggesting(true);
     try {
-      // Mock demands for demonstration - in real app, fetch from regional_demands table
       const mockDemands = [
         { region: 'ARUSHA', boxes: 150 },
         { region: 'KILIMANJARO', boxes: 120 },
@@ -61,24 +71,26 @@ const AISuggesterPage = () => {
   if (loading) return <div className="flex h-[400px] items-center justify-center"><Spinner size="lg" /></div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/budgets')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-purple-600" />
-              AI Route Suggester
-            </h1>
-            <p className="text-sm text-muted-foreground">{budget?.title} ({budget?.year})</p>
+    <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-8 space-y-10 max-w-[1700px] mx-auto pb-32">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
+            <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate('/dashboard/budgets')}>Budgets</span>
+            <ChevronRight className="w-3 h-3" />
+            <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate(`/dashboard/budgets/overview/${id}`)}>Action Plan</span>
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-slate-900">AI Suggester</span>
           </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+            <Sparkles className="h-6 w-6 text-purple-600" /> AI Route Suggester
+          </h1>
         </div>
+        
         <Button 
           onClick={handleGenerate} 
           disabled={suggesting}
-          className="bg-purple-600 hover:bg-purple-700 gap-2"
+          className="rounded-xl h-11 px-8 bg-purple-600 hover:bg-purple-700 text-white font-bold uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-purple-100"
         >
           {suggesting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           Generate Suggestions
@@ -86,54 +98,64 @@ const AISuggesterPage = () => {
       </div>
 
       {suggestions.length === 0 ? (
-        <Card className="border-dashed border-2">
-          <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="p-4 bg-purple-50 rounded-full mb-4">
-              <Sparkles className="h-10 w-10 text-purple-400" />
-            </div>
-            <h3 className="text-lg font-bold">No Suggestions Yet</h3>
-            <p className="text-muted-foreground max-w-md mt-2">
-              Click the button above to let our AI analyze regional demands and suggest the most efficient transportation routes.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-32 bg-white rounded-[2.5rem] border border-dashed border-slate-200">
+          <div className="p-6 bg-purple-50 rounded-3xl mb-6">
+            <Sparkles className="h-12 w-12 text-purple-400" />
+          </div>
+          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Ready to Optimize?</h3>
+          <p className="text-slate-500 max-w-md text-center mt-2 font-medium">
+            Our AI engine will analyze regional demands, distances, and vehicle capacities to suggest the most cost-effective routes.
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {suggestions.map((route, idx) => (
-            <Card key={idx} className="overflow-hidden border-l-4 border-l-purple-500">
-              <CardHeader className="bg-slate-50/50 pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Truck className="h-5 w-5 text-purple-600" />
-                    {route.name}
-                  </CardTitle>
-                  <Badge variant="outline" className="bg-white">{route.totalBoxes} Boxes</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    Route Path:
+            <Card key={idx} className="border-none bg-white shadow-sm hover:shadow-xl transition-all rounded-[2.5rem] overflow-hidden ring-1 ring-slate-200/50 group">
+              <div className="p-8 bg-slate-900 text-white flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center">
+                    <Truck className="h-6 w-6 text-purple-400" />
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div>
+                    <h3 className="font-black uppercase tracking-tight text-lg">{route.name}</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Route {idx + 1}</p>
+                  </div>
+                </div>
+                <Badge className="bg-purple-500 text-white border-none px-4 py-1 rounded-full font-black">
+                  {route.totalBoxes} BOXES
+                </Badge>
+              </div>
+              <CardContent className="p-8 space-y-8">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <MapPin className="h-3.5 w-3.5" /> Delivery Sequence
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
                     {route.pathDisplay.map((point: string, pIdx: number) => (
                       <React.Fragment key={pIdx}>
-                        <Badge variant="secondary">{point}</Badge>
-                        {pIdx < route.pathDisplay.length - 1 && <span className="text-slate-300">→</span>}
+                        <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 text-xs font-black text-slate-700">
+                          {point}
+                        </div>
+                        {pIdx < route.pathDisplay.length - 1 && <ChevronRight className="w-4 h-4 text-slate-300" />}
                       </React.Fragment>
                     ))}
                   </div>
-                  <div className="pt-4 border-t flex justify-between items-center">
-                    <div className="text-xs text-muted-foreground">
-                      Est. Distance: <span className="font-bold text-slate-900">{route.totalKm} KM</span>
-                    </div>
-                    <Button size="sm" variant="outline" className="gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Apply Route
-                    </Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
+                  <div className="p-4 bg-slate-50/50 rounded-2xl">
+                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Est. Distance</p>
+                    <p className="text-xl font-black text-slate-900">{route.totalKm} KM</p>
+                  </div>
+                  <div className="p-4 bg-slate-50/50 rounded-2xl">
+                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Est. Weight</p>
+                    <p className="text-xl font-black text-slate-900">{route.totalTons} Tons</p>
                   </div>
                 </div>
+
+                <Button className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-[10px] tracking-widest gap-2">
+                  <CheckCircle2 className="w-4 h-4" /> Apply This Suggestion
+                </Button>
               </CardContent>
             </Card>
           ))}
