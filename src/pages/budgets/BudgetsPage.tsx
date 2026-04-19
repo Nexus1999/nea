@@ -167,7 +167,6 @@ const BudgetsPage = () => {
 
       <CardContent>
         <div className="mb-4">
-<dyad-write path="src/pages/budgets/BudgetsPage.tsx" description="Continuing BudgetsPage UI update">
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
