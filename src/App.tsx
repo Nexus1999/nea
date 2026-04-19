@@ -44,7 +44,8 @@ import AuditLogs from "./pages/security/AuditLogs";
 
 // Budget Module Pages
 import BudgetsPage from "./pages/budgets/BudgetsPage";
-import TransportationActionPlanPage from "./pages/budgets/transportation/ActionPlanPage";
+import RoutePlannerPage from "./pages/budgets/transportation/RoutePlannerPage";
+import AISuggesterPage from "./pages/budgets/transportation/AISuggesterPage";
 import TemplatePage from "./pages/budgets/TemplatePage";
 
 const queryClient = new QueryClient();
@@ -123,7 +124,8 @@ const App = () => (
 
               {/* Budget Module Routes */}
               <Route path="budgets" element={<BudgetsPage />} />
-              <Route path="budgets/transportation/action-plan/:id" element={<TransportationActionPlanPage />} />
+              <Route path="budgets/transportation/route-planner/:id" element={<RoutePlannerPage />} />
+              <Route path="budgets/transportation/ai-suggester/:id" element={<AISuggesterPage />} />
               <Route path="budgets/template/:id" element={<TemplatePage />} />
 
               {/* Add more routes as needed */}

@@ -9,9 +9,11 @@ import {
   ArrowUpDown, 
   AlertTriangle,
   Search,
-  Settings2,
   RefreshCw,
-  Package
+  Package,
+  MapPin,
+  Sparkles,
+  FileText
 } from "lucide-react";
 import {
   Table,
@@ -142,14 +144,6 @@ const BudgetsPage = () => {
     }
   };
 
-  const handleActionPlan = (budget: any) => {
-    if (budget.type === 'TRANSPORT_EXAMS') {
-      navigate(`/dashboard/budgets/transportation/action-plan/${budget.id}`);
-    } else {
-      navigate(`/dashboard/budgets/action-plan/${budget.id}`);
-    }
-  };
-
   const handleOpenDemands = (budget: any) => {
     setSelectedBudget(budget);
     setIsDemandsOpen(true);
@@ -173,6 +167,7 @@ const BudgetsPage = () => {
 
       <CardContent>
         <div className="mb-4">
+<dyad-write path="src/pages/budgets/BudgetsPage.tsx" description="Continuing BudgetsPage UI update">
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -240,15 +235,37 @@ const BudgetsPage = () => {
                         >
                           <Package className="h-4 w-4" />
                         </Button>
+                        
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                          title="Action Plan"
-                          onClick={() => handleActionPlan(budget)}
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="Route Planner"
+                          onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${budget.id}`)}
                         >
-                          <Settings2 className="h-4 w-4" />
+                          <MapPin className="h-4 w-4" />
                         </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                          title="AI Suggester"
+                          onClick={() => navigate(`/dashboard/budgets/transportation/ai-suggester/${budget.id}`)}
+                        >
+                          <Sparkles className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          title="Budget Template"
+                          onClick={() => navigate(`/dashboard/budgets/template/${budget.id}`)}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+
                         <Button
                           variant="ghost"
                           size="icon"
