@@ -12,7 +12,8 @@ import {
   RefreshCw,
   LayoutDashboard,
   Eye,
-  FileText
+  FileText,
+  ClipboardList
 } from "lucide-react";
 import {
   Table,
@@ -213,6 +214,16 @@ const BudgetsPage = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                          title="Action Plan"
+                          onClick={() => navigate(`/dashboard/budgets/action-plan/${budget.id}`)}
+                        >
+                          <ClipboardList className="h-4 w-4" />
+                        </Button>
+
                         <Button
                           variant="ghost"
                           size="icon"

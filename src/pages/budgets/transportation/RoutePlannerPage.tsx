@@ -15,7 +15,8 @@ import {
   X, 
   ChevronRight,
   Package,
-  ArrowUpDown
+  ArrowUpDown,
+  Sparkles
 } from "lucide-react";
 import {
   Table,
@@ -67,7 +68,7 @@ const RoutePlannerPage = () => {
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
               <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate('/dashboard/budgets')}>Budgets</span>
               <ChevronRight className="w-3 h-3" />
-              <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate(`/dashboard/budgets/overview/${id}`)}>Action Plan</span>
+              <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate(`/dashboard/budgets/action-plan/${id}`)}>Action Plan</span>
               <ChevronRight className="w-3 h-3" />
               <span className="text-slate-900">Route Planner</span>
             </div>
@@ -81,8 +82,12 @@ const RoutePlannerPage = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="rounded-xl h-10 px-6 border-slate-200 font-bold uppercase text-[10px] tracking-widest gap-2">
-              <Plus className="w-4 h-4" /> Add New Route
+            <Button 
+              variant="outline" 
+              onClick={() => navigate(`/dashboard/budgets/transportation/ai-suggester/${id}`)}
+              className="rounded-xl h-10 px-6 border-purple-200 text-purple-600 hover:bg-purple-50 font-bold uppercase text-[10px] tracking-widest gap-2"
+            >
+              <Sparkles className="w-4 h-4" /> AI Suggester
             </Button>
             <Button className="rounded-xl h-10 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase text-[10px] tracking-widest gap-2">
               <Save className="w-4 h-4" /> Save Configuration

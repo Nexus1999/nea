@@ -44,7 +44,7 @@ import AuditLogs from "./pages/security/AuditLogs";
 
 // Budget Module Pages
 import BudgetsPage from "./pages/budgets/BudgetsPage";
-import BudgetOverviewPage from "./pages/budgets/BudgetOverviewPage";
+import ActionPlanPage from "./pages/budgets/ActionPlanPage";
 import RoutePlannerPage from "./pages/budgets/transportation/RoutePlannerPage";
 import AISuggesterPage from "./pages/budgets/transportation/AISuggesterPage";
 import TemplatePage from "./pages/budgets/TemplatePage";
@@ -64,6 +64,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
+        <Toaster />
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -125,7 +126,7 @@ const App = () => (
 
               {/* Budget Module Routes */}
               <Route path="budgets" element={<BudgetsPage />} />
-              <Route path="budgets/overview/:id" element={<BudgetOverviewPage />} />
+              <Route path="budgets/action-plan/:id" element={<ActionPlanPage />} />
               <Route path="budgets/transportation/route-planner/:id" element={<RoutePlannerPage />} />
               <Route path="budgets/transportation/ai-suggester/:id" element={<AISuggesterPage />} />
               <Route path="budgets/template/:id" element={<TemplatePage />} />
