@@ -7,7 +7,6 @@ import {
   Sparkles, 
   RefreshCw, 
   Loader2, 
-  CheckCircle2,
   ArrowRight,
   Calendar,
   Package,
@@ -74,6 +73,7 @@ const AISuggesterPage = () => {
           name: msafara.name,
           starting_point: msafara.startingPoint,
           start_date: msafara.startDate,
+          loading_date: msafara.loadingDate, // Fixed: Added missing loading_date
           total_boxes: msafara.totalBoxes,
           total_tons: msafara.totalTons,
         })
@@ -81,6 +81,7 @@ const AISuggesterPage = () => {
         .single();
 
       if (rError) throw rError;
+      if (!route) throw new Error("Failed to create route record");
 
       await supabase.from('transportation_route_vehicles').insert(
         msafara.vehicles.map(v => ({
@@ -96,15 +97,14 @@ const AISuggesterPage = () => {
           region_name: r.name,
           receiving_place: r.receivingPlace,
           boxes_count: r.boxes,
-          delivery_date: r.deliveryDate,
+          delivery_date: r.delivery_date || r.deliveryDate,
           sequence_order: idx
         }))
       );
 
-      setSuggestions(prev => prev.filter(s => s.msafaraNumber !== msafara.msafaraNumber));
       return true;
     } catch (err: any) {
-      showError(err.message);
+      console.error(err);
       return false;
     }
   };
@@ -117,7 +117,14 @@ const AISuggesterPage = () => {
       const success = await handleApply(s);
       if (success) count++;
     }
-    showSuccess(`Successfully applied ${count} routes`);
+    
+    if (count > 0) {
+      showSuccess(`Successfully applied ${count} routes`);
+      setSuggestions([]);
+      navigate(`/dashboard/budgets/action-plan/${id}`);
+    } else {
+      showError("Failed to apply routes. Please check your data.");
+    }
     setApplying(false);
   };
 
@@ -137,7 +144,7 @@ const AISuggesterPage = () => {
               disabled={applying}
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-6"
             >
-              {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve All</>}
+              {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve All Suggestions</>}
             </Button>
           )}
           <Button 
@@ -174,7 +181,7 @@ const AISuggesterPage = () => {
       <ScrollArea className="h-[600px]">
         <div className="grid grid-cols-1 gap-6">
           {suggestions.map((msafara) => (
-            <Card key={msafara.msafaraNumber} className="border-none shadow-sm hover:shadow-md transition-all overflow-hidden group">
+            <Card key={msafara.msafaraNumber} className="border-none shadow-sm overflow-hidden group">
               <CardContent className="p-6 flex flex-col md:flex-row gap-6">
                 <div className="flex-1 space-y-4">
                   <div className="flex items-center justify-between">
@@ -211,17 +218,6 @@ const AISuggesterPage = () => {
                       </div>
                     ))}
                   </div>
-                </div>
-                <div className="md:w-48 flex flex-col justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-6 md:pt-0 md:pl-6">
-                  <Button 
-                    onClick={() => {
-                      handleApply(msafara);
-                      showSuccess(`Applied ${msafara.name}`);
-                    }}
-                    className="w-full h-14 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest transition-all"
-                  >
-                    <CheckCircle2 className="w-4 h-4 mr-2" /> Apply
-                  </Button>
                 </div>
               </CardContent>
             </Card>

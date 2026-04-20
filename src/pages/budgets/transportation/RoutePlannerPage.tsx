@@ -8,7 +8,6 @@ import {
   Sparkles, 
   Plus, 
   Trash2, 
-  Truck,
   MapPin,
   Loader2
 } from 'lucide-react';
@@ -38,6 +37,7 @@ const RoutePlannerPage = () => {
     name: '',
     startingPoint: 'DAR ES SALAAM',
     startDate: '',
+    loadingDate: '', // Added loadingDate
     vehicles: [{ type: 'TRUCK_AND_TRAILER', quantity: 1 }],
     stops: [] as any[]
   });
@@ -66,6 +66,7 @@ const RoutePlannerPage = () => {
           name: data.name,
           startingPoint: data.starting_point,
           startDate: data.start_date,
+          loadingDate: data.loading_date || data.start_date,
           vehicles: data.transportation_route_vehicles.map((v: any) => ({ type: v.vehicle_type, quantity: v.quantity })),
           stops: data.transportation_route_stops.sort((a: any, b: any) => a.sequence_order - b.sequence_order).map((s: any) => ({
             name: s.region_name,
@@ -96,6 +97,7 @@ const RoutePlannerPage = () => {
         name: formData.name,
         starting_point: formData.startingPoint,
         start_date: formData.startDate,
+        loading_date: formData.loadingDate || formData.startDate, // Fixed: Added loading_date
         total_boxes: totalBoxes,
         total_tons: (totalBoxes * 34) / 1000,
       };
@@ -106,9 +108,13 @@ const RoutePlannerPage = () => {
         await supabase.from('transportation_route_vehicles').delete().eq('route_id', editId);
         await supabase.from('transportation_route_stops').delete().eq('route_id', editId);
       } else {
-        const { data } = await supabase.from('transportation_routes').insert(payload).select().single();
+        const { data, error } = await supabase.from('transportation_routes').insert(payload).select().single();
+        if (error) throw error;
+        if (!data) throw new Error("Failed to create route record");
         routeId = data.id;
       }
+
+      if (!routeId) throw new Error("Route ID is missing");
 
       await supabase.from('transportation_route_vehicles').insert(
         formData.vehicles.map(v => ({ route_id: routeId, vehicle_type: v.type, quantity: v.quantity }))
@@ -173,9 +179,15 @@ const RoutePlannerPage = () => {
               <Label className="text-[10px] font-bold uppercase text-slate-400">Route Name</Label>
               <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. Northern Corridor A" className="h-10 rounded-xl" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-[10px] font-bold uppercase text-slate-400">Start Date</Label>
-              <Input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="h-10 rounded-xl" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold uppercase text-slate-400">Loading Date</Label>
+                <Input type="date" value={formData.loadingDate} onChange={e => setFormData({...formData, loadingDate: e.target.value})} className="h-10 rounded-xl" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold uppercase text-slate-400">Start Date</Label>
+                <Input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="h-10 rounded-xl" />
+              </div>
             </div>
             <div className="pt-4 border-t space-y-4">
               <div className="flex items-center justify-between">
