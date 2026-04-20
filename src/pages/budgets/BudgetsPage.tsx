@@ -11,7 +11,7 @@ import {
   RefreshCw,
   Eye,
   ClipboardList,
-  Layers,
+  Package,
   Settings2
 } from "lucide-react";
 import {
@@ -159,14 +159,6 @@ const BudgetsPage = () => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-2xl font-bold">Budgets</CardTitle>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-slate-500 hover:text-slate-900"
-            title="Budget Settings"
-          >
-            <Settings2 className="h-4 w-4" />
-          </Button>
           <Button size="sm" className="h-8 gap-1" onClick={() => setIsDrawerOpen(true)} disabled={loading}>
             <PlusCircle className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Create Budget</span>
@@ -190,6 +182,7 @@ const BudgetsPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[60px]">S/N</TableHead>
                 <TableHead>
                   <Button variant="ghost" onClick={() => handleSort('title')} className="px-0 hover:bg-transparent">
                     Budget Title
@@ -211,13 +204,16 @@ const BudgetsPage = () => {
             <TableBody>
               {currentItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No budget records found.
                   </TableCell>
                 </TableRow>
               ) : (
-                currentItems.map(budget => (
+                currentItems.map((budget, index) => (
                   <TableRow key={budget.id}>
+                    <TableCell className="text-xs font-medium text-slate-400">
+                      {(currentPage - 1) * itemsPerPage + index + 1}
+                    </TableCell>
                     <TableCell className="font-medium">{budget.title}</TableCell>
                     <TableCell>{budget.year}</TableCell>
                     <TableCell>
@@ -250,7 +246,7 @@ const BudgetsPage = () => {
                           title="Regional Boxes"
                           onClick={() => openRegionalBoxes(budget.id)}
                         >
-                          <Layers className="h-4 w-4" />
+                          <Package className="h-4 w-4" />
                         </Button>
 
                         {/* 3. ACTION PLAN BUTTON */}
@@ -264,7 +260,18 @@ const BudgetsPage = () => {
                           <ClipboardList className="h-4 w-4" />
                         </Button>
 
-                        {/* 4. DELETE BUTTON */}
+                        {/* 4. SETTINGS BUTTON */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                          title="Settings"
+                          onClick={() => navigate(`/dashboard/budgets/template/${budget.id}`)}
+                        >
+                          <Settings2 className="h-4 w-4" />
+                        </Button>
+
+                        {/* 5. DELETE BUTTON */}
                         <Button
                           variant="ghost"
                           size="icon"
