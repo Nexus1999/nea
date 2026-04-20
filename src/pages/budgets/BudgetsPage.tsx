@@ -9,10 +9,10 @@ import {
   ArrowUpDown, 
   AlertTriangle,
   RefreshCw,
-  LayoutDashboard,
   Eye,
   ClipboardList,
-  Layers // Icon for Regional Boxes
+  Layers,
+  Settings2
 } from "lucide-react";
 import {
   Table,
@@ -37,9 +37,8 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from 'react-router-dom';
 import Spinner from "@/components/Spinner";
 import PaginationControls from "@/components/ui/pagination-controls";
-import RegionalDemandsTable from "@/components/budgets/AddBudgetDrawer";
-// Assuming the drawer exists at this path, adjust if necessary
-import RegionalBoxesDrawer from "@/components/budgets/transportation/RegionalDemandsTable"; 
+import AddBudgetDrawer from "@/components/budgets/AddBudgetDrawer";
+import RegionalDemandsDrawer from "@/components/budgets/RegionalDemandsDrawer"; 
 import { cn } from "@/lib/utils";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -159,10 +158,20 @@ const BudgetsPage = () => {
 
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-2xl font-bold">Budgets</CardTitle>
-        <Button size="sm" className="h-8 gap-1" onClick={() => setIsDrawerOpen(true)} disabled={loading}>
-          <PlusCircle className="h-3.5 w-3.5" />
-          <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Create Budget</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-slate-500 hover:text-slate-900"
+            title="Budget Settings"
+          >
+            <Settings2 className="h-4 w-4" />
+          </Button>
+          <Button size="sm" className="h-8 gap-1" onClick={() => setIsDrawerOpen(true)} disabled={loading}>
+            <PlusCircle className="h-3.5 w-3.5" />
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Create Budget</span>
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent>
@@ -227,10 +236,10 @@ const BudgetsPage = () => {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="View Overview"
+                          title="View"
                           onClick={() => navigate(`/dashboard/budgets/overview/${budget.id}`)}
                         >
-                          <LayoutDashboard className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
 
                         {/* 2. REGIONAL BOXES BUTTON */}
@@ -289,11 +298,11 @@ const BudgetsPage = () => {
         onSuccess={fetchBudgets}
       />
 
-      {/* Regional Boxes Drawer Component */}
-      <RegionalDemandsTable
+      <RegionalDemandsDrawer
         isOpen={isRegionalDrawerOpen}
         onClose={() => setIsRegionalDrawerOpen(false)}
-        budgetId={selectedBudgetId}
+        budgetId={selectedBudgetId || ""}
+        budgetTitle={budgets.find(b => b.id === selectedBudgetId)?.title || ""}
       />
 
       <AlertDialog
