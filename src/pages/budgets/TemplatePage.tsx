@@ -37,14 +37,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
 
-// DEFAULT RATES AS REQUESTED
 const RATES = {
   EXAM_OFFICER: 170000,
   POLICE: 170000,
   SECURITY: 170000,
   DRIVER: 150000,
-  LOADING_PER_ROUTE: 20000 * 30, // 600,000 per route
-  PADLOCKS_PER_ROUTE: 6 * 4 * 10000, // 240,000 per route
+  LOADING_PER_ROUTE: 20000 * 30,
+  PADLOCKS_PER_ROUTE: 6 * 4 * 10000,
 };
 
 const TemplatePage = () => {
@@ -78,11 +77,14 @@ const TemplatePage = () => {
       if (templateData) {
         setTemplate(templateData);
         
+        // Fetch the latest current version
         const { data: versionData } = await supabase
           .from('transportation_template_versions')
           .select('*')
           .eq('template_id', templateData.id)
           .eq('is_current', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
         
         if (versionData) {
@@ -95,9 +97,12 @@ const TemplatePage = () => {
           
           setPersonnel(pRes.data || []);
           setOtherCosts(oRes.data || []);
+        } else {
+          setCurrentVersion(null);
         }
       }
     } catch (err: any) {
+      console.error("Fetch error:", err);
       showError("Failed to load template data");
     } finally {
       setLoading(false);
@@ -137,7 +142,13 @@ const TemplatePage = () => {
         throw new Error("No Action Plan found. Please create routes first.");
       }
 
-      // 3. Create New Version
+      // 3. Deactivate old versions
+      await supabase
+        .from('transportation_template_versions')
+        .update({ is_current: false })
+        .eq('template_id', tId);
+
+      // 4. Create New Version
       const { data: version, error: vErr } = await supabase
         .from('transportation_template_versions')
         .insert({
@@ -151,12 +162,15 @@ const TemplatePage = () => {
       
       if (vErr) throw vErr;
 
-      // 4. Generate Personnel Rows
+      // 5. Generate Personnel Rows
       const personnelRows: any[] = [];
+      let totalPersonnelCost = 0;
+
       routes.forEach(route => {
         const routeDays = route.transportation_route_stops.length + 2;
 
         // Police (2 per route)
+        const policeCost = 2 * routeDays * RATES.POLICE;
         personnelRows.push({
           template_version_id: version.id,
           route_id: route.id,
@@ -164,10 +178,13 @@ const TemplatePage = () => {
           quantity: 2,
           days: routeDays,
           allowance_per_day: RATES.POLICE,
-          allowance_transit_per_day: RATES.POLICE
+          allowance_transit_per_day: RATES.POLICE,
+          total_cost: policeCost
         });
+        totalPersonnelCost += policeCost;
 
         // Security (1 per route)
+        const securityCost = 1 * routeDays * RATES.SECURITY;
         personnelRows.push({
           template_version_id: version.id,
           route_id: route.id,
@@ -175,11 +192,15 @@ const TemplatePage = () => {
           quantity: 1,
           days: routeDays,
           allowance_per_day: RATES.SECURITY,
-          allowance_transit_per_day: RATES.SECURITY
+          allowance_transit_per_day: RATES.SECURITY,
+          total_cost: securityCost
         });
+        totalPersonnelCost += securityCost;
 
-        // Drivers (per vehicle)
+        // Drivers
         route.transportation_route_vehicles.forEach((v: any) => {
+          const emergency = v.vehicle_type === 'TRUCK_AND_TRAILER' ? 100000 : 50000;
+          const driverCost = (v.quantity * routeDays * RATES.DRIVER) + (v.quantity * emergency);
           personnelRows.push({
             template_version_id: version.id,
             route_id: route.id,
@@ -188,12 +209,15 @@ const TemplatePage = () => {
             quantity: v.quantity,
             days: routeDays,
             allowance_per_day: RATES.DRIVER,
-            emergency_allowance: v.vehicle_type === 'TRUCK_AND_TRAILER' ? 100000 : 50000
+            emergency_allowance: emergency,
+            total_cost: driverCost
           });
+          totalPersonnelCost += driverCost;
         });
 
-        // Exam Officers (1 per region)
+        // Exam Officers
         route.transportation_route_stops.forEach((stop: any) => {
+          const officerCost = (1 * 3 * RATES.EXAM_OFFICER) + (1 * 2 * RATES.EXAM_OFFICER) + 20000 + 50000;
           personnelRows.push({
             template_version_id: version.id,
             route_id: route.id,
@@ -204,13 +228,18 @@ const TemplatePage = () => {
             transit_days: 2,
             allowance_per_day: RATES.EXAM_OFFICER,
             allowance_transit_per_day: RATES.EXAM_OFFICER,
-            unloading_cash: 20000, // Standard unloading per officer
-            fare_return: 50000 // Standard return fare
+            unloading_cash: 20000,
+            fare_return: 50000,
+            total_cost: officerCost
           });
+          totalPersonnelCost += officerCost;
         });
       });
 
-      // 5. Generate Operational Costs (Other Costs)
+      // 6. Generate Operational Costs
+      const loadingCost = routes.length * RATES.LOADING_PER_ROUTE;
+      const padlockCost = routes.length * RATES.PADLOCKS_PER_ROUTE;
+      
       const otherCostRows = [
         {
           template_version_id: version.id,
@@ -218,6 +247,7 @@ const TemplatePage = () => {
           description: `Loading costs for ${routes.length} routes (30 people per route)`,
           quantity: routes.length,
           unit_cost: RATES.LOADING_PER_ROUTE,
+          total_cost: loadingCost,
           category: 'operational'
         },
         {
@@ -226,18 +256,25 @@ const TemplatePage = () => {
           description: `Security hardware for ${routes.length} routes`,
           quantity: routes.length,
           unit_cost: RATES.PADLOCKS_PER_ROUTE,
+          total_cost: padlockCost,
           category: 'security'
         }
       ];
+      const totalOtherCost = loadingCost + padlockCost;
 
-      // 6. Bulk Insert
+      // 7. Bulk Insert
       await Promise.all([
         supabase.from('transportation_template_personnel').insert(personnelRows),
-        supabase.from('transportation_template_other_costs').insert(otherCostRows)
+        supabase.from('transportation_template_other_costs').insert(otherCostRows),
+        supabase.from('transportation_template_versions').update({
+          total_personnel_cost: totalPersonnelCost,
+          total_other_cost: totalOtherCost,
+          grand_total: totalPersonnelCost + totalOtherCost
+        }).eq('id', version.id)
       ]);
       
-      showSuccess("Financial template generated with default rates!");
-      fetchData();
+      showSuccess("Financial template generated successfully!");
+      await fetchData();
     } catch (err: any) {
       showError(err.message);
     } finally {
