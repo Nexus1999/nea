@@ -308,8 +308,8 @@ const RoutePlannerPage = () => {
                         <SelectContent>
                           <SelectItem value="TRUCK_AND_TRAILER">Truck & Trailer (TT)</SelectItem>
                           <SelectItem value="STANDARD_TRUCK">Standard Truck (T)</SelectItem>
-                          <SelectItem value="ESCORT_VEHICLE">Escort (HT)</SelectItem>
-                          <SelectItem value="ESCORT_VEHICLE">Escort (Coaster)</SelectItem>
+                          <SelectItem value="ESCORT_VEHICLE_HT">Escort (HT)</SelectItem>
+                          <SelectItem value="ESCORT_VEHICLE_COASTER">Escort (Coaster)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
