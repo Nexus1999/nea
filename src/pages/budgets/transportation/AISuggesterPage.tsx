@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ChevronLeft, 
@@ -11,7 +11,8 @@ import {
   ArrowRight,
   Calendar,
   Package,
-  Truck
+  Truck,
+  CheckCircle
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +28,7 @@ const AISuggesterPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestedMsafara[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
 
@@ -99,33 +101,56 @@ const AISuggesterPage = () => {
         }))
       );
 
-      showSuccess(`Applied ${msafara.name}`);
-      // Remove from list but keep page open
       setSuggestions(prev => prev.filter(s => s.msafaraNumber !== msafara.msafaraNumber));
+      return true;
     } catch (err: any) {
       showError(err.message);
+      return false;
     }
+  };
+
+  const handleApproveAll = async () => {
+    if (suggestions.length === 0) return;
+    setApplying(true);
+    let count = 0;
+    for (const s of [...suggestions]) {
+      const success = await handleApply(s);
+      if (success) count++;
+    }
+    showSuccess(`Successfully applied ${count} routes`);
+    setApplying(false);
   };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/budgets/action-plan/${id}`)} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${id}`)} className="rounded-full">
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">AI Route Suggester</h1>
         </div>
-        <Button 
-          variant="outline"
-          onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${id}`)}
-          className="border-2 border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-6 transition-all"
-        >
-          Manual Planner
-        </Button>
+        <div className="flex gap-2">
+          {suggestions.length > 0 && (
+            <Button 
+              onClick={handleApproveAll}
+              disabled={applying}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-6"
+            >
+              {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve All</>}
+            </Button>
+          )}
+          <Button 
+            variant="outline"
+            onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${id}`)}
+            className="border-2 border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-6 transition-all"
+          >
+            Manual Planner
+          </Button>
+        </div>
       </div>
 
-      <Card className="border-none shadow-sm bg-slate-900 text-white overflow-hidden">
+      <Card className="border-none shadow-sm bg-white overflow-hidden border border-slate-100">
         <CardContent className="p-8 flex flex-col md:flex-row items-end gap-6">
           <div className="flex-1 space-y-2">
             <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Loading Date</Label>
@@ -133,13 +158,13 @@ const AISuggesterPage = () => {
               type="date" 
               value={selectedDate} 
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-white/10 border-white/20 text-white h-11 rounded-xl focus:ring-indigo-500"
+              className="bg-slate-50 border-slate-200 h-11 rounded-xl focus:ring-indigo-500"
             />
           </div>
           <Button 
             onClick={fetchAndPlan} 
             disabled={loading || !selectedDate}
-            className="h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl"
+            className="h-11 bg-slate-900 hover:bg-black text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><RefreshCw className="h-4 w-4 mr-2" /> Generate Suggestions</>}
           </Button>
@@ -189,7 +214,10 @@ const AISuggesterPage = () => {
                 </div>
                 <div className="md:w-48 flex flex-col justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-6 md:pt-0 md:pl-6">
                   <Button 
-                    onClick={() => handleApply(msafara)}
+                    onClick={() => {
+                      handleApply(msafara);
+                      showSuccess(`Applied ${msafara.name}`);
+                    }}
                     className="w-full h-14 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4 mr-2" /> Apply

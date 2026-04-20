@@ -116,7 +116,7 @@ export function generateIntelligentRoutes(
       const lakeTotal = sum(lakeAll);
 
       if (lakeTotal <= MAX_BOXES_PER_TT) {
-        stage("Lake Zone (Full)", lakeRegs, lakeAll, 1, TT_ONLY);
+        stage("SIMIYU", lakeRegs, lakeAll, 1, TT_ONLY);
       } else {
         const grpA_regs = ["MWANZA", "SHINYANGA", "SIMIYU", "MARA"];
         const grpB_regs = ["KAGERA", "GEITA"];
@@ -127,7 +127,7 @@ export function generateIntelligentRoutes(
         const grpBSum = sum(grpB);
 
         if (grpA.length > 0 && grpASum <= MAX_BOXES_PER_TT) {
-          stage("Lake Zone (Mwanza/Shinyanga/Simiyu/Mara)", grpA_regs, grpA, 1, TT_ONLY);
+          stage("SIMIYU", grpA_regs, grpA, 1, TT_ONLY);
         }
 
         if (grpB.length > 0 && grpBSum <= MAX_BOXES_PER_TT) {
@@ -142,7 +142,7 @@ export function generateIntelligentRoutes(
           if (morogoro && bSum + morogoro.boxes <= MAX_BOXES_PER_TT) {
             listB.unshift(morogoro);
           }
-          stage("Kagera/Geita Route", listB.map(d => d.region), listB, 1, TT_ONLY);
+          stage("KAGERA", listB.map(d => d.region), listB, 1, TT_ONLY);
         } else if (grpB.length > 0) {
           handleKageraGeita();
         }
@@ -166,24 +166,24 @@ export function generateIntelligentRoutes(
           let   cur = kgSum;
           if (singida  && cur + singida.boxes  <= MAX_BOXES_PER_TT) { list.unshift(singida);  cur += singida.boxes; }
           if (morogoro && cur + morogoro.boxes <= MAX_BOXES_PER_TT) { list.unshift(morogoro); }
-          stage("Kagera/Geita Route", list.map(d => d.region), list, 1, TT_ONLY);
+          stage("KAGERA", list.map(d => d.region), list, 1, TT_ONLY);
         } else {
           const hK   = demand("SINGIDA") ?? demand("DODOMA");
           const kList = hK && kagera.boxes + hK.boxes <= MAX_BOXES_PER_TT ? [hK, kagera] : [kagera];
-          stage("Kagera Direct", kList.map(d => d.region), kList, 1, TT_ONLY);
+          stage("KAGERA", kList.map(d => d.region), kList, 1, TT_ONLY);
 
           const hG   = demand("MOROGORO") ?? demand("DODOMA") ?? demand("SINGIDA");
           const gList = hG && geita.boxes + hG.boxes <= MAX_BOXES_PER_TT ? [hG, geita] : [geita];
-          stage("Geita Direct", gList.map(d => d.region), gList, 1, TT_ONLY);
+          stage("GEITA", gList.map(d => d.region), gList, 1, TT_ONLY);
         }
       } else if (kagera) {
         const h    = demand("SINGIDA") ?? demand("DODOMA");
         const list = h && kagera.boxes + h.boxes <= MAX_BOXES_PER_TT ? [h, kagera] : [kagera];
-        stage("Kagera Direct", list.map(d => d.region), list, 1, TT_ONLY);
+        stage("KAGERA", list.map(d => d.region), list, 1, TT_ONLY);
       } else if (geita) {
         const h    = demand("MOROGORO") ?? demand("DODOMA") ?? demand("SINGIDA");
         const list = h && geita.boxes + h.boxes <= MAX_BOXES_PER_TT ? [h, geita] : [geita];
-        stage("Geita Direct", list.map(d => d.region), list, 1, TT_ONLY);
+        stage("GEITA", list.map(d => d.region), list, 1, TT_ONLY);
       }
     }
 
@@ -194,9 +194,9 @@ export function generateIntelligentRoutes(
       if (mwanza.boxes >= MAX_BOXES_PER_TT) {
         const mid = demand("SINGIDA") ?? demand("DODOMA") ?? demand("PWANI") ?? demand("MOROGORO");
         if (mid) {
-          stage("Mwanza Heavy", [mid.region, "MWANZA"], [mid, mwanza], 1, ttPlusExtraTruck(mid.region));
+          stage("MWANZA", [mid.region, "MWANZA"], [mid, mwanza], 1, ttPlusExtraTruck(mid.region));
         } else {
-          stage("Mwanza", ["MWANZA"], [mwanza], 1, TT_ONLY);
+          stage("MWANZA", ["MWANZA"], [mwanza], 1, TT_ONLY);
         }
       } else {
         const mara      = demand("MARA");
@@ -206,11 +206,11 @@ export function generateIntelligentRoutes(
         if (mara && mwanza.boxes + mara.boxes <= MAX_BOXES_PER_TT) {
           const list: RegionDemand[] = [mwanza, mara];
           if (simiyu && sum(list) + simiyu.boxes <= MAX_BOXES_PER_TT) list.push(simiyu);
-          stage("Mwanza/Mara Corridor", list.map(d => d.region), list, 1, TT_ONLY);
+          stage("MARA", list.map(d => d.region), list, 1, TT_ONLY);
         } else if (shinyanga && mwanza.boxes + shinyanga.boxes <= MAX_BOXES_PER_TT) {
-          stage("Mwanza/Shinyanga", ["SHINYANGA", "MWANZA"], [shinyanga, mwanza], 1, TT_ONLY);
+          stage("MWANZA", ["SHINYANGA", "MWANZA"], [shinyanga, mwanza], 1, TT_ONLY);
         } else {
-          stage("Mwanza", ["MWANZA"], [mwanza], 1, TT_ONLY);
+          stage("MWANZA", ["MWANZA"], [mwanza], 1, TT_ONLY);
         }
       }
     }
@@ -233,10 +233,10 @@ export function generateIntelligentRoutes(
       }
 
       if (sum(list) <= MAX_BOXES_PER_TT) {
-        stage("Mara/Simiyu Route", list.map(d => d.region), list, 1, TT_ONLY);
+        stage("MARA", list.map(d => d.region), list, 1, TT_ONLY);
       } else {
-        if (mara)   stage("Mara Direct",   ["MARA"],   [mara],   1, TT_ONLY);
-        if (simiyu) stage("Simiyu Direct", ["SIMIYU"], [simiyu], 1, TT_ONLY);
+        if (mara)   stage("MARA",   ["MARA"],   [mara],   1, TT_ONLY);
+        if (simiyu) stage("SIMIYU", ["SIMIYU"], [simiyu], 1, TT_ONLY);
       }
     }
 
@@ -245,7 +245,7 @@ export function generateIntelligentRoutes(
       if (!shinyanga) return;
       const h    = demand("SINGIDA") ?? demand("DODOMA") ?? demand("PWANI") ?? demand("MOROGORO");
       const list = h && shinyanga.boxes + h.boxes <= MAX_BOXES_PER_TT ? [h, shinyanga] : [shinyanga];
-      stage("Shinyanga Route", list.map(d => d.region), list, 1, TT_ONLY);
+      stage("SHINYANGA", list.map(d => d.region), list, 1, TT_ONLY);
     }
   }
 
@@ -277,30 +277,30 @@ export function generateIntelligentRoutes(
       const total = sum(western);
 
       if (total <= MAX_BOXES_PER_TT) {
-        stage("Western Corridor", ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KATAVI", "KIGOMA"], western, 2, TT_ONLY);
+        stage("KIGOMA", ["PWANI", "MOROGORO", "DODOMA", "TABORA", "KATAVI", "KIGOMA"], western, 2, TT_ONLY);
       } else {
         const westernNoPwani = [morogoro, dodoma, tabora, katavi, kigoma].filter(Boolean) as RegionDemand[];
         const noPwaniTotal   = sum(westernNoPwani);
 
         if (noPwaniTotal <= MAX_BOXES_PER_TT) {
-          stage("Western Corridor", ["MOROGORO", "DODOMA", "TABORA", "KATAVI", "KIGOMA"], westernNoPwani, 2, TT_ONLY);
+          stage("KIGOMA", ["MOROGORO", "DODOMA", "TABORA", "KATAVI", "KIGOMA"], westernNoPwani, 2, TT_ONLY);
           const pwaniLeft = demand("PWANI");
           if (pwaniLeft) {
             const partner = demand("DODOMA"); 
             const pList   = partner && pwaniLeft.boxes + partner.boxes <= MAX_BOXES_PER_TT
               ? [pwaniLeft, partner] : [pwaniLeft];
-            stage("Pwani Route", pList.map(d => d.region), pList, 2, TT_ONLY);
+            stage("PWANI", pList.map(d => d.region), pList, 2, TT_ONLY);
           }
         } else {
           const far    = [dodoma, tabora, katavi, kigoma].filter(Boolean) as RegionDemand[];
           const farSum = sum(far);
 
           if (far.length > 0 && farSum <= MAX_BOXES_PER_TT) {
-            stage("Western (Kigoma Focus)", ["DODOMA", "TABORA", "KATAVI", "KIGOMA"], far, 2, TT_ONLY);
+            stage("KIGOMA", ["DODOMA", "TABORA", "KATAVI", "KIGOMA"], far, 2, TT_ONLY);
           } else {
             const kigGroup = [tabora, katavi, kigoma].filter(Boolean) as RegionDemand[];
             if (kigGroup.length > 0 && sum(kigGroup) <= MAX_BOXES_PER_TT) {
-              stage("Western (Kigoma)", ["TABORA", "KATAVI", "KIGOMA"], kigGroup, 2, TT_ONLY);
+              stage("KIGOMA", ["TABORA", "KATAVI", "KIGOMA"], kigGroup, 2, TT_ONLY);
             } else {
               kigGroup.forEach(nd => stage(`${nd.region} Direct`, [nd.region], [nd], 2, TT_ONLY));
             }
@@ -308,14 +308,14 @@ export function generateIntelligentRoutes(
             if (dod) {
               const p     = demand("PWANI") ?? demand("MOROGORO");
               const dList = p && dod.boxes + p.boxes <= MAX_BOXES_PER_TT ? [p, dod] : [dod];
-              stage("Dodoma Route", dList.map(d => d.region), dList, 2, TT_ONLY);
+              stage("DODOMA", dList.map(d => d.region), dList, 2, TT_ONLY);
             }
           }
 
           const nearList = [demand("PWANI"), demand("MOROGORO")].filter(Boolean) as RegionDemand[];
           if (nearList.length > 0) {
             if (sum(nearList) <= MAX_BOXES_PER_TT) {
-              stage("Western (Near)", nearList.map(d => d.region), nearList, 2, TT_ONLY);
+              stage("PWANI", nearList.map(d => d.region), nearList, 2, TT_ONLY);
             } else {
               nearList.forEach(nd => stage(`${nd.region} Route`, [nd.region], [nd], 2, TT_ONLY));
             }
@@ -340,7 +340,7 @@ export function generateIntelligentRoutes(
 
       if (total <= MAX_BOXES_PER_TT) {
         stage(
-          "Southern Highlands (Full)",
+          "RUKWA",
           ["IRINGA", "NJOMBE", "RUVUMA", "MBEYA", "SONGWE", "RUKWA"],
           allSH,
           3,
@@ -359,14 +359,14 @@ export function generateIntelligentRoutes(
 
         if (westP2fits && eastP2fits) {
           stage(
-            "Southern Highlands (West)",
+            "RUKWA",
             ["IRINGA", "MBEYA", "SONGWE", "RUKWA"],
             westP2,
             3,
             TT_ONLY
           );
           stage(
-            "Southern Highlands (East + Morogoro)",
+            "RUVUMA",
             eastP2.map(d => d.region),
             eastP2,
             3,
@@ -377,13 +377,13 @@ export function generateIntelligentRoutes(
           const eastP3 = [iringa, njombe, ruvuma].filter(Boolean) as RegionDemand[];
 
           if (westP3.length > 0 && sum(westP3) <= MAX_BOXES_PER_TT) {
-            stage("Southern Highlands (West)", ["MBEYA", "SONGWE", "RUKWA"], westP3, 3, TT_ONLY);
+            stage("RUKWA", ["MBEYA", "SONGWE", "RUKWA"], westP3, 3, TT_ONLY);
           } else {
             westP3.forEach(nd => stage(`${nd.region} Direct`, [nd.region], [nd], 3, TT_ONLY));
           }
 
           if (eastP3.length > 0 && sum(eastP3) <= MAX_BOXES_PER_TT) {
-            stage("Southern Highlands (East)", ["IRINGA", "NJOMBE", "RUVUMA"], eastP3, 3, TT_ONLY);
+            stage("RUVUMA", ["IRINGA", "NJOMBE", "RUVUMA"], eastP3, 3, TT_ONLY);
           } else {
             eastP3.forEach(nd => stage(`${nd.region} Direct`, [nd.region], [nd], 3, TT_ONLY));
           }
@@ -406,10 +406,10 @@ export function generateIntelligentRoutes(
 
     if (present.length > 0) {
       if (sum(present) <= MAX_BOXES_PER_TT) {
-        stage("Northern (Full)", ["TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"], present, 4, TT_ONLY);
+        stage("MANYARA", ["TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"], present, 4, TT_ONLY);
       } else if (coreSum <= MAX_BOXES_PER_TT && tanga && tanga.boxes <= MAX_BOXES_PER_T) {
         stage(
-          "Northern (Core TT + Tanga Truck)",
+          "MANYARA",
           ["TANGA", "KILIMANJARO", "ARUSHA", "MANYARA"],
           [...coreList, tanga],
           4,
@@ -418,20 +418,20 @@ export function generateIntelligentRoutes(
       } else if (akSum <= MAX_BOXES_PER_TT) {
         if (tanga) {
           stage(
-            "Northern (Arusha/Kili TT + Tanga Truck)",
+            "ARUSHA",
             ["TANGA", "KILIMANJARO", "ARUSHA"],
             [...akList, tanga],
             4,
             ttPlusExtraTruck("TANGA")
           );
         } else {
-          stage("Northern (Arusha/Kili)", ["KILIMANJARO", "ARUSHA"], akList, 4, TT_ONLY);
+          stage("ARUSHA", ["KILIMANJARO", "ARUSHA"], akList, 4, TT_ONLY);
         }
         const manyD = demand("MANYARA");
         if (manyD) {
           const mid      = demand("MOROGORO") ?? demand("PWANI") ?? demand("DODOMA");
           const manyList = mid ? [mid, manyD] : [manyD];
-          stage("Manyara Route", manyList.map(d => d.region), manyList, 4, TT_ONLY);
+          stage("MANYARA", manyList.map(d => d.region), manyList, 4, TT_ONLY);
         }
       } else {
         present.forEach(nd => stage(`${nd.region} Direct`, [nd.region], [nd], 4, TT_ONLY));
@@ -446,7 +446,7 @@ export function generateIntelligentRoutes(
 
     if (sc.length > 0) {
       if (sum(sc) <= MAX_BOXES_PER_TT) {
-        stage("South Coast (Lindi/Mtwara)", ["LINDI", "MTWARA"], sc, 5, TT_ONLY);
+        stage("MTWARA", ["LINDI", "MTWARA"], sc, 5, TT_ONLY);
       } else {
         sc.forEach(nd => stage(`${nd.region} Direct`, [nd.region], [nd], 5, TT_ONLY));
       }
@@ -469,7 +469,7 @@ export function generateIntelligentRoutes(
 
   {
     const dar = demand("DAR ES SALAAM");
-    if (dar) stage("Dar es Salaam", ["DAR ES SALAAM"], [dar], 7, TT_ONLY);
+    if (dar) stage("DAR ES SALAAM", ["DAR ES SALAAM"], [dar], 7, TT_ONLY);
   }
 
   {
@@ -481,9 +481,9 @@ export function generateIntelligentRoutes(
           .map(([r, b]) => ({ region: r, boxes: b }))
           .find(d => dodoma.boxes + d.boxes <= MAX_BOXES_PER_TT);
       if (partner && dodoma.boxes + partner.boxes <= MAX_BOXES_PER_TT) {
-        stage("Dodoma/Pwani Route", [partner.region, "DODOMA"], [partner as RegionDemand, dodoma], 99, TT_ONLY);
+        stage("DODOMA", [partner.region, "DODOMA"], [partner as RegionDemand, dodoma], 99, TT_ONLY);
       } else {
-        stage("DODOMA Route", ["DODOMA"], [dodoma], 99, TT_ONLY);
+        stage("DODOMA", ["DODOMA"], [dodoma], 99, TT_ONLY);
       }
     }
   }
@@ -589,7 +589,7 @@ function buildRoute(
 
   return {
     msafaraNumber: num,
-    name:          `Msafara ${num}: ${name}`,
+    name:         name,
     loadingDate,
     startDate:     loadingDate,
     startingPoint: "DAR ES SALAAM",

@@ -35,14 +35,14 @@ const iconMap: Record<string, React.ReactNode> = {
   version: <History className="h-4 w-4" />
 };
 
-const labelMap: Record<string, string> = {
+const labelMap: Record<string, string> ={
   dashboard: "Dashboard",
   timetables: "Timetables",
   budgets: "Budgets",
-  transportation: "Budgets",
+  transportation: "Transportation",
   'action-plan': "Action Plan",
-  'route-planner': "Manual Planner",
-  'ai-suggester': "AI Suggester",
+  'route-planner': "Route Planner",
+  'ai-suggester': "Suggester",
   mastersummaries: "Master Summaries",
   supervisors: "Supervisions",
   miscellaneous: "Miscellaneous",
@@ -81,7 +81,13 @@ const DynamicBreadcrumbs = () => {
           const isLastVisible = remainingSegments.every(seg => isSkippable(seg));
 
           let to = `/${pathnames.slice(0, actualIndex + 1).join('/')}`;
-          if (value === 'transportation') to = '/dashboard/budgets';
+          
+          // Special handling for transportation hierarchy
+          if (value === 'transportation') {
+            // If we are at /dashboard/budgets/transportation/..., 
+            // we want this link to go back to the budgets list or stay consistent
+            to = '/dashboard/budgets';
+          }
 
           const displayName = labelMap[value] || value.charAt(0).toUpperCase() + value.slice(1).replace(/-/g, ' ');
           const icon = iconMap[value] || <FileText className="h-4 w-4" />;

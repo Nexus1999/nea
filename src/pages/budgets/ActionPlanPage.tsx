@@ -4,11 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ChevronLeft, 
-  UserPlus, 
-  Link as LinkIcon, 
-  Download, 
-  RotateCcw,
-  MapPinned,
   Plus,
   Truck,
   Trash2,
@@ -94,45 +89,10 @@ const ActionPlanPage = () => {
           <Button 
             variant="default" 
             size="sm" 
-            className="bg-slate-900 hover:bg-black text-[10px] font-black uppercase tracking-wider rounded-lg h-9" 
-            onClick={() => {}}
-          >
-            <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Auto-Assign
-          </Button>
-
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="border-2 border-slate-200 text-slate-600 hover:border-indigo-600 hover:text-indigo-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-9 px-4 transition-all" 
-            onClick={() => {}}
-          >
-            <LinkIcon className="h-3.5 w-3.5 mr-1.5" /> Accounts Link
-          </Button>
-
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="border-2 border-slate-200 text-slate-600 hover:border-emerald-600 hover:text-emerald-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-9 px-4 transition-all" 
-            onClick={() => {}}
-          >
-            <Download className="h-3.5 w-3.5 mr-1.5" /> Export
-          </Button>
-
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="border-2 border-slate-200 text-slate-600 hover:border-red-600 hover:text-red-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-9 px-4 transition-all" 
-            onClick={() => {}}
-          >
-            <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reset
-          </Button>
-
-          <Button 
-            variant="outline"
+            className="bg-slate-900 hover:bg-black text-[10px] font-black uppercase tracking-wider rounded-lg h-9 px-6" 
             onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${id}`)}
-            className="border-2 border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-9 px-4 transition-all"
           >
-            <MapPinned className="w-3.5 h-3.5 mr-1.5" /> Manual Planner
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Route
           </Button>
         </div>
       </div>
