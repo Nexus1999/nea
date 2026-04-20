@@ -50,6 +50,8 @@ import AISuggesterPage from "./pages/budgets/transportation/AISuggesterPage";
 import TemplatePage from "./pages/budgets/TemplatePage";
 import BudgetOverviewPage from "./pages/budgets/BudgetOverviewPage";
 import BudgetSettingsPage from "./pages/budgets/BudgetSettingsPage";
+import ParticipantsPage from "./pages/budgets/ParticipantsPage";
+import AssignmentPage from "./pages/budgets/AssignmentPage";
 
 const queryClient = new QueryClient();
 
@@ -129,11 +131,13 @@ const App = () => (
               {/* Budget Module Routes */}
               <Route path="budgets" element={<BudgetsPage />} />
               <Route path="budgets/settings" element={<BudgetSettingsPage />} />
+              <Route path="budgets/participants" element={<ParticipantsPage />} />
               <Route path="budgets/overview/:id" element={<BudgetOverviewPage />} />
               <Route path="budgets/action-plan/:id" element={<ActionPlanPage />} />
               <Route path="budgets/transportation/route-planner/:id" element={<RoutePlannerPage />} />
               <Route path="budgets/transportation/ai-suggester/:id" element={<AISuggesterPage />} />
               <Route path="budgets/template/:id" element={<TemplatePage />} />
+              <Route path="budgets/assignments/:id" element={<AssignmentPage />} />
 
               {/* Add more routes as needed */}
               <Route path="*" element={<div className="p-4">Page under construction</div>} />

@@ -18,7 +18,9 @@ import {
   Sparkles, 
   MapPinned, 
   Settings2,
-  ChevronRight
+  ChevronRight,
+  UserCheck,
+  Users
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -76,7 +78,7 @@ const BudgetOverviewPage = () => {
       setBudget(budgetData);
 
       const { data: demandsData, error: demandsError } = await supabase
-        .from('regional_demands')
+        .from('transportation_region_boxes')
         .select('*')
         .eq('budget_id', id);
 
@@ -90,12 +92,12 @@ const BudgetOverviewPage = () => {
   };
 
   const stats = useMemo(() => {
-    const totalBoxes = demands.reduce((sum, d) => sum + (d.boxes || 0), 0);
+    const totalBoxes = demands.reduce((sum, d) => sum + (d.boxes_count || 0), 0);
     return {
       regions: demands.length,
       totalBoxes,
       totalTons: Math.round((totalBoxes * 34) / 1000 * 100) / 100,
-      routes: 0, // This would come from a routes table
+      routes: 0, 
     };
   }, [demands]);
 
@@ -120,15 +122,15 @@ const BudgetOverviewPage = () => {
           <Button 
             variant="outline" 
             className="rounded-xl h-11 px-6 border-slate-200 font-bold uppercase text-[10px] tracking-widest gap-2"
-            onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${id}`)}
+            onClick={() => navigate(`/dashboard/budgets/participants`)}
           >
-            <Settings2 className="w-4 h-4" /> Manual Planner
+            <Users className="w-4 h-4" /> HR Registry
           </Button>
           <Button 
-            className="rounded-xl h-11 px-6 bg-purple-600 hover:bg-purple-700 text-white font-bold uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-purple-100"
-            onClick={() => navigate(`/dashboard/budgets/transportation/ai-suggester/${id}`)}
+            className="rounded-xl h-11 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-emerald-100"
+            onClick={() => navigate(`/dashboard/budgets/assignments/${id}`)}
           >
-            <Sparkles className="w-4 h-4" /> AI Suggester
+            <UserCheck className="w-4 h-4" /> Manage Assignments
           </Button>
         </div>
       </div>
@@ -174,25 +176,25 @@ const BudgetOverviewPage = () => {
         </Card>
 
         <div className="lg:col-span-4 grid grid-cols-2 gap-4 h-full">
-          <Card className="border-none shadow-sm bg-white rounded-[2rem] p-8 flex flex-col justify-between hover:shadow-xl transition-all border border-slate-100 group">
+          <Card className="border-none shadow-sm bg-white rounded-[2rem] p-8 flex flex-col justify-between hover:shadow-xl transition-all border border-slate-100 group" onClick={() => navigate(`/dashboard/budgets/template/${id}`)}>
             <div className="p-4 bg-blue-500 text-white w-fit rounded-2xl shadow-lg shadow-blue-200 group-hover:scale-110 transition-transform">
               <Calculator size={24} />
             </div>
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] mb-2">Est. Cost</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] mb-2">Financial Template</p>
               <h3 className="text-2xl font-[1000] text-slate-900 tracking-tighter leading-none">
-                TZS 0
+                VIEW COSTS
               </h3>
             </div>
           </Card>
-          <Card className="border-none shadow-sm bg-white rounded-[2rem] p-8 flex flex-col justify-between hover:shadow-xl transition-all border border-slate-100 group">
+          <Card className="border-none shadow-sm bg-white rounded-[2rem] p-8 flex flex-col justify-between hover:shadow-xl transition-all border border-slate-100 group" onClick={() => navigate(`/dashboard/budgets/assignments/${id}`)}>
             <div className="p-4 bg-purple-600 text-white w-fit rounded-2xl shadow-lg shadow-purple-200 group-hover:scale-110 transition-transform">
-              <Layers size={24} />
+              <UserCheck size={24} />
             </div>
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] mb-2">Vehicles</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] mb-2">Assignments</p>
               <h3 className="text-3xl font-[1000] text-slate-900 tracking-tighter leading-none">
-                <CountUp value={0}/>
+                EXECUTE
               </h3>
             </div>
           </Card>
@@ -218,18 +220,18 @@ const BudgetOverviewPage = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {demands
-            .filter(d => d.region.toLowerCase().includes(searchQuery.toLowerCase()))
+            .filter(d => d.region_name.toLowerCase().includes(searchQuery.toLowerCase()))
             .map((demand) => (
               <Card key={demand.id} className="border-none shadow-sm bg-white rounded-2xl p-5 hover:shadow-md transition-all border border-slate-100">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="font-black text-slate-900 uppercase text-xs tracking-tight">{demand.region}</span>
+                  <span className="font-black text-slate-900 uppercase text-xs tracking-tight">{demand.region_name}</span>
                   <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-none font-bold">
-                    {demand.boxes} BOXES
+                    {demand.boxes_count} BOXES
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                   <span>Weight</span>
-                  <span className="text-slate-600">{Math.round((demand.boxes * 34) / 1000 * 100) / 100} Tons</span>
+                  <span className="text-slate-600">{Math.round((demand.boxes_count * 34) / 1000 * 100) / 100} Tons</span>
                 </div>
               </Card>
             ))}
