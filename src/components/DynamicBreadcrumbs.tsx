@@ -14,7 +14,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags, Shield, FileText,
   Settings, Users, LayoutDashboard, Globe, MapPin, BookOpen, GraduationCap, Accessibility,
-  UserCheck, User, Truck, Sparkles, MapPinned
+  UserCheck, User, Truck, Sparkles, MapPinned, ClipboardList
 } from "lucide-react";
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -22,7 +22,7 @@ const iconMap: Record<string, React.ReactNode> = {
   timetables: <Clock className="h-4 w-4" />,
   budgets: <DollarSign className="h-4 w-4" />,
   transportation: <Truck className="h-4 w-4" />,
-  'action-plan': <LayoutDashboard className="h-4 w-4" />,
+  'action-plan': <ClipboardList className="h-4 w-4" />,
   'route-planner': <MapPinned className="h-4 w-4" />,
   'ai-suggester': <Sparkles className="h-4 w-4" />,
   mastersummaries: <Database className="h-4 w-4" />,
@@ -62,55 +62,78 @@ const DynamicBreadcrumbs = () => {
 
   if (pathnames.length <= 1) return null;
 
+  // Custom hierarchy logic
+  const getBreadcrumbs = () => {
+    const items: { label: string; to: string; icon: React.ReactNode }[] = [];
+    
+    // Always start with Dashboard
+    items.push({ label: "Dashboard", to: "/dashboard", icon: iconMap.dashboard });
+
+    if (pathnames.includes('budgets')) {
+      items.push({ label: "Budgets", to: "/dashboard/budgets", icon: iconMap.budgets });
+      
+      // If we are in any transportation related page, show the hierarchy
+      if (pathnames.includes('transportation') || pathnames.includes('action-plan')) {
+        // Virtual "Transportation" segment that redirects to budgets
+        items.push({ label: "Transportation", to: "/dashboard/budgets", icon: iconMap.transportation });
+        
+        // Action Plan is always before Route Planner/Suggester in the requested hierarchy
+        const budgetId = pathnames.find(p => p.match(/^[0-9a-fA-F-]{36}$/));
+        if (budgetId) {
+          items.push({ label: "Action Plan", to: `/dashboard/budgets/action-plan/${budgetId}`, icon: iconMap['action-plan'] });
+          
+          if (pathnames.includes('route-planner')) {
+            items.push({ label: "Route Planner", to: `/dashboard/budgets/transportation/route-planner/${budgetId}`, icon: iconMap['route-planner'] });
+          }
+          
+          if (pathnames.includes('ai-suggester')) {
+            // If we are in suggester, we must have come through route planner in the hierarchy
+            if (!pathnames.includes('route-planner')) {
+              items.push({ label: "Route Planner", to: `/dashboard/budgets/transportation/route-planner/${budgetId}`, icon: iconMap['route-planner'] });
+            }
+            items.push({ label: "Suggester", to: `/dashboard/budgets/transportation/ai-suggester/${budgetId}`, icon: iconMap['ai-suggester'] });
+          }
+        }
+      }
+    } else {
+      // Fallback for other routes
+      pathnames.slice(1).forEach((value, index) => {
+        if (isSkippable(value)) return;
+        const to = `/${pathnames.slice(0, index + 2).join('/')}`;
+        items.push({
+          label: labelMap[value] || value.charAt(0).toUpperCase() + value.slice(1).replace(/-/g, ' '),
+          to,
+          icon: iconMap[value] || <FileText className="h-4 w-4" />
+        });
+      });
+    }
+
+    return items;
+  };
+
+  const breadcrumbs = getBreadcrumbs();
+
   return (
     <Breadcrumb className="text-sm">
       <BreadcrumbList className="flex flex-wrap items-center gap-1.5">
-        <BreadcrumbItem>
-          <BreadcrumbLink asChild>
-            <Link to="/dashboard" className="flex items-center gap-1.5 text-primary hover:text-primary/80 transition-colors font-medium">
-              {iconMap.dashboard} Dashboard
-            </Link>
-          </BreadcrumbLink>
-        </BreadcrumbItem>
-
-        {pathnames.slice(1).map((value, index) => {
-          const actualIndex = index + 1;
-          if (isSkippable(value)) return null;
-
-          const remainingSegments = pathnames.slice(actualIndex + 1);
-          const isLastVisible = remainingSegments.every(seg => isSkippable(seg));
-
-          let to = `/${pathnames.slice(0, actualIndex + 1).join('/')}`;
-          
-          // Special handling for transportation hierarchy
-          if (value === 'transportation') {
-            // If we are at /dashboard/budgets/transportation/..., 
-            // we want this link to go back to the budgets list or stay consistent
-            to = '/dashboard/budgets';
-          }
-
-          const displayName = labelMap[value] || value.charAt(0).toUpperCase() + value.slice(1).replace(/-/g, ' ');
-          const icon = iconMap[value] || <FileText className="h-4 w-4" />;
-
-          return (
-            <React.Fragment key={to}>
-              <BreadcrumbSeparator><ChevronRight className="h-4 w-4 text-gray-400" /></BreadcrumbSeparator>
-              <BreadcrumbItem>
-                {isLastVisible ? (
-                  <BreadcrumbPage className="font-medium text-gray-900 flex items-center gap-1.5">
-                    {icon} {displayName}
-                  </BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink asChild>
-                    <Link to={to} className="flex items-center gap-1.5 text-primary hover:text-primary/80 transition-colors font-medium">
-                      {icon} {displayName}
-                    </Link>
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            </React.Fragment>
-          );
-        })}
+        {breadcrumbs.map((item, index) => (
+          <React.Fragment key={item.to}>
+            {index > 0 && <BreadcrumbSeparator><ChevronRight className="h-4 w-4 text-gray-400" /></BreadcrumbSeparator>}
+            <BreadcrumbItem>
+              {index === breadcrumbs.length - 1 ? (
+                <BreadcrumbPage className="font-medium text-gray-900 flex items-center gap-1.5">
+                  {item.icon} {item.label}
+                </BreadcrumbPage>
+              ) : (
+                <BreadcrumbLink asChild>
+                  <Link to={item.to} className="flex items-center gap-1.5 text-primary hover:text-primary/80 transition-colors font-medium">
+                    {item.icon} {item.label}
+                  </Link>
+                </BreadcrumbLink>
+              )}
+            </BreadcrumbItem>
+          </React.Fragment>
+        ))}
       </BreadcrumbList>
     </Breadcrumb>
   );

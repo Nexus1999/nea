@@ -7,7 +7,9 @@ import {
   Truck,
   Trash2,
   Edit,
-  ArrowUpDown
+  ArrowUpDown,
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -142,7 +144,6 @@ const ActionPlanPage = () => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
         <div>
           <CardTitle className="text-2xl font-bold">{budget?.title}</CardTitle>
-          
         </div>
 
         <Button 
@@ -165,21 +166,18 @@ const ActionPlanPage = () => {
           />
         </div>
 
-        <div className="border rounded-md">
+        <div className="border rounded-md overflow-x-auto">
           <Table>
             <TableHeader className="bg-gray-50">
               <TableRow>
                 <TableHead className="w-[60px]">SN</TableHead>
                 <TableHead 
                   onClick={() => handleSort('name')} 
-                  className="cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer hover:bg-gray-100 min-w-[200px]"
                 >
                   Msafara <ArrowUpDown className="ml-2 h-3 w-3 inline" />
                 </TableHead>
-                
-                {/* NEW COLUMN */}
                 <TableHead className="text-center">Na</TableHead>
-                
                 <TableHead>Mkoa</TableHead>
                 <TableHead>Mahali pa Kupokelea</TableHead>
                 <TableHead>Tarehe ya Kupokea</TableHead>
@@ -213,13 +211,21 @@ const ActionPlanPage = () => {
                   ) || [];
                   
                   const vehicles = route.transportation_route_vehicles || [];
-                  const truckLabel = vehicles.find((v: any) => 
-                    v.vehicle_type.includes('TRUCK')
-                  )?.vehicle_type === 'TRUCK_AND_TRAILER' ? 'TT' : 'T';
                   
-                  const escortLabel = vehicles.find((v: any) => 
-                    v.vehicle_type === 'ESCORT_VEHICLE'
-                  ) ? 'HT' : 'C';
+                  // Map all trucks
+                  const trucks = vehicles.filter((v: any) => v.vehicle_type.includes('TRUCK'));
+                  const truckLabels = trucks.map((v: any) => {
+                    const label = v.vehicle_type === 'TRUCK_AND_TRAILER' ? 'TT' : 'T';
+                    return v.quantity > 1 ? `${v.quantity}${label}` : label;
+                  });
+                  
+                  // Map all escorts
+                  const escorts = vehicles.filter((v: any) => !v.vehicle_type.includes('TRUCK'));
+                  const escortLabels = escorts.map((v: any) => {
+                    let label = 'C'; // Default Coaster
+                    if (v.vehicle_type === 'ESCORT_VEHICLE') label = 'HT';
+                    return v.quantity > 1 ? `${v.quantity}${label}` : label;
+                  });
 
                   return stops.map((stop: any, sIdx: number) => (
                     <TableRow key={stop.id} className="hover:bg-slate-50/50">
@@ -229,12 +235,21 @@ const ActionPlanPage = () => {
                             {rIdx + 1}
                           </TableCell>
                           <TableCell rowSpan={stops.length} className="font-semibold border-r bg-slate-50/30">
-                            {route.name}
+                            <div className="flex flex-col gap-2">
+                              <span className="text-sm">{route.name}</span>
+                              <div className="flex flex-wrap gap-1">
+                                <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 text-[9px] font-bold px-1.5 py-0 h-4 flex items-center gap-1">
+                                  <Clock className="w-2.5 h-2.5" /> L: {route.loading_date}
+                                </Badge>
+                                <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 text-[9px] font-bold px-1.5 py-0 h-4 flex items-center gap-1">
+                                  <Calendar className="w-2.5 h-2.5" /> T: {route.start_date}
+                                </Badge>
+                              </div>
+                            </div>
                           </TableCell>
                         </>
                       )}
 
-                      {/* NEW COLUMN - Serial Number of Regions (per route) */}
                       <TableCell className="text-center font-medium text-muted-foreground border-r">
                         {sIdx + 1}
                       </TableCell>
@@ -248,14 +263,22 @@ const ActionPlanPage = () => {
                       {sIdx === 0 && (
                         <>
                           <TableCell rowSpan={stops.length} className="text-center border-l">
-                            <Badge variant="outline" className="font-bold">
-                              {truckLabel}
-                            </Badge>
+                            <div className="flex flex-wrap justify-center gap-1">
+                              {truckLabels.map((lbl, i) => (
+                                <Badge key={i} variant="outline" className="font-bold text-[10px] px-1.5">
+                                  {lbl}
+                                </Badge>
+                              ))}
+                            </div>
                           </TableCell>
                           <TableCell rowSpan={stops.length} className="text-center border-l">
-                            <Badge variant="outline" className="font-bold">
-                              {escortLabel}
-                            </Badge>
+                            <div className="flex flex-wrap justify-center gap-1">
+                              {escortLabels.map((lbl, i) => (
+                                <Badge key={i} variant="outline" className="font-bold text-[10px] px-1.5">
+                                  {lbl}
+                                </Badge>
+                              ))}
+                            </div>
                           </TableCell>
                           <TableCell rowSpan={stops.length} className="text-right border-l">
                             <div className="flex justify-end gap-1">

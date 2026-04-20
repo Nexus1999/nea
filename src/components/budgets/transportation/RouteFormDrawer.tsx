@@ -17,7 +17,8 @@ import {
   MapPin, 
   Calendar,
   Save,
-  Loader2
+  Loader2,
+  Clock
 } from "lucide-react";
 import {
   Select,
@@ -55,7 +56,7 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData, budgetId }: R
         setFormData({
           name: initialData.name,
           startingPoint: initialData.starting_point,
-          loadingDate: initialData.loading_date,
+          loadingDate: initialData.loading_date || '',
           startDate: initialData.start_date,
           vehicles: initialData.transportation_route_vehicles.map((v: any) => ({
             type: v.vehicle_type,
@@ -82,7 +83,7 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData, budgetId }: R
   }, [isOpen, initialData]);
 
   const fetchRegions = async () => {
-    const { data } = await supabase.from('regional_demands').select('*').eq('budget_id', budgetId);
+    const { data } = await supabase.from('transportation_region_boxes').select('region_name, boxes_count').eq('budget_id', budgetId);
     setRegions(data || []);
   };
 
@@ -158,16 +159,21 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData, budgetId }: R
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Starting Point</Label>
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Loading Date
+                </Label>
                 <Input 
                   required
-                  value={formData.startingPoint}
-                  onChange={(e) => setFormData({...formData, startingPoint: e.target.value})}
+                  type="date"
+                  value={formData.loadingDate}
+                  onChange={(e) => setFormData({...formData, loadingDate: e.target.value})}
                   className="h-10 rounded-xl"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</Label>
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" /> Travel Date
+                </Label>
                 <Input 
                   required
                   type="date"
@@ -201,9 +207,10 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData, budgetId }: R
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="TRUCK_AND_TRAILER">Truck & Trailer</SelectItem>
-                      <SelectItem value="STANDARD_TRUCK">Standard Truck</SelectItem>
-                      <SelectItem value="ESCORT_VEHICLE">Escort Vehicle</SelectItem>
+                      <SelectItem value="TRUCK_AND_TRAILER">Truck & Trailer (TT)</SelectItem>
+                      <SelectItem value="STANDARD_TRUCK">Standard Truck (T)</SelectItem>
+                      <SelectItem value="ESCORT_VEHICLE">Escort Vehicle (HT)</SelectItem>
+                      <SelectItem value="COASTER">Coaster (C)</SelectItem>
                     </SelectContent>
                   </Select>
                   <Input 
@@ -211,7 +218,7 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData, budgetId }: R
                     value={v.quantity}
                     onChange={(e) => {
                       const newVehicles = [...formData.vehicles];
-                      newVehicles[idx].quantity = parseInt(e.target.value);
+                      newVehicles[idx].quantity = parseInt(e.target.value) || 1;
                       setFormData({...formData, vehicles: newVehicles});
                     }}
                     className="w-20 h-10 rounded-xl"
@@ -244,9 +251,9 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData, budgetId }: R
                         value={r.name} 
                         onValueChange={(val) => {
                           const newRegions = [...formData.regions];
-                          const regData = regions.find(reg => reg.region === val);
+                          const regData = regions.find(reg => reg.region_name === val);
                           newRegions[idx].name = val;
-                          newRegions[idx].boxes = regData?.boxes || 0;
+                          newRegions[idx].boxes = regData?.boxes_count || 0;
                           setFormData({...formData, regions: newRegions});
                         }}
                       >
@@ -255,7 +262,7 @@ const RouteFormDrawer = ({ isOpen, onClose, onSubmit, initialData, budgetId }: R
                         </SelectTrigger>
                         <SelectContent>
                           {regions.map(reg => (
-                            <SelectItem key={reg.id} value={reg.region}>{reg.region}</SelectItem>
+                            <SelectItem key={reg.region_name} value={reg.region_name}>{reg.region_name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
