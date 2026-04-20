@@ -15,7 +15,7 @@ import {
   Edit
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
@@ -174,7 +175,7 @@ const ActionPlanPage = () => {
                   const stops = route.transportation_route_stops?.sort((a: any, b: any) => a.sequence_order - b.sequence_order) || [];
                   const vehicles = route.transportation_route_vehicles || [];
                   const truckLabel = vehicles.find((v: any) => v.vehicle_type.includes('TRUCK'))?.vehicle_type === 'TRUCK_AND_TRAILER' ? 'TT' : 'T';
-                  const escortLabel = vehicles.find((v: any) => v.vehicle_type === 'ESCORT_VEHICLE') ? 'HT' : '-';
+                  const escortLabel = vehicles.find((v: any) => v.vehicle_type === 'ESCORT_VEHICLE') ? 'HT' : 'C';
 
                   return stops.map((stop: any, sIdx: number) => (
                     <TableRow key={stop.id} className="hover:bg-slate-50/50">
