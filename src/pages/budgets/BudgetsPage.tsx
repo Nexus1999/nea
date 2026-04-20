@@ -8,12 +8,11 @@ import {
   Trash2, 
   ArrowUpDown, 
   AlertTriangle,
-  Search,
   RefreshCw,
   LayoutDashboard,
   Eye,
-  FileText,
-  ClipboardList
+  ClipboardList,
+  Layers // Icon for Regional Boxes
 } from "lucide-react";
 import {
   Table,
@@ -38,7 +37,9 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from 'react-router-dom';
 import Spinner from "@/components/Spinner";
 import PaginationControls from "@/components/ui/pagination-controls";
-import AddBudgetDrawer from "@/components/budgets/AddBudgetDrawer";
+import RegionalDemandsTable from "@/components/budgets/AddBudgetDrawer";
+// Assuming the drawer exists at this path, adjust if necessary
+import RegionalBoxesDrawer from "@/components/budgets/transportation/RegionalDemandsTable"; 
 import { cn } from "@/lib/utils";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +49,8 @@ const BudgetsPage = () => {
   const [budgets, setBudgets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isRegionalDrawerOpen, setIsRegionalDrawerOpen] = useState(false);
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [orderBy, setOrderBy] = useState<string>('created_at');
   const [order, setOrder] = useState<'desc' | 'asc'>('desc');
@@ -107,6 +110,11 @@ const BudgetsPage = () => {
 
   const totalPages = Math.ceil(filteredBudgets.length / itemsPerPage);
   const currentItems = filteredBudgets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const openRegionalBoxes = (id: string) => {
+    setSelectedBudgetId(id);
+    setIsRegionalDrawerOpen(true);
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -214,6 +222,29 @@ const BudgetsPage = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {/* 1. VIEW BUTTON */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="View Overview"
+                          onClick={() => navigate(`/dashboard/budgets/overview/${budget.id}`)}
+                        >
+                          <LayoutDashboard className="h-4 w-4" />
+                        </Button>
+
+                        {/* 2. REGIONAL BOXES BUTTON */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          title="Regional Boxes"
+                          onClick={() => openRegionalBoxes(budget.id)}
+                        >
+                          <Layers className="h-4 w-4" />
+                        </Button>
+
+                        {/* 3. ACTION PLAN BUTTON */}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -224,26 +255,7 @@ const BudgetsPage = () => {
                           <ClipboardList className="h-4 w-4" />
                         </Button>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="View Overview"
-                          onClick={() => navigate(`/dashboard/budgets/overview/${budget.id}`)}
-                        >
-                          <LayoutDashboard className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                          title="View Details"
-                          onClick={() => navigate(`/dashboard/budgets/template/${budget.id}`)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-
+                        {/* 4. DELETE BUTTON */}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -275,6 +287,13 @@ const BudgetsPage = () => {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         onSuccess={fetchBudgets}
+      />
+
+      {/* Regional Boxes Drawer Component */}
+      <RegionalDemandsTable
+        isOpen={isRegionalDrawerOpen}
+        onClose={() => setIsRegionalDrawerOpen(false)}
+        budgetId={selectedBudgetId}
       />
 
       <AlertDialog
