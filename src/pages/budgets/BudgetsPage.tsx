@@ -160,6 +160,16 @@ const BudgetsPage = () => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-2xl font-bold">Budgets</CardTitle>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 gap-1" 
+            onClick={() => navigate('/dashboard/budgets/settings')}
+            disabled={loading}
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Budget Settings</span>
+          </Button>
           <Button size="sm" className="h-8 gap-1" onClick={() => setIsDrawerOpen(true)} disabled={loading}>
             <PlusCircle className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Create Budget</span>
