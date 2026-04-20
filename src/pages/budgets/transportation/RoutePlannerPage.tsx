@@ -9,7 +9,10 @@ import {
   Plus, 
   Trash2, 
   MapPin,
-  Loader2
+  Loader2,
+  ArrowUp,
+  ArrowDown,
+  GripVertical
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,7 +55,6 @@ const RoutePlannerPage = () => {
     if (editId) fetchRouteData();
   }, [editId]);
 
-  // Fetch regions for Route Name dropdown
   const fetchAllRegions = async () => {
     const { data } = await supabase
       .from('regions')
@@ -61,10 +63,8 @@ const RoutePlannerPage = () => {
     setAllRegions(data || []);
   };
 
-  // Simple fetch - No complex joins
   const fetchRegionsForStops = async () => {
     try {
-      // First get transportation_region_boxes
       const { data: boxesData } = await supabase
         .from('transportation_region_boxes')
         .select('region_name, boxes_count')
@@ -72,36 +72,31 @@ const RoutePlannerPage = () => {
         .gt('boxes_count', 0)
         .order('region_name');
 
-      if (!boxesData) return;
+      if (!boxesData?.length) return;
 
-      // Get towns from regions table
       const regionNames = boxesData.map(b => b.region_name);
+      
       const { data: regionsData } = await supabase
         .from('regions')
         .select('region_name, town')
         .in('region_name', regionNames);
 
-      // Get travel days
       const { data: daysData } = await supabase
         .from('transportation_days_guideline')
-        .select('region_id, days_truck')
-        .in('region_id', 
-          (await supabase.from('regions').select('id').in('region_name', regionNames)).data?.map(r => r.id) || []
-        );
+        .select('region_id, days_truck');
 
       const merged = boxesData.map(box => {
         const regionInfo = regionsData?.find(r => r.region_name === box.region_name);
-        const daysInfo = daysData?.find(d => /* match by region_id if needed */ true);
         return {
           ...box,
           town: regionInfo?.town || '',
-          days_truck: daysInfo?.days_truck || 2
+          days_truck: daysData?.find(d => true)?.days_truck || 2
         };
       });
 
       setRegionsForStops(merged);
     } catch (err) {
-      console.error("Error fetching regions:", err);
+      console.error(err);
       showError("Failed to load regions");
     }
   };
@@ -160,6 +155,17 @@ const RoutePlannerPage = () => {
     return date.toISOString().split('T')[0];
   };
 
+  // Reorder stops
+  const moveStop = (index: number, direction: 'up' | 'down') => {
+    const newStops = [...formData.stops];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    if (targetIndex < 0 || targetIndex >= newStops.length) return;
+
+    [newStops[index], newStops[targetIndex]] = [newStops[targetIndex], newStops[index]];
+    setFormData({ ...formData, stops: newStops });
+  };
+
   const handleSave = async () => {
     if (!formData.name || !formData.travelDate || formData.stops.length === 0) {
       showError("Please fill all required fields and add at least one stop");
@@ -216,23 +222,18 @@ const RoutePlannerPage = () => {
     }
   };
 
-  if (loading && editId) {
-    return <div className="h-screen flex items-center justify-center"><Spinner size="lg" /></div>;
-  }
+  if (loading && editId) return <div className="h-screen flex items-center justify-center"><Spinner size="lg" /></div>;
 
   return (
-    <Card className="w-full max-w-6xl mx-auto">
-      {/* Header remains same */}
+    <Card className="">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/budgets/action-plan/${id}`)} className="rounded-full">
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
+          
           <div>
             <CardTitle className="text-2xl font-bold">
               {editId ? 'Edit Route' : 'Manual Route Planner'}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">Create or modify transportation route</p>
+            
           </div>
         </div>
 
@@ -248,11 +249,11 @@ const RoutePlannerPage = () => {
 
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* LEFT COLUMN - Basic Info + Vehicles */}
-          <div className="md:col-span-1 space-y-6">
+          {/* LEFT COLUMN - Tighter spacing */}
+          <div className="md:col-span-1 space-y-4">
             <Card>
               <CardHeader><CardTitle className="text-lg">Basic Information</CardTitle></CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-4">
                 <div className="space-y-1.5">
                   <Label>Route Name (Msafara)</Label>
                   <Select value={formData.name} onValueChange={(val) => setFormData({...formData, name: val})}>
@@ -285,7 +286,6 @@ const RoutePlannerPage = () => {
               </CardContent>
             </Card>
 
-            {/* Vehicles Card remains the same */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">Vehicles</CardTitle>
@@ -293,37 +293,36 @@ const RoutePlannerPage = () => {
                   <Plus className="w-4 h-4 mr-2" /> Add
                 </Button>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {formData.vehicles.map((v, idx) => (
-                    <div key={idx} className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl">
-                      <div className="flex-1">
-                        <Select value={v.type} onValueChange={val => {
-                          const newV = [...formData.vehicles];
-                          newV[idx].type = val;
-                          setFormData({...formData, vehicles: newV});
-                        }}>
-                          <SelectTrigger className="h-11">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="TRUCK_AND_TRAILER">Truck & Trailer (TT)</SelectItem>
-                            <SelectItem value="STANDARD_TRUCK">Standard Truck (T)</SelectItem>
-                            <SelectItem value="ESCORT_VEHICLE">Escort (Coaster - HT)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => setFormData({...formData, vehicles: formData.vehicles.filter((_, i) => i !== idx)})}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+              <CardContent className="space-y-3">
+                {formData.vehicles.map((v, idx) => (
+                  <div key={idx} className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl">
+                    <div className="flex-1">
+                      <Select value={v.type} onValueChange={val => {
+                        const newV = [...formData.vehicles];
+                        newV[idx].type = val;
+                        setFormData({...formData, vehicles: newV});
+                      }}>
+                        <SelectTrigger className="h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="TRUCK_AND_TRAILER">Truck & Trailer (TT)</SelectItem>
+                          <SelectItem value="STANDARD_TRUCK">Standard Truck (T)</SelectItem>
+                          <SelectItem value="ESCORT_VEHICLE">Escort (HT)</SelectItem>
+                          <SelectItem value="ESCORT_VEHICLE">Escort (Coaster)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ))}
-                </div>
+                    <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => setFormData({...formData, vehicles: formData.vehicles.filter((_, i) => i !== idx)})}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </div>
 
-          {/* RIGHT COLUMN - Stops */}
+          {/* RIGHT COLUMN - Stops with Reordering */}
           <div className="md:col-span-2">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -339,14 +338,28 @@ const RoutePlannerPage = () => {
                     <p className="text-slate-400 font-medium">No stops added yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {formData.stops.map((stop, idx) => (
-                      <div key={idx} className="p-5 bg-slate-50 border border-slate-100 rounded-2xl relative">
-                        <Button variant="ghost" size="icon" className="absolute -top-3 -right-3 h-8 w-8 bg-white shadow hover:bg-red-50 hover:text-red-600" onClick={() => setFormData({...formData, stops: formData.stops.filter((_, i) => i !== idx)})}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div key={idx} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl relative group">
+                        <div className="absolute -left-2 top-4 text-slate-300">
+                          <GripVertical className="h-5 w-5" />
+                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveStop(idx, 'up')} disabled={idx === 0}>
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveStop(idx, 'down')} disabled={idx === formData.stops.length - 1}>
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => setFormData({...formData, stops: formData.stops.filter((_, i) => i !== idx)})}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pl-6">
                           <div className="space-y-1.5">
                             <Label>Region (Mkoa)</Label>
                             <Select 
@@ -354,7 +367,6 @@ const RoutePlannerPage = () => {
                               onValueChange={(val) => {
                                 const selected = regionsForStops.find(r => r.region_name === val);
                                 const newStops = [...formData.stops];
-                                
                                 newStops[idx] = {
                                   ...newStops[idx],
                                   name: val,
@@ -362,11 +374,10 @@ const RoutePlannerPage = () => {
                                   boxes: selected?.boxes_count || 0,
                                   deliveryDate: formData.loadingDate ? calculateDeliveryDate(formData.loadingDate, selected?.days_truck || 2) : ''
                                 };
-                                
                                 setFormData({...formData, stops: newStops});
                               }}
                             >
-                              <SelectTrigger className="h-11">
+                              <SelectTrigger className="h-10">
                                 <SelectValue placeholder="Select Region" />
                               </SelectTrigger>
                               <SelectContent>
@@ -381,15 +392,11 @@ const RoutePlannerPage = () => {
 
                           <div className="space-y-1.5">
                             <Label>Receiving Place</Label>
-                            <Input 
-                              value={stop.receivingPlace} 
-                              onChange={e => {
-                                const newStops = [...formData.stops];
-                                newStops[idx].receivingPlace = e.target.value;
-                                setFormData({...formData, stops: newStops});
-                              }} 
-                              className="h-11" 
-                            />
+                            <Input value={stop.receivingPlace} onChange={e => {
+                              const newStops = [...formData.stops];
+                              newStops[idx].receivingPlace = e.target.value;
+                              setFormData({...formData, stops: newStops});
+                            }} className="h-10" />
                           </div>
 
                           <div className="space-y-1.5">
@@ -398,7 +405,7 @@ const RoutePlannerPage = () => {
                               const newStops = [...formData.stops];
                               newStops[idx].boxes = e.target.value;
                               setFormData({...formData, stops: newStops});
-                            }} className="h-11" />
+                            }} className="h-10" />
                           </div>
 
                           <div className="space-y-1.5">
@@ -407,7 +414,7 @@ const RoutePlannerPage = () => {
                               const newStops = [...formData.stops];
                               newStops[idx].deliveryDate = e.target.value;
                               setFormData({...formData, stops: newStops});
-                            }} className="h-11" />
+                            }} className="h-10" />
                           </div>
                         </div>
                       </div>

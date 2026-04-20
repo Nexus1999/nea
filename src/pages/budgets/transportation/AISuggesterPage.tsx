@@ -14,7 +14,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -73,7 +73,7 @@ const AISuggesterPage = () => {
           name: msafara.name,
           starting_point: msafara.startingPoint,
           start_date: msafara.startDate,
-          loading_date: msafara.loadingDate, // Fixed: Added missing loading_date
+          loading_date: msafara.loadingDate,
           total_boxes: msafara.totalBoxes,
           total_tons: msafara.totalTons,
         })
@@ -81,12 +81,13 @@ const AISuggesterPage = () => {
         .single();
 
       if (rError) throw rError;
-      if (!route) throw new Error("Failed to create route record");
+      if (!route) throw new Error("Failed to create route");
 
       await supabase.from('transportation_route_vehicles').insert(
         msafara.vehicles.map(v => ({
           route_id: route.id,
-          vehicle_type: v.type === 'TT' ? 'TRUCK_AND_TRAILER' : v.type === 'T' ? 'STANDARD_TRUCK' : 'ESCORT_VEHICLE',
+          vehicle_type: v.type === 'TT' ? 'TRUCK_AND_TRAILER' : 
+                       v.type === 'T' ? 'STANDARD_TRUCK' : 'ESCORT_VEHICLE',
           quantity: v.quantity
         }))
       );
@@ -113,124 +114,151 @@ const AISuggesterPage = () => {
     if (suggestions.length === 0) return;
     setApplying(true);
     let count = 0;
+
     for (const s of [...suggestions]) {
       const success = await handleApply(s);
       if (success) count++;
     }
     
     if (count > 0) {
-      showSuccess(`Successfully applied ${count} routes`);
+      showSuccess(`Successfully applied ${count} route(s)`);
       setSuggestions([]);
       navigate(`/dashboard/budgets/action-plan/${id}`);
     } else {
-      showError("Failed to apply routes. Please check your data.");
+      showError("Failed to apply some routes");
     }
     setApplying(false);
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between">
+    <Card className="">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${id}`)} className="rounded-full">
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">AI Route Suggester</h1>
+           
+          <div>
+            <CardTitle className="text-2xl font-bold">System Route Suggester</CardTitle>
+          </div>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex gap-3">
           {suggestions.length > 0 && (
             <Button 
               onClick={handleApproveAll}
               disabled={applying}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-6"
+              className="bg-emerald-600 hover:bg-emerald-700"
             >
-              {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve All Suggestions</>}
+              {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve All</>}
             </Button>
           )}
           <Button 
             variant="outline"
             onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${id}`)}
-            className="border-2 border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-6 transition-all"
           >
             Manual Planner
           </Button>
         </div>
-      </div>
+      </CardHeader>
 
-      <Card className="border-none shadow-sm bg-white overflow-hidden border border-slate-100">
-        <CardContent className="p-8 flex flex-col md:flex-row items-end gap-6">
-          <div className="flex-1 space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Loading Date</Label>
-            <Input 
-              type="date" 
-              value={selectedDate} 
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-slate-50 border-slate-200 h-11 rounded-xl focus:ring-indigo-500"
-            />
-          </div>
-          <Button 
-            onClick={fetchAndPlan} 
-            disabled={loading || !selectedDate}
-            className="h-11 bg-slate-900 hover:bg-black text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><RefreshCw className="h-4 w-4 mr-2" /> Generate Suggestions</>}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <ScrollArea className="h-[600px]">
-        <div className="grid grid-cols-1 gap-6">
-          {suggestions.map((msafara) => (
-            <Card key={msafara.msafaraNumber} className="border-none shadow-sm overflow-hidden group">
-              <CardContent className="p-6 flex flex-col md:flex-row gap-6">
-                <div className="flex-1 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{msafara.name}</h3>
-                    <Badge className="bg-indigo-50 text-indigo-600 border-indigo-100 font-black text-[10px]">OPTIMIZED</Badge>
-                  </div>
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2 text-slate-500">
-                      <Calendar className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-wider">Starts: {msafara.startDate}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-500">
-                      <Package className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-wider">{msafara.totalBoxes} Boxes ({msafara.totalTons}T)</span>
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-600">DAR</span>
-                      <ArrowRight className="w-3 h-3 text-slate-300" />
-                      {msafara.regions.map((r, idx) => (
-                        <React.Fragment key={idx}>
-                          <Badge variant="outline" className="bg-white border-slate-200 text-slate-700 font-bold text-[10px]">{r.name}</Badge>
-                          {idx < msafara.regions.length - 1 && <ArrowRight className="w-3 h-3 text-slate-300" />}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {msafara.vehicles.map((v, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl border border-blue-100">
-                        <Truck className="w-3.5 h-3.5" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">{v.quantity}x {v.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {suggestions.length === 0 && !loading && (
-            <div className="py-20 text-center">
-              <Sparkles className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-              <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Select a date to see AI suggestions</p>
+      <CardContent className="space-y-8">
+        {/* Date Selector Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Select Loading Date</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <Input 
+                type="date" 
+                value={selectedDate} 
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="h-11"
+              />
             </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
+            <Button 
+              onClick={fetchAndPlan} 
+              disabled={loading || !selectedDate}
+              className="bg-black hover:bg-gray-800 h-11 px-8"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><RefreshCw className="h-4 w-4 mr-2" /> Generate AI Suggestions</>}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Suggestions */}
+        {suggestions.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">AI Suggested Routes ({suggestions.length})</h3>
+            </div>
+
+            <div className="space-y-6">
+              {suggestions.map((msafara, index) => (
+                <Card key={index} className="overflow-hidden border border-slate-200">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col lg:flex-row gap-6">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-xl font-black tracking-tight">{msafara.name}</h3>
+                          <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200">AI OPTIMIZED</Badge>
+                        </div>
+
+                        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-slate-500" />
+                            <span>Loading: <strong>{msafara.loadingDate}</strong></span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-slate-500" />
+                            <span>Travel: <strong>{msafara.startDate}</strong></span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Package className="w-4 h-4 text-slate-500" />
+                            <span><strong>{msafara.totalBoxes}</strong> Boxes • <strong>{msafara.totalTons}T</strong></span>
+                          </div>
+                        </div>
+
+                        {/* Route Flow */}
+                        <div className="mt-5 flex items-center flex-wrap gap-2">
+                          <Badge variant="outline" className="font-medium">DAR ES SALAAM</Badge>
+                          <ArrowRight className="w-4 h-4 text-slate-300" />
+                          {msafara.regions.map((r, i) => (
+                            <React.Fragment key={i}>
+                              <Badge variant="outline" className="font-medium">{r.name}</Badge>
+                              {i < msafara.regions.length - 1 && <ArrowRight className="w-4 h-4 text-slate-300" />}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Vehicles */}
+                      <div className="lg:w-72 pt-2">
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Vehicles</p>
+                        <div className="flex flex-wrap gap-2">
+                          {msafara.vehicles.map((v, i) => (
+                            <div key={i} className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-xl">
+                              <Truck className="w-4 h-4" />
+                              <span className="text-sm font-semibold">{v.quantity}× {v.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {suggestions.length === 0 && !loading && (
+          <div className="py-24 text-center border border-dashed border-slate-200 rounded-3xl">
+            <Sparkles className="h-16 w-16 text-slate-200 mx-auto mb-6" />
+            <p className="text-slate-400 font-medium">No suggestions yet</p>
+            <p className="text-sm text-slate-500 mt-1">Select a loading date and click Generate to see AI recommendations</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
