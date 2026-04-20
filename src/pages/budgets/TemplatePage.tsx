@@ -37,6 +37,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
 
+// DEFAULT RATES AS REQUESTED
+const RATES = {
+  EXAM_OFFICER: 170000,
+  POLICE: 170000,
+  SECURITY: 170000,
+  DRIVER: 150000,
+  LOADING_PER_ROUTE: 20000 * 30, // 600,000 per route
+  PADLOCKS_PER_ROUTE: 6 * 4 * 10000, // 240,000 per route
+};
+
 const TemplatePage = () => {
   const { id: budgetId } = useParams();
   const navigate = useNavigate();
@@ -52,7 +62,6 @@ const TemplatePage = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Fetch Budget
       const { data: budgetData } = await supabase
         .from('budgets')
         .select('*')
@@ -60,7 +69,6 @@ const TemplatePage = () => {
         .single();
       setBudget(budgetData);
 
-      // 2. Fetch Template Header
       const { data: templateData } = await supabase
         .from('transportation_templates')
         .select('*')
@@ -70,7 +78,6 @@ const TemplatePage = () => {
       if (templateData) {
         setTemplate(templateData);
         
-        // 3. Fetch Current Version
         const { data: versionData } = await supabase
           .from('transportation_template_versions')
           .select('*')
@@ -81,7 +88,6 @@ const TemplatePage = () => {
         if (versionData) {
           setCurrentVersion(versionData);
           
-          // 4. Fetch Personnel & Other Costs
           const [pRes, oRes] = await Promise.all([
             supabase.from('transportation_template_personnel').select('*').eq('template_version_id', versionData.id),
             supabase.from('transportation_template_other_costs').select('*').eq('template_version_id', versionData.id)
@@ -105,7 +111,6 @@ const TemplatePage = () => {
   const handleGenerateTemplate = async () => {
     setGenerating(true);
     try {
-      // This logic follows your "Step-by-step" generation flow
       // 1. Ensure Template Header exists
       let tId = template?.id;
       if (!tId) {
@@ -118,17 +123,7 @@ const TemplatePage = () => {
         tId = newT.id;
       }
 
-      // 2. Get Rates for the budget year
-      const { data: rates } = await supabase
-        .from('transportation_rates')
-        .select('*')
-        .eq('fiscal_year', budget.year);
-      
-      if (!rates || rates.length === 0) {
-        throw new Error(`No rates found for fiscal year ${budget.year}. Please set rates first.`);
-      }
-
-      // 3. Get Action Plan Data (Routes, Stops, Vehicles)
+      // 2. Get Action Plan Data
       const { data: routes } = await supabase
         .from('transportation_routes')
         .select(`
@@ -142,51 +137,48 @@ const TemplatePage = () => {
         throw new Error("No Action Plan found. Please create routes first.");
       }
 
-      // 4. Create New Version
+      // 3. Create New Version
       const { data: version, error: vErr } = await supabase
         .from('transportation_template_versions')
         .insert({
           template_id: tId,
           version_num: (currentVersion?.version_num || 0) + 1,
           is_current: true,
-          label: `Auto-generated from Action Plan (${new Date().toLocaleDateString()})`
+          label: `Auto-generated (${new Date().toLocaleDateString()})`
         })
         .select()
         .single();
       
       if (vErr) throw vErr;
 
-      // 5. Generate Personnel Rows based on your rules
+      // 4. Generate Personnel Rows
       const personnelRows: any[] = [];
       routes.forEach(route => {
-        const routeDays = route.transportation_route_stops.length + 2; // Simple estimate: stops + transit
+        const routeDays = route.transportation_route_stops.length + 2;
 
-        // Rule: Police (2 per route)
-        const policeRate = rates.find(r => r.role === 'police_officer');
+        // Police (2 per route)
         personnelRows.push({
           template_version_id: version.id,
           route_id: route.id,
           role: 'police_officer',
           quantity: 2,
           days: routeDays,
-          allowance_per_day: policeRate?.allowance_per_day || 0,
-          allowance_transit_per_day: policeRate?.allowance_transit_per_day || 0
+          allowance_per_day: RATES.POLICE,
+          allowance_transit_per_day: RATES.POLICE
         });
 
-        // Rule: Security (1 per route)
-        const securityRate = rates.find(r => r.role === 'security_officer');
+        // Security (1 per route)
         personnelRows.push({
           template_version_id: version.id,
           route_id: route.id,
           role: 'security_officer',
           quantity: 1,
           days: routeDays,
-          allowance_per_day: securityRate?.allowance_per_day || 0,
-          allowance_transit_per_day: securityRate?.allowance_transit_per_day || 0
+          allowance_per_day: RATES.SECURITY,
+          allowance_transit_per_day: RATES.SECURITY
         });
 
-        // Rule: Drivers (1 per vehicle)
-        const driverRate = rates.find(r => r.role === 'driver');
+        // Drivers (per vehicle)
         route.transportation_route_vehicles.forEach((v: any) => {
           personnelRows.push({
             template_version_id: version.id,
@@ -195,13 +187,12 @@ const TemplatePage = () => {
             vehicle_type: v.vehicle_type.toLowerCase().replace('_and_trailer', '_trailer'),
             quantity: v.quantity,
             days: routeDays,
-            allowance_per_day: driverRate?.allowance_per_day || 0,
+            allowance_per_day: RATES.DRIVER,
             emergency_allowance: v.vehicle_type === 'TRUCK_AND_TRAILER' ? 100000 : 50000
           });
         });
 
-        // Rule: Exam Officers (1 per region/stop)
-        const officerRate = rates.find(r => r.role === 'examination_officer');
+        // Exam Officers (1 per region)
         route.transportation_route_stops.forEach((stop: any) => {
           personnelRows.push({
             template_version_id: version.id,
@@ -209,20 +200,43 @@ const TemplatePage = () => {
             region_name: stop.region_name,
             role: 'examination_officer',
             quantity: 1,
-            days: 3, // Standard days for officer
+            days: 3,
             transit_days: 2,
-            allowance_per_day: officerRate?.allowance_per_day || 0,
-            allowance_transit_per_day: officerRate?.allowance_transit_per_day || 0,
-            unloading_cash: officerRate?.unloading_per_officer || 0,
-            fare_return: officerRate?.fare_return || 0
+            allowance_per_day: RATES.EXAM_OFFICER,
+            allowance_transit_per_day: RATES.EXAM_OFFICER,
+            unloading_cash: 20000, // Standard unloading per officer
+            fare_return: 50000 // Standard return fare
           });
         });
       });
 
+      // 5. Generate Operational Costs (Other Costs)
+      const otherCostRows = [
+        {
+          template_version_id: version.id,
+          item_name: 'Loading Labor (Vibarua)',
+          description: `Loading costs for ${routes.length} routes (30 people per route)`,
+          quantity: routes.length,
+          unit_cost: RATES.LOADING_PER_ROUTE,
+          category: 'operational'
+        },
+        {
+          template_version_id: version.id,
+          item_name: 'Padlocks & Security Seals',
+          description: `Security hardware for ${routes.length} routes`,
+          quantity: routes.length,
+          unit_cost: RATES.PADLOCKS_PER_ROUTE,
+          category: 'security'
+        }
+      ];
+
       // 6. Bulk Insert
-      await supabase.from('transportation_template_personnel').insert(personnelRows);
+      await Promise.all([
+        supabase.from('transportation_template_personnel').insert(personnelRows),
+        supabase.from('transportation_template_other_costs').insert(otherCostRows)
+      ]);
       
-      showSuccess("Template generated successfully!");
+      showSuccess("Financial template generated with default rates!");
       fetchData();
     } catch (err: any) {
       showError(err.message);
@@ -241,7 +255,7 @@ const TemplatePage = () => {
         </div>
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900">No Template Generated</h2>
-          <p className="text-slate-500 max-w-md mx-auto">This budget doesn't have a financial template yet. Generate one based on your current Action Plan.</p>
+          <p className="text-slate-500 max-w-md mx-auto">Generate a financial template based on your current Action Plan using standard government rates.</p>
         </div>
         <Button 
           onClick={handleGenerateTemplate} 
@@ -279,9 +293,6 @@ const TemplatePage = () => {
 
         <div className="flex items-center gap-3">
           <Button variant="outline" className="rounded-xl h-11 px-5 border-slate-200 font-bold uppercase text-[10px] tracking-widest gap-2">
-            <History className="w-4 h-4" /> History
-          </Button>
-          <Button variant="outline" className="rounded-xl h-11 px-5 border-slate-200 font-bold uppercase text-[10px] tracking-widest gap-2">
             <Printer className="w-4 h-4" /> Print
           </Button>
           <Button 
@@ -305,7 +316,7 @@ const TemplatePage = () => {
             </h2>
             <div className="mt-6 flex items-center gap-2">
               <Badge className="bg-white/10 text-white border-none font-bold text-[9px]">ESTIMATED</Badge>
-              <span className="text-[10px] text-slate-500 font-medium italic">Based on current rates</span>
+              <span className="text-[10px] text-slate-500 font-medium italic">Based on standard rates</span>
             </div>
           </CardContent>
         </Card>
@@ -394,15 +405,33 @@ const TemplatePage = () => {
         </TabsContent>
 
         <TabsContent value="operational">
-          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden p-12 text-center space-y-4">
-            <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center mx-auto">
-              <Plus className="w-8 h-8" />
-            </div>
-            <h3 className="text-lg font-black uppercase tracking-tight text-slate-900">Add Operational Costs</h3>
-            <p className="text-slate-500 max-w-xs mx-auto text-sm">Add items like Padlocks, Loading/Unloading labor, and Follow-up convoy costs.</p>
-            <Button variant="outline" className="rounded-xl font-bold uppercase text-[10px] tracking-widest">
-              <Plus className="w-4 h-4 mr-2" /> Add Line Item
-            </Button>
+          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest pl-8">Item Name</TableHead>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Description</TableHead>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Qty</TableHead>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Unit Cost</TableHead>
+                  <TableHead className="text-right text-[9px] font-black uppercase tracking-widest pr-8">Total Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {otherCosts.map((item) => (
+                  <TableRow key={item.id} className="hover:bg-slate-50/30 group">
+                    <TableCell className="pl-8 py-4">
+                      <span className="font-black text-slate-900 uppercase text-xs tracking-tight">{item.item_name}</span>
+                    </TableCell>
+                    <TableCell className="text-[10px] text-slate-500 font-medium">{item.description}</TableCell>
+                    <TableCell className="font-bold text-slate-700">{item.quantity}</TableCell>
+                    <TableCell className="font-bold text-slate-700">{item.unit_cost.toLocaleString()}</TableCell>
+                    <TableCell className="text-right pr-8 font-black text-slate-900">
+                      TZS {(item.total_cost || 0).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Card>
         </TabsContent>
       </Tabs>
