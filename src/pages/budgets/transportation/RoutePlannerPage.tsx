@@ -1,168 +1,275 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  MapPin, 
-  ArrowLeft, 
+  ChevronLeft, 
   Save, 
+  Sparkles, 
   Plus, 
   Trash2, 
-  Truck, 
-  Search, 
-  X, 
-  ChevronRight,
-  Package,
-  ArrowUpDown,
-  Sparkles
-} from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Truck,
+  MapPin,
+  Loader2
+} from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
 
 const RoutePlannerPage = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [budget, setBudget] = useState<any>(null);
-  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [regions, setRegions] = useState<any[]>([]);
+  const [formData, setFormData] = useState({
+    name: '',
+    startingPoint: 'DAR ES SALAAM',
+    startDate: '',
+    vehicles: [{ type: 'TRUCK_AND_TRAILER', quantity: 1 }],
+    stops: [] as any[]
+  });
 
   useEffect(() => {
-    const fetchBudget = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('budgets')
-          .select('*')
-          .eq('id', id)
-          .single();
-        if (error) throw error;
-        setBudget(data);
-      } catch (err: any) {
-        showError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBudget();
-  }, [id]);
+    fetchRegions();
+    if (editId) fetchRouteData();
+  }, [editId]);
 
-  if (loading) return <div className="flex h-[400px] items-center justify-center"><Spinner size="lg" /></div>;
+  const fetchRegions = async () => {
+    const { data } = await supabase.from('transportation_region_boxes').select('*').eq('budget_id', id).gt('boxes_count', 0);
+    setRegions(data || []);
+  };
+
+  const fetchRouteData = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from('transportation_routes')
+        .select('*, transportation_route_vehicles(*), transportation_route_stops(*)')
+        .eq('id', editId)
+        .single();
+
+      if (data) {
+        setFormData({
+          name: data.name,
+          startingPoint: data.starting_point,
+          startDate: data.start_date,
+          vehicles: data.transportation_route_vehicles.map((v: any) => ({ type: v.vehicle_type, quantity: v.quantity })),
+          stops: data.transportation_route_stops.sort((a: any, b: any) => a.sequence_order - b.sequence_order).map((s: any) => ({
+            name: s.region_name,
+            receivingPlace: s.receiving_place,
+            boxes: s.boxes_count,
+            deliveryDate: s.delivery_date
+          }))
+        });
+      }
+    } catch (err) {
+      showError("Failed to load route");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!formData.name || !formData.startDate || formData.stops.length === 0) {
+      showError("Please fill in all required fields and add at least one stop");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const totalBoxes = formData.stops.reduce((sum, s) => sum + Number(s.boxes), 0);
+      const payload = {
+        budget_id: id,
+        name: formData.name,
+        starting_point: formData.startingPoint,
+        start_date: formData.startDate,
+        total_boxes: totalBoxes,
+        total_tons: (totalBoxes * 34) / 1000,
+      };
+
+      let routeId = editId;
+      if (editId) {
+        await supabase.from('transportation_routes').update(payload).eq('id', editId);
+        await supabase.from('transportation_route_vehicles').delete().eq('route_id', editId);
+        await supabase.from('transportation_route_stops').delete().eq('route_id', editId);
+      } else {
+        const { data } = await supabase.from('transportation_routes').insert(payload).select().single();
+        routeId = data.id;
+      }
+
+      await supabase.from('transportation_route_vehicles').insert(
+        formData.vehicles.map(v => ({ route_id: routeId, vehicle_type: v.type, quantity: v.quantity }))
+      );
+
+      await supabase.from('transportation_route_stops').insert(
+        formData.stops.map((s, idx) => ({
+          route_id: routeId,
+          region_name: s.name,
+          receiving_place: s.receivingPlace,
+          boxes_count: s.boxes,
+          delivery_date: s.deliveryDate,
+          sequence_order: idx
+        }))
+      );
+
+      showSuccess("Route saved successfully");
+      navigate(`/dashboard/budgets/action-plan/${id}`);
+    } catch (err: any) {
+      showError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && editId) return <div className="h-screen flex items-center justify-center"><Spinner size="lg" /></div>;
 
   return (
-    <div className="space-y-4 p-4">
-      <Card className="w-full relative min-h-[600px] border-none shadow-sm">
-        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0 pb-6 border-b mb-4">
-          <div>
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
-              <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate('/dashboard/budgets')}>Budgets</span>
-              <ChevronRight className="w-3 h-3" />
-              <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate(`/dashboard/budgets/action-plan/${id}`)}>Action Plan</span>
-              <ChevronRight className="w-3 h-3" />
-              <span className="text-slate-900">Route Planner</span>
-            </div>
-            <CardTitle className="text-2xl font-black uppercase tracking-tight text-slate-900">
-              Transportation Route Planner
-            </CardTitle>
-            <div className="flex items-center gap-4 mt-1">
-              <p className="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase">
-                {budget?.title}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate(`/dashboard/budgets/transportation/ai-suggester/${id}`)}
-              className="rounded-xl h-10 px-6 border-purple-200 text-purple-600 hover:bg-purple-50 font-bold uppercase text-[10px] tracking-widest gap-2"
-            >
-              <Sparkles className="w-4 h-4" /> AI Suggester
-            </Button>
-            <Button className="rounded-xl h-10 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase text-[10px] tracking-widest gap-2">
-              <Save className="w-4 h-4" /> Save Configuration
-            </Button>
-          </div>
-        </CardHeader>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/budgets/action-plan/${id}`)} className="rounded-full">
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">
+            {editId ? 'Edit Route' : 'Manual Route Planner'}
+          </h1>
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => navigate(`/dashboard/budgets/transportation/ai-suggester/${id}`)}
+            className="border-2 border-slate-200 text-slate-600 hover:border-purple-600 hover:text-purple-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-6 transition-all"
+          >
+            <Sparkles className="w-4 h-4 mr-2" /> Use AI Suggester
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={loading}
+            className="bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-8"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" /> Save Route</>}
+          </Button>
+        </div>
+      </div>
 
-        <CardContent>
-          <div className="mb-6">
-            <div className="relative w-full max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <Input
-                placeholder="Search routes or regions..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10 text-sm border-slate-200 focus:ring-slate-100"
-              />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-1 border-none shadow-sm">
+          <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest">Basic Info</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase text-slate-400">Route Name</Label>
+              <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. Northern Corridor A" className="h-10 rounded-xl" />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow className="hover:bg-transparent border-b border-slate-200">
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Route Name</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500">Regions</TableHead>
-                      <TableHead className="text-right text-[10px] font-black uppercase text-slate-500">Total Boxes</TableHead>
-                      <TableHead className="text-right text-[10px] font-black uppercase text-slate-500 px-6">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow className="hover:bg-slate-50/30 border-b border-slate-100 transition-colors">
-                      <TableCell className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                        <Truck className="h-4 w-4 text-blue-600" /> Route 1: Northern
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600">
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant="secondary" className="text-[9px]">ARUSHA</Badge>
-                          <Badge variant="secondary" className="text-[9px]">KILIMANJARO</Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm font-bold">270</TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase text-slate-400">Start Date</Label>
+              <Input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="h-10 rounded-xl" />
+            </div>
+            <div className="pt-4 border-t space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] font-bold uppercase text-slate-400">Vehicles</Label>
+                <Button variant="ghost" size="sm" onClick={() => setFormData({...formData, vehicles: [...formData.vehicles, { type: 'ESCORT_VEHICLE', quantity: 1 }]})} className="h-7 text-indigo-600 font-bold text-[10px] uppercase">
+                  <Plus className="w-3 h-3 mr-1" /> Add
+                </Button>
               </div>
+              {formData.vehicles.map((v, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <Select value={v.type} onValueChange={val => {
+                    const newV = [...formData.vehicles];
+                    newV[idx].type = val;
+                    setFormData({...formData, vehicles: newV});
+                  }}>
+                    <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TRUCK_AND_TRAILER">Truck & Trailer (TT)</SelectItem>
+                      <SelectItem value="STANDARD_TRUCK">Standard Truck (T)</SelectItem>
+                      <SelectItem value="ESCORT_VEHICLE">Escort Vehicle (HT)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, vehicles: formData.vehicles.filter((_, i) => i !== idx)})} className="h-9 w-9 text-slate-300 hover:text-red-600">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-4">
-              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2">
-                  <Package className="w-3.5 h-3.5" /> Unassigned Regions
-                </h3>
-                <div className="space-y-2">
-                  {['MANYARA', 'TANGA', 'MWANZA', 'SHINYANGA'].map(region => (
-                    <div key={region} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-400 cursor-move transition-all flex items-center justify-between group">
-                      <span className="text-xs font-black text-slate-700">{region}</span>
-                      <Badge variant="outline" className="text-[9px] font-bold">120 BOXES</Badge>
-                    </div>
-                  ))}
+        <Card className="md:col-span-2 border-none shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-black uppercase tracking-widest">Delivery Stops</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setFormData({...formData, stops: [...formData.stops, { name: '', receivingPlace: '', boxes: 0, deliveryDate: '' }]})} className="h-7 text-indigo-600 font-bold text-[10px] uppercase">
+              <Plus className="w-3 h-3 mr-1" /> Add Stop
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {formData.stops.map((stop, idx) => (
+              <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 relative grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, stops: formData.stops.filter((_, i) => i !== idx)})} className="absolute -top-2 -right-2 h-6 w-6 bg-white shadow-sm rounded-full text-slate-300 hover:text-red-600">
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-bold uppercase text-slate-400">Region</Label>
+                  <Select value={stop.name} onValueChange={val => {
+                    const newS = [...formData.stops];
+                    const reg = regions.find(r => r.region_name === val);
+                    newS[idx].name = val;
+                    newS[idx].boxes = reg?.boxes_count || 0;
+                    setFormData({...formData, stops: newS});
+                  }}>
+                    <SelectTrigger className="h-9 rounded-lg bg-white"><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {regions.map(r => <SelectItem key={r.id} value={r.region_name}>{r.region_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-bold uppercase text-slate-400">Receiving Place</Label>
+                  <Input value={stop.receivingPlace} onChange={e => {
+                    const newS = [...formData.stops];
+                    newS[idx].receivingPlace = e.target.value;
+                    setFormData({...formData, stops: newS});
+                  }} className="h-9 rounded-lg bg-white" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-bold uppercase text-slate-400">Boxes</Label>
+                  <Input type="number" value={stop.boxes} onChange={e => {
+                    const newS = [...formData.stops];
+                    newS[idx].boxes = e.target.value;
+                    setFormData({...formData, stops: newS});
+                  }} className="h-9 rounded-lg bg-white" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-bold uppercase text-slate-400">Delivery Date</Label>
+                  <Input type="date" value={stop.deliveryDate} onChange={e => {
+                    const newS = [...formData.stops];
+                    newS[idx].deliveryDate = e.target.value;
+                    setFormData({...formData, stops: newS});
+                  }} className="h-9 rounded-lg bg-white" />
                 </div>
               </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            ))}
+            {formData.stops.length === 0 && (
+              <div className="py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
+                <MapPin className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No stops added yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

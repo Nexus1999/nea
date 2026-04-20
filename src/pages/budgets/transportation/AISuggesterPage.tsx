@@ -2,241 +2,210 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { 
+  ChevronLeft, 
   Sparkles, 
   RefreshCw, 
-  CheckCircle2, 
-  Truck, 
-  MapPin, 
-  ChevronRight,
+  Loader2, 
+  CheckCircle2,
+  ArrowRight,
+  Calendar,
   Package,
-  Save
-} from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { showSuccess, showError } from "@/utils/toast";
-import Spinner from "@/components/Spinner";
-import { generateIntelligentRoutes, SuggestedMsafara } from "@/utils/intelligentRoutePlanner";
+  Truck
+} from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { generateIntelligentRoutes, SuggestedMsafara, RegionDemand } from "@/utils/intelligentRoutePlanner";
+import { showSuccess, showError } from "@/utils/toast";
 
 const AISuggesterPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [suggesting, setSuggesting] = useState(false);
-  const [budget, setBudget] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestedMsafara[]>([]);
+  const [selectedDate, setSelectedDate] = useState("");
 
-  useEffect(() => {
-    const fetchBudget = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('budgets')
-          .select('*')
-          .eq('id', id)
-          .single();
-        if (error) throw error;
-        setBudget(data);
-      } catch (err: any) {
-        showError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBudget();
-  }, [id]);
+  const fetchAndPlan = async () => {
+    if (!selectedDate) {
+      showError("Please select a loading date");
+      return;
+    }
 
-  const handleGenerate = async () => {
-    setSuggesting(true);
+    setLoading(true);
     try {
-      // 1. Fetch regional boxes for this budget
-      const { data: boxesData, error: boxesError } = await supabase
+      const { data } = await supabase
         .from('transportation_region_boxes')
         .select('region_name, boxes_count')
-        .eq('budget_id', id);
+        .eq('budget_id', id)
+        .gt('boxes_count', 0);
 
-      if (boxesError) throw boxesError;
+      if (!data || data.length === 0) {
+        showError("No regional demands found. Please add box counts first.");
+        return;
+      }
 
-      // 2. Fetch regional distances - Corrected table name to region_distances
-      const { data: distancesData, error: distError } = await supabase
-        .from('region_distances')
-        .select('*');
-
-      if (distError) throw distError;
-
-      const demands = (boxesData || []).map(b => ({
-        region: b.region_name,
-        boxes: b.boxes_count
+      const demands: RegionDemand[] = data.map(d => ({
+        region: d.region_name,
+        boxes: d.boxes_count
       }));
 
-      const routes = generateIntelligentRoutes(
-        demands, 
-        new Date().toISOString().split('T')[0], 
-        distancesData || []
-      );
-      
-      setSuggestions(routes);
-      showSuccess("AI Route suggestions generated successfully");
+      const plannedRoutes = generateIntelligentRoutes(demands, selectedDate);
+      setSuggestions(plannedRoutes);
     } catch (err: any) {
-      showError(err.message || "Failed to generate suggestions");
+      showError("Failed to generate suggestions");
     } finally {
-      setSuggesting(false);
+      setLoading(false);
     }
   };
 
-  const handleApplySuggestion = async (suggestion: SuggestedMsafara) => {
+  const handleApply = async (msafara: SuggestedMsafara) => {
     try {
-      // Insert the route
-      const { data: routeData, error: routeError } = await supabase
+      const { data: route, error: rError } = await supabase
         .from('transportation_routes')
         .insert({
           budget_id: id,
-          name: suggestion.name,
-          starting_point: suggestion.startingPoint,
-          loading_date: suggestion.loadingDate,
-          start_date: suggestion.startDate,
-          total_boxes: suggestion.totalBoxes,
-          total_tons: suggestion.totalTons
+          name: msafara.name,
+          starting_point: msafara.startingPoint,
+          start_date: msafara.startDate,
+          total_boxes: msafara.totalBoxes,
+          total_tons: msafara.totalTons,
         })
         .select()
         .single();
 
-      if (routeError) throw routeError;
+      if (rError) throw rError;
 
-      // Insert vehicles
-      const vehiclePayload = suggestion.vehicles.map(v => ({
-        route_id: routeData.id,
-        vehicle_type: v.type === 'TT' ? 'TRUCK_AND_TRAILER' : v.type === 'T' ? 'STANDARD_TRUCK' : 'ESCORT_VEHICLE',
-        quantity: v.quantity
-      }));
-      await supabase.from('transportation_route_vehicles').insert(vehiclePayload);
+      await supabase.from('transportation_route_vehicles').insert(
+        msafara.vehicles.map(v => ({
+          route_id: route.id,
+          vehicle_type: v.type === 'TT' ? 'TRUCK_AND_TRAILER' : v.type === 'T' ? 'STANDARD_TRUCK' : 'ESCORT_VEHICLE',
+          quantity: v.quantity
+        }))
+      );
 
-      // Insert stops
-      const stopPayload = suggestion.regions.map((r, idx) => ({
-        route_id: routeData.id,
-        region_name: r.name,
-        receiving_place: r.receivingPlace,
-        boxes_count: r.boxes,
-        delivery_date: r.deliveryDate,
-        sequence_order: idx
-      }));
-      await supabase.from('transportation_route_stops').insert(stopPayload);
+      await supabase.from('transportation_route_stops').insert(
+        msafara.regions.map((r, idx) => ({
+          route_id: route.id,
+          region_name: r.name,
+          receiving_place: r.receivingPlace,
+          boxes_count: r.boxes,
+          delivery_date: r.deliveryDate,
+          sequence_order: idx
+        }))
+      );
 
-      showSuccess(`Applied ${suggestion.name} to Action Plan`);
-      navigate(`/dashboard/budgets/action-plan/${id}`);
+      showSuccess(`Applied ${msafara.name}`);
+      // Remove from list but keep page open
+      setSuggestions(prev => prev.filter(s => s.msafaraNumber !== msafara.msafaraNumber));
     } catch (err: any) {
       showError(err.message);
     }
   };
 
-  if (loading) return <div className="flex h-[400px] items-center justify-center"><Spinner size="lg" /></div>;
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-8 space-y-10 max-w-[1700px] mx-auto pb-32">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
-            <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate('/dashboard/budgets')}>Budgets</span>
-            <ChevronRight className="w-3 h-3" />
-            <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate(`/dashboard/budgets/action-plan/${id}`)}>Action Plan</span>
-            <ChevronRight className="w-3 h-3" />
-            <span className="text-slate-900">AI Suggester</span>
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            <Sparkles className="h-6 w-6 text-purple-600" /> AI Route Suggester
-          </h1>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/budgets/action-plan/${id}`)} className="rounded-full">
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">AI Route Suggester</h1>
         </div>
-        
         <Button 
-          onClick={handleGenerate} 
-          disabled={suggesting}
-          className="rounded-xl h-11 px-8 bg-purple-600 hover:bg-purple-700 text-white font-bold uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-purple-100"
+          variant="outline"
+          onClick={() => navigate(`/dashboard/budgets/transportation/route-planner/${id}`)}
+          className="border-2 border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 text-[10px] font-black uppercase tracking-wider rounded-lg h-10 px-6 transition-all"
         >
-          {suggesting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          Generate Suggestions
+          Manual Planner
         </Button>
       </div>
 
-      {suggestions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 bg-white rounded-[2.5rem] border border-dashed border-slate-200">
-          <div className="p-6 bg-purple-50 rounded-3xl mb-6">
-            <Sparkles className="h-12 w-12 text-purple-400" />
+      <Card className="border-none shadow-sm bg-slate-900 text-white overflow-hidden">
+        <CardContent className="p-8 flex flex-col md:flex-row items-end gap-6">
+          <div className="flex-1 space-y-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Loading Date</Label>
+            <Input 
+              type="date" 
+              value={selectedDate} 
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="bg-white/10 border-white/20 text-white h-11 rounded-xl focus:ring-indigo-500"
+            />
           </div>
-          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Ready to Optimize?</h3>
-          <p className="text-slate-500 max-w-md text-center mt-2 font-medium">
-            Our AI engine will analyze regional demands from your budget, distances, and vehicle capacities to suggest the most cost-effective routes.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {suggestions.map((route, idx) => (
-            <Card key={idx} className="border-none bg-white shadow-sm hover:shadow-xl transition-all rounded-[2.5rem] overflow-hidden ring-1 ring-slate-200/50 group">
-              <div className="p-8 bg-slate-900 text-white flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center">
-                    <Truck className="h-6 w-6 text-purple-400" />
+          <Button 
+            onClick={fetchAndPlan} 
+            disabled={loading || !selectedDate}
+            className="h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><RefreshCw className="h-4 w-4 mr-2" /> Generate Suggestions</>}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <ScrollArea className="h-[600px]">
+        <div className="grid grid-cols-1 gap-6">
+          {suggestions.map((msafara) => (
+            <Card key={msafara.msafaraNumber} className="border-none shadow-sm hover:shadow-md transition-all overflow-hidden group">
+              <CardContent className="p-6 flex flex-col md:flex-row gap-6">
+                <div className="flex-1 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{msafara.name}</h3>
+                    <Badge className="bg-indigo-50 text-indigo-600 border-indigo-100 font-black text-[10px]">OPTIMIZED</Badge>
                   </div>
-                  <div>
-                    <h3 className="font-black uppercase tracking-tight text-lg">{route.name}</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Route {idx + 1}</p>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Calendar className="w-4 h-4" />
+                      <span className="text-xs font-bold uppercase tracking-wider">Starts: {msafara.startDate}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Package className="w-4 h-4" />
+                      <span className="text-xs font-bold uppercase tracking-wider">{msafara.totalBoxes} Boxes ({msafara.totalTons}T)</span>
+                    </div>
                   </div>
-                </div>
-                <Badge className="bg-purple-500 text-white border-none px-4 py-1 rounded-full font-black">
-                  {route.totalBoxes} BOXES
-                </Badge>
-              </div>
-              <CardContent className="p-8 space-y-8">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <MapPin className="h-3.5 w-3.5" /> Delivery Sequence
+                  <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-600">DAR</span>
+                      <ArrowRight className="w-3 h-3 text-slate-300" />
+                      {msafara.regions.map((r, idx) => (
+                        <React.Fragment key={idx}>
+                          <Badge variant="outline" className="bg-white border-slate-200 text-slate-700 font-bold text-[10px]">{r.name}</Badge>
+                          {idx < msafara.regions.length - 1 && <ArrowRight className="w-3 h-3 text-slate-300" />}
+                        </React.Fragment>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {route.pathDisplay.map((point: string, pIdx: number) => (
-                      <React.Fragment key={pIdx}>
-                        <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 text-xs font-black text-slate-700">
-                          {point}
-                        </div>
-                        {pIdx < route.pathDisplay.length - 1 && <ChevronRight className="w-4 h-4 text-slate-300" />}
-                      </React.Fragment>
+                  <div className="flex items-center gap-3">
+                    {msafara.vehicles.map((v, idx) => (
+                      <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl border border-blue-100">
+                        <Truck className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{v.quantity}x {v.label}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
-                  <div className="p-4 bg-slate-50/50 rounded-2xl">
-                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Est. Distance</p>
-                    <p className="text-xl font-black text-slate-900">{route.totalKm} KM</p>
-                  </div>
-                  <div className="p-4 bg-slate-50/50 rounded-2xl">
-                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Est. Weight</p>
-                    <p className="text-xl font-black text-slate-900">{route.totalTons} Tons</p>
-                  </div>
+                <div className="md:w-48 flex flex-col justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-6 md:pt-0 md:pl-6">
+                  <Button 
+                    onClick={() => handleApply(msafara)}
+                    className="w-full h-14 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest transition-all"
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-2" /> Apply
+                  </Button>
                 </div>
-
-                <div className="space-y-3">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Required Vehicles</p>
-                  <div className="flex flex-wrap gap-2">
-                    {route.vehicles.map((v, vIdx) => (
-                      <Badge key={vIdx} variant="outline" className="px-3 py-1 border-slate-200 text-slate-600 font-bold">
-                        {v.quantity}x {v.label}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <Button 
-                  onClick={() => handleApplySuggestion(route)}
-                  className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-[10px] tracking-widest gap-2"
-                >
-                  <CheckCircle2 className="w-4 h-4" /> Apply This Suggestion
-                </Button>
               </CardContent>
             </Card>
           ))}
+          {suggestions.length === 0 && !loading && (
+            <div className="py-20 text-center">
+              <Sparkles className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+              <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Select a date to see AI suggestions</p>
+            </div>
+          )}
         </div>
-      )}
+      </ScrollArea>
     </div>
   );
 };
