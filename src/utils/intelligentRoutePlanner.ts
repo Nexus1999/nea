@@ -36,13 +36,13 @@ const MAX_BOXES_PER_TT = 950; // Truck & Trailer (practical estimate)
 const MAX_BOXES_PER_T  = 450; // Standard Truck  (practical estimate)
 
 const HUB_RULES: Record<string, string> = {
-  "SIMIYU":  "SHINYANGA",
+  "SIMIYU":  "BARIADI",
   "MARA":    "MWANZA",
-  "KAGERA":  "MWANZA",
-  "GEITA":   "MWANZA",
+  "KAGERA":  "BUKOBA",
+  "GEITA":   "GEITA",
   "KATAVI":  "TABORA",
-  "RUVUMA":  "NJOMBE",
-  "TANGA":   "SEGERA / TANGA TOWN",
+  "RUVUMA":  "RUVUMA",
+  "TANGA":   "TANGA",
 };
 
 const TT_ONLY = [
