@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  ChevronLeft, 
+  ChevronRight, 
   Printer, 
   Download, 
   Plus, 
@@ -14,7 +14,11 @@ import {
   Truck,
   Save,
   CheckCircle2,
-  ChevronRight
+  RefreshCw,
+  History,
+  AlertCircle,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,296 +32,396 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { showSuccess } from "@/utils/toast";
-
-interface PersonnelRow {
-  id: string;
-  role: string;
-  region: string;
-  count: number;
-  days: number;
-  transitDays: number;
-  rate: number;
-}
-
-interface CostRow {
-  id: string;
-  name: string;
-  quantity: number;
-  days: number;
-  rate: number;
-}
-
-interface RouteBudget {
-  id: string;
-  name: string;
-  personnel: PersonnelRow[];
-  costs: CostRow[];
-}
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
+import { showSuccess, showError } from "@/utils/toast";
+import Spinner from "@/components/Spinner";
 
 const TemplatePage = () => {
-  const { id } = useParams();
+  const { id: budgetId } = useParams();
   const navigate = useNavigate();
   
-  const [routes, setRoutes] = useState<RouteBudget[]>([
-    {
-      id: '1',
-      name: 'Northern Route',
-      personnel: [
-        { id: 'p1', role: 'POLICE', region: 'All', count: 2, days: 5, transitDays: 2, rate: 50000 },
-        { id: 'p2', role: 'SECURITY', region: 'All', count: 1, days: 5, transitDays: 2, rate: 40000 },
-        { id: 'p3', role: 'DRIVER', region: 'All', count: 1, days: 5, transitDays: 2, rate: 45000 },
-        { id: 'p4', role: 'EXAM_OFFICER', region: 'Arusha', count: 1, days: 3, transitDays: 1, rate: 60000 },
-      ],
-      costs: [
-        { id: 'c1', name: 'LOADING/UNLOADING', quantity: 1, days: 2, rate: 100000 },
-        { id: 'c2', name: 'PADLOCKS', quantity: 10, days: 1, rate: 5000 },
-      ]
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [budget, setBudget] = useState<any>(null);
+  const [template, setTemplate] = useState<any>(null);
+  const [currentVersion, setCurrentVersion] = useState<any>(null);
+  const [personnel, setPersonnel] = useState<any[]>([]);
+  const [otherCosts, setOtherCosts] = useState<any[]>([]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch Budget
+      const { data: budgetData } = await supabase
+        .from('budgets')
+        .select('*')
+        .eq('id', budgetId)
+        .single();
+      setBudget(budgetData);
+
+      // 2. Fetch Template Header
+      const { data: templateData } = await supabase
+        .from('transportation_templates')
+        .select('*')
+        .eq('budget_id', budgetId)
+        .maybeSingle();
+      
+      if (templateData) {
+        setTemplate(templateData);
+        
+        // 3. Fetch Current Version
+        const { data: versionData } = await supabase
+          .from('transportation_template_versions')
+          .select('*')
+          .eq('template_id', templateData.id)
+          .eq('is_current', true)
+          .maybeSingle();
+        
+        if (versionData) {
+          setCurrentVersion(versionData);
+          
+          // 4. Fetch Personnel & Other Costs
+          const [pRes, oRes] = await Promise.all([
+            supabase.from('transportation_template_personnel').select('*').eq('template_version_id', versionData.id),
+            supabase.from('transportation_template_other_costs').select('*').eq('template_version_id', versionData.id)
+          ]);
+          
+          setPersonnel(pRes.data || []);
+          setOtherCosts(oRes.data || []);
+        }
+      }
+    } catch (err: any) {
+      showError("Failed to load template data");
+    } finally {
+      setLoading(false);
     }
-  ]);
+  }, [budgetId]);
 
-  const updatePersonnel = (routeId: string, rowId: string, field: keyof PersonnelRow, value: any) => {
-    setRoutes(routes.map(r => {
-      if (r.id === routeId) {
-        return {
-          ...r,
-          personnel: r.personnel.map(p => p.id === rowId ? { ...p, [field]: value } : p)
-        };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleGenerateTemplate = async () => {
+    setGenerating(true);
+    try {
+      // This logic follows your "Step-by-step" generation flow
+      // 1. Ensure Template Header exists
+      let tId = template?.id;
+      if (!tId) {
+        const { data: newT, error: tErr } = await supabase
+          .from('transportation_templates')
+          .insert({ budget_id: budgetId, status: 'draft' })
+          .select()
+          .single();
+        if (tErr) throw tErr;
+        tId = newT.id;
       }
-      return r;
-    }));
-  };
 
-  const addPersonnel = (routeId: string) => {
-    setRoutes(routes.map(r => {
-      if (r.id === routeId) {
-        return {
-          ...r,
-          personnel: [...r.personnel, {
-            id: Math.random().toString(36).substr(2, 9),
-            role: 'NEW_ROLE',
-            region: 'All',
-            count: 1,
-            days: 1,
-            transitDays: 0,
-            rate: 0
-          }]
-        };
+      // 2. Get Rates for the budget year
+      const { data: rates } = await supabase
+        .from('transportation_rates')
+        .select('*')
+        .eq('fiscal_year', budget.year);
+      
+      if (!rates || rates.length === 0) {
+        throw new Error(`No rates found for fiscal year ${budget.year}. Please set rates first.`);
       }
-      return r;
-    }));
-  };
 
-  const removePersonnel = (routeId: string, rowId: string) => {
-    setRoutes(routes.map(r => {
-      if (r.id === routeId) {
-        return { ...r, personnel: r.personnel.filter(p => p.id !== rowId) };
+      // 3. Get Action Plan Data (Routes, Stops, Vehicles)
+      const { data: routes } = await supabase
+        .from('transportation_routes')
+        .select(`
+          *,
+          transportation_route_stops (*),
+          transportation_route_vehicles (*)
+        `)
+        .eq('budget_id', budgetId);
+
+      if (!routes || routes.length === 0) {
+        throw new Error("No Action Plan found. Please create routes first.");
       }
-      return r;
-    }));
-  };
 
-  const updateCost = (routeId: string, rowId: string, field: keyof CostRow, value: any) => {
-    setRoutes(routes.map(r => {
-      if (r.id === routeId) {
-        return {
-          ...r,
-          costs: r.costs.map(c => c.id === rowId ? { ...c, [field]: value } : c)
-        };
-      }
-      return r;
-    }));
-  };
+      // 4. Create New Version
+      const { data: version, error: vErr } = await supabase
+        .from('transportation_template_versions')
+        .insert({
+          template_id: tId,
+          version_num: (currentVersion?.version_num || 0) + 1,
+          is_current: true,
+          label: `Auto-generated from Action Plan (${new Date().toLocaleDateString()})`
+        })
+        .select()
+        .single();
+      
+      if (vErr) throw vErr;
 
-  const addCost = (routeId: string) => {
-    setRoutes(routes.map(r => {
-      if (r.id === routeId) {
-        return {
-          ...r,
-          costs: [...r.costs, {
-            id: Math.random().toString(36).substr(2, 9),
-            name: 'New Item',
+      // 5. Generate Personnel Rows based on your rules
+      const personnelRows: any[] = [];
+      routes.forEach(route => {
+        const routeDays = route.transportation_route_stops.length + 2; // Simple estimate: stops + transit
+
+        // Rule: Police (2 per route)
+        const policeRate = rates.find(r => r.role === 'police_officer');
+        personnelRows.push({
+          template_version_id: version.id,
+          route_id: route.id,
+          role: 'police_officer',
+          quantity: 2,
+          days: routeDays,
+          allowance_per_day: policeRate?.allowance_per_day || 0,
+          allowance_transit_per_day: policeRate?.allowance_transit_per_day || 0
+        });
+
+        // Rule: Security (1 per route)
+        const securityRate = rates.find(r => r.role === 'security_officer');
+        personnelRows.push({
+          template_version_id: version.id,
+          route_id: route.id,
+          role: 'security_officer',
+          quantity: 1,
+          days: routeDays,
+          allowance_per_day: securityRate?.allowance_per_day || 0,
+          allowance_transit_per_day: securityRate?.allowance_transit_per_day || 0
+        });
+
+        // Rule: Drivers (1 per vehicle)
+        const driverRate = rates.find(r => r.role === 'driver');
+        route.transportation_route_vehicles.forEach((v: any) => {
+          personnelRows.push({
+            template_version_id: version.id,
+            route_id: route.id,
+            role: 'driver',
+            vehicle_type: v.vehicle_type.toLowerCase().replace('_and_trailer', '_trailer'),
+            quantity: v.quantity,
+            days: routeDays,
+            allowance_per_day: driverRate?.allowance_per_day || 0,
+            emergency_allowance: v.vehicle_type === 'TRUCK_AND_TRAILER' ? 100000 : 50000
+          });
+        });
+
+        // Rule: Exam Officers (1 per region/stop)
+        const officerRate = rates.find(r => r.role === 'examination_officer');
+        route.transportation_route_stops.forEach((stop: any) => {
+          personnelRows.push({
+            template_version_id: version.id,
+            route_id: route.id,
+            region_name: stop.region_name,
+            role: 'examination_officer',
             quantity: 1,
-            days: 1,
-            rate: 0
-          }]
-        };
-      }
-      return r;
-    }));
+            days: 3, // Standard days for officer
+            transit_days: 2,
+            allowance_per_day: officerRate?.allowance_per_day || 0,
+            allowance_transit_per_day: officerRate?.allowance_transit_per_day || 0,
+            unloading_cash: officerRate?.unloading_per_officer || 0,
+            fare_return: officerRate?.fare_return || 0
+          });
+        });
+      });
+
+      // 6. Bulk Insert
+      await supabase.from('transportation_template_personnel').insert(personnelRows);
+      
+      showSuccess("Template generated successfully!");
+      fetchData();
+    } catch (err: any) {
+      showError(err.message);
+    } finally {
+      setGenerating(false);
+    }
   };
 
-  const calculatePersonnelTotal = (p: PersonnelRow) => p.count * (p.days + p.transitDays) * p.rate;
-  const calculateCostTotal = (c: CostRow) => c.quantity * c.days * c.rate;
+  if (loading) return <div className="h-screen flex items-center justify-center"><Spinner size="lg" label="Loading financial template..." /></div>;
 
-  const routeTotals = useMemo(() => {
-    return routes.map(r => {
-      const pTotal = r.personnel.reduce((sum, p) => sum + calculatePersonnelTotal(p), 0);
-      const cTotal = r.costs.reduce((sum, c) => sum + calculateCostTotal(c), 0);
-      return pTotal + cTotal;
-    });
-  }, [routes]);
-
-  const grandTotal = routeTotals.reduce((sum, t) => sum + t, 0);
+  if (!template || !currentVersion) {
+    return (
+      <div className="h-[600px] flex flex-col items-center justify-center gap-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+        <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center">
+          <Calculator className="w-10 h-10" />
+        </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900">No Template Generated</h2>
+          <p className="text-slate-500 max-w-md mx-auto">This budget doesn't have a financial template yet. Generate one based on your current Action Plan.</p>
+        </div>
+        <Button 
+          onClick={handleGenerateTemplate} 
+          disabled={generating}
+          className="h-14 px-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-100"
+        >
+          {generating ? <RefreshCw className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
+          Generate Financial Template
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <Card className="border-none shadow-sm rounded-2xl overflow-hidden min-h-[600px]">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 bg-slate-50/50 border-b">
-        <div>
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
-            <span className="hover:text-indigo-600 cursor-pointer" onClick={() => navigate('/dashboard/budgets')}>Budgets</span>
-            <ChevronRight className="w-3 h-3" />
-            <span className="text-slate-900">Template</span>
+    <div className="space-y-8 pb-20">
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg">
+            <Calculator className="w-7 h-7" />
           </div>
-          <CardTitle className="text-2xl font-black uppercase tracking-tight">Budget Template</CardTitle>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 font-bold uppercase text-[10px] tracking-widest">
-            <Printer className="w-4 h-4 mr-2" /> Print
-          </Button>
-          <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 font-bold uppercase text-[10px] tracking-widest">
-            <Download className="w-4 h-4 mr-2" /> Export
-          </Button>
-          <Button onClick={() => showSuccess("Changes saved")} className="h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest px-6">
-            <Save className="w-4 h-4 mr-2" /> Save Changes
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardContent className="pt-8 space-y-10">
-        {/* Grand Total Summary */}
-        <div className="bg-slate-900 rounded-3xl p-8 text-white flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl shadow-slate-200">
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10">
-              <Calculator className="w-8 h-8 text-indigo-400" />
+          <div>
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
+              <span>v{currentVersion.version_num}</span>
+              <span className="w-1 h-1 bg-slate-300 rounded-full" />
+              <span className={currentVersion.locked ? "text-red-500" : "text-emerald-500"}>
+                {currentVersion.locked ? "LOCKED" : "DRAFT"}
+              </span>
             </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Estimated Grand Total</p>
-              <h2 className="text-4xl font-black tracking-tighter">TZS {grandTotal.toLocaleString()}</h2>
-            </div>
-          </div>
-          <div className="flex gap-12">
-            <div className="text-center">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Routes</p>
-              <p className="text-2xl font-black">{routes.length}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Personnel</p>
-              <p className="text-2xl font-black">{routes.reduce((sum, r) => sum + r.personnel.length, 0)}</p>
-            </div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
+              {budget?.title}
+            </h1>
           </div>
         </div>
 
-        {/* Routes Sections */}
-        <div className="space-y-16">
-          {routes.map((route, rIndex) => (
-            <div key={route.id} className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-slate-100 text-slate-900 rounded-xl flex items-center justify-center">
-                  <Truck className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-black uppercase tracking-tight text-slate-900">{route.name}</h3>
-                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Route Total: TZS {routeTotals[rIndex].toLocaleString()}</p>
-                </div>
-              </div>
-
-              {/* Personnel Table */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between px-2">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5" /> Personnel Allowances
-                  </h4>
-                  <Button variant="ghost" size="sm" className="h-7 text-indigo-600 font-bold uppercase text-[9px] tracking-widest" onClick={() => addPersonnel(route.id)}>
-                    <Plus className="w-3 h-3 mr-1" /> Add Row
-                  </Button>
-                </div>
-                <div className="border rounded-2xl overflow-hidden shadow-sm">
-                  <Table>
-                    <TableHeader className="bg-slate-50/50">
-                      <TableRow>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Role</TableHead>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Region</TableHead>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Count</TableHead>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Days</TableHead>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Transit</TableHead>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Rate (TZS)</TableHead>
-                        <TableHead className="text-right text-[9px] font-black uppercase tracking-widest">Total</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {route.personnel.map((p) => (
-                        <TableRow key={p.id} className="hover:bg-slate-50/30">
-                          <TableCell><Input className="h-8 text-xs rounded-lg border-slate-100" value={p.role} onChange={(e) => updatePersonnel(route.id, p.id, 'role', e.target.value)} /></TableCell>
-                          <TableCell><Input className="h-8 text-xs rounded-lg border-slate-100" value={p.region} onChange={(e) => updatePersonnel(route.id, p.id, 'region', e.target.value)} /></TableCell>
-                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={p.count} onChange={(e) => updatePersonnel(route.id, p.id, 'count', parseInt(e.target.value))} /></TableCell>
-                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={p.days} onChange={(e) => updatePersonnel(route.id, p.id, 'days', parseInt(e.target.value))} /></TableCell>
-                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={p.transitDays} onChange={(e) => updatePersonnel(route.id, p.id, 'transitDays', parseInt(e.target.value))} /></TableCell>
-                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={p.rate} onChange={(e) => updatePersonnel(route.id, p.id, 'rate', parseInt(e.target.value))} /></TableCell>
-                          <TableCell className="text-right font-bold text-slate-900 text-xs">{calculatePersonnelTotal(p).toLocaleString()}</TableCell>
-                          <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-600 rounded-lg" onClick={() => removePersonnel(route.id, p.id)}><Trash2 className="w-3.5 h-3.5" /></Button></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-
-              {/* Other Costs Table */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between px-2">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                    <CreditCard className="w-3.5 h-3.5" /> Operational Costs
-                  </h4>
-                  <Button variant="ghost" size="sm" className="h-7 text-indigo-600 font-bold uppercase text-[9px] tracking-widest" onClick={() => addCost(route.id)}>
-                    <Plus className="w-3 h-3 mr-1" /> Add Row
-                  </Button>
-                </div>
-                <div className="border rounded-2xl overflow-hidden shadow-sm">
-                  <Table>
-                    <TableHeader className="bg-slate-50/50">
-                      <TableRow>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Item Name</TableHead>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Quantity</TableHead>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Days</TableHead>
-                        <TableHead className="text-[9px] font-black uppercase tracking-widest">Rate (TZS)</TableHead>
-                        <TableHead className="text-right text-[9px] font-black uppercase tracking-widest">Total</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {route.costs.map((c) => (
-                        <TableRow key={c.id} className="hover:bg-slate-50/30">
-                          <TableCell><Input className="h-8 text-xs rounded-lg border-slate-100" value={c.name} onChange={(e) => updateCost(route.id, c.id, 'name', e.target.value)} /></TableCell>
-                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={c.quantity} onChange={(e) => updateCost(route.id, c.id, 'quantity', parseInt(e.target.value))} /></TableCell>
-                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={c.days} onChange={(e) => updateCost(route.id, c.id, 'days', parseInt(e.target.value))} /></TableCell>
-                          <TableCell><Input type="number" className="h-8 text-xs rounded-lg border-slate-100" value={c.rate} onChange={(e) => updateCost(route.id, c.id, 'rate', parseInt(e.target.value))} /></TableCell>
-                          <TableCell className="text-right font-bold text-slate-900 text-xs">{calculateCostTotal(c).toLocaleString()}</TableCell>
-                          <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-600 rounded-lg" onClick={() => {
-                            setRoutes(routes.map(r => r.id === route.id ? { ...r, costs: r.costs.filter(item => item.id !== c.id) } : r));
-                          }}><Trash2 className="w-3.5 h-3.5" /></Button></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="rounded-xl h-11 px-5 border-slate-200 font-bold uppercase text-[10px] tracking-widest gap-2">
+            <History className="w-4 h-4" /> History
+          </Button>
+          <Button variant="outline" className="rounded-xl h-11 px-5 border-slate-200 font-bold uppercase text-[10px] tracking-widest gap-2">
+            <Printer className="w-4 h-4" /> Print
+          </Button>
+          <Button 
+            onClick={handleGenerateTemplate}
+            disabled={generating || currentVersion.locked}
+            className="rounded-xl h-11 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-indigo-100"
+          >
+            <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} /> Refresh from Plan
+          </Button>
         </div>
+      </div>
 
-        <div className="flex justify-center py-12 border-t border-slate-100">
-          <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white px-12 rounded-2xl shadow-xl shadow-green-100 font-black uppercase text-xs tracking-widest h-14" onClick={() => {
+      {/* TOTALS CARD */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="bg-slate-900 text-white rounded-[2rem] border-none shadow-2xl shadow-slate-200 overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-8 opacity-10"><Calculator size={120} /></div>
+          <CardContent className="p-8">
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Grand Total Budget</p>
+            <h2 className="text-4xl font-black tracking-tighter">
+              TZS {(currentVersion.grand_total || 0).toLocaleString()}
+            </h2>
+            <div className="mt-6 flex items-center gap-2">
+              <Badge className="bg-white/10 text-white border-none font-bold text-[9px]">ESTIMATED</Badge>
+              <span className="text-[10px] text-slate-500 font-medium italic">Based on current rates</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white rounded-[2rem] border-slate-100 shadow-sm p-8 flex flex-col justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Personnel Costs</p>
+            <h3 className="text-2xl font-black text-slate-900">
+              TZS {(currentVersion.total_personnel_cost || 0).toLocaleString()}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2 text-emerald-600">
+            <Users className="w-4 h-4" />
+            <span className="text-[10px] font-bold uppercase tracking-widest">{personnel.length} Line Items</span>
+          </div>
+        </Card>
+
+        <Card className="bg-white rounded-[2rem] border-slate-100 shadow-sm p-8 flex flex-col justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Operational Costs</p>
+            <h3 className="text-2xl font-black text-slate-900">
+              TZS {(currentVersion.total_other_cost || 0).toLocaleString()}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2 text-indigo-600">
+            <CreditCard className="w-4 h-4" />
+            <span className="text-[10px] font-bold uppercase tracking-widest">{otherCosts.length} Line Items</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* EDITOR TABS */}
+      <Tabs defaultValue="personnel" className="space-y-6">
+        <TabsList className="bg-white p-1.5 rounded-2xl border border-slate-100 h-14 shadow-sm">
+          <TabsTrigger value="personnel" className="rounded-xl px-8 font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+            <Users className="w-4 h-4 mr-2" /> Personnel Allowances
+          </TabsTrigger>
+          <TabsTrigger value="operational" className="rounded-xl px-8 font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+            <CreditCard className="w-4 h-4 mr-2" /> Operational Costs
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="personnel">
+          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest pl-8">Role / Category</TableHead>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Qty</TableHead>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Days</TableHead>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Rate (TZS)</TableHead>
+                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Special/Transit</TableHead>
+                  <TableHead className="text-right text-[9px] font-black uppercase tracking-widest pr-8">Total Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {personnel.map((p) => (
+                  <TableRow key={p.id} className="hover:bg-slate-50/30 group">
+                    <TableCell className="pl-8 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-black text-slate-900 uppercase text-xs tracking-tight">
+                          {p.role.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                          {p.region_name || 'Route Wide'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-bold text-slate-700">{p.quantity}</TableCell>
+                    <TableCell className="font-bold text-slate-700">{p.days + (p.transit_days || 0)}</TableCell>
+                    <TableCell className="font-bold text-slate-700">{p.allowance_per_day.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {p.unloading_cash > 0 && <Badge variant="outline" className="text-[8px] font-bold">UNLOADING: {p.unloading_cash.toLocaleString()}</Badge>}
+                        {p.emergency_allowance > 0 && <Badge variant="outline" className="text-[8px] font-bold">EMERGENCY: {p.emergency_allowance.toLocaleString()}</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right pr-8 font-black text-slate-900">
+                      TZS {(p.total_cost || 0).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="operational">
+          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden p-12 text-center space-y-4">
+            <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center mx-auto">
+              <Plus className="w-8 h-8" />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-tight text-slate-900">Add Operational Costs</h3>
+            <p className="text-slate-500 max-w-xs mx-auto text-sm">Add items like Padlocks, Loading/Unloading labor, and Follow-up convoy costs.</p>
+            <Button variant="outline" className="rounded-xl font-bold uppercase text-[10px] tracking-widest">
+              <Plus className="w-4 h-4 mr-2" /> Add Line Item
+            </Button>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* FINAL ACTIONS */}
+      <div className="flex justify-center pt-10">
+        <Button 
+          size="lg" 
+          disabled={currentVersion.locked}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white px-12 rounded-2xl shadow-xl shadow-emerald-100 font-black uppercase text-xs tracking-widest h-14"
+          onClick={() => {
             showSuccess("Budget finalized and submitted for approval!");
             navigate('/dashboard/budgets');
-          }}>
-            <CheckCircle2 className="w-5 h-5 mr-2" /> Finalize & Submit Budget
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          }}
+        >
+          <CheckCircle2 className="w-5 h-5 mr-2" /> Finalize & Submit for Approval
+        </Button>
+      </div>
+    </div>
   );
 };
 

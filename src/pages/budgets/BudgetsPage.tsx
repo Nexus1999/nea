@@ -12,7 +12,8 @@ import {
   Eye,
   ClipboardList,
   Package,
-  Settings2
+  Settings2,
+  Calculator
 } from "lucide-react";
 import {
   Table,
@@ -232,7 +233,7 @@ const BudgetsPage = () => {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="View"
+                          title="View Overview"
                           onClick={() => navigate(`/dashboard/budgets/overview/${budget.id}`)}
                         >
                           <Eye className="h-4 w-4" />
@@ -260,15 +261,15 @@ const BudgetsPage = () => {
                           <ClipboardList className="h-4 w-4" />
                         </Button>
 
-                        {/* 4. SETTINGS BUTTON */}
+                        {/* 4. FINANCIAL TEMPLATE BUTTON */}
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                          title="Settings"
+                          className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                          title="Financial Template"
                           onClick={() => navigate(`/dashboard/budgets/template/${budget.id}`)}
                         >
-                          <Settings2 className="h-4 w-4" />
+                          <Calculator className="h-4 w-4" />
                         </Button>
 
                         {/* 5. DELETE BUTTON */}
