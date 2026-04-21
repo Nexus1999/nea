@@ -79,7 +79,6 @@ export const generateTemplate = async ({
       .neq('id', version.id);
 
     const lineItems: any[] = [];
-    let grandTotal = 0;
     let totalPersonnel = 0;
     let totalFuel = 0;
     let totalUpakiaji = 0;
@@ -96,10 +95,8 @@ export const generateTemplate = async ({
       const endStops = stops.map(s => new Date(s.delivery_date));
       const maxEnd = new Date(Math.max(...endStops.map(d => d.getTime())));
       const durationDays = Math.ceil((maxEnd.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      
-      const totalBoxes = stops.reduce((sum, s) => sum + (s.boxes_count || 0), 0);
 
-      // A. Personnel Costs (Exam Officers, Police, Drivers)
+      // A. Personnel Costs
       const roles = [
         { role: 'exam_officer', rate: rates.exam_officer_rate, qty: 2 },
         { role: 'police_officer', rate: rates.police_rate, qty: 2 },
@@ -111,6 +108,7 @@ export const generateTemplate = async ({
         lineItems.push({
           template_version_id: version.id,
           route_id: route.id,
+          category: 'PERSONNEL',
           role: r.role,
           quantity: r.qty,
           days: durationDays,
@@ -121,7 +119,7 @@ export const generateTemplate = async ({
         totalPersonnel += posho;
       }
 
-      // B. Vehicle Specific Costs (Fuel, Drivers, Emergency)
+      // B. Vehicle Specific Costs
       for (const v of vehicles) {
         // Driver for each truck
         if (v.vehicle_type.includes('TRUCK')) {
@@ -129,6 +127,7 @@ export const generateTemplate = async ({
           lineItems.push({
             template_version_id: version.id,
             route_id: route.id,
+            category: 'PERSONNEL',
             role: 'driver',
             quantity: v.quantity,
             days: durationDays,
@@ -143,6 +142,7 @@ export const generateTemplate = async ({
           lineItems.push({
             template_version_id: version.id,
             route_id: route.id,
+            category: 'TAHADHARI',
             role: 'emergency',
             vehicle_type: v.vehicle_type,
             quantity: v.quantity,
@@ -152,7 +152,7 @@ export const generateTemplate = async ({
           totalTahadhari += emergency;
         }
 
-        // Fuel Calculation (Simplified for now: 1000km avg if distance missing)
+        // Fuel Calculation
         const consumption = v.vehicle_type === 'TRUCK_AND_TRAILER' ? rates.fuel_consumption_tt : 
                            v.vehicle_type === 'STANDARD_TRUCK' ? rates.fuel_consumption_truck : 
                            rates.fuel_consumption_escort;
@@ -164,6 +164,7 @@ export const generateTemplate = async ({
         lineItems.push({
           template_version_id: version.id,
           route_id: route.id,
+          category: 'FUEL',
           role: 'fuel',
           vehicle_type: v.vehicle_type,
           quantity: v.quantity,
@@ -181,6 +182,7 @@ export const generateTemplate = async ({
         lineItems.push({
           template_version_id: version.id,
           route_id: route.id,
+          category: 'UPAKIAJI',
           role: 'loading',
           region_name: stop.region_name,
           item_quantity: stop.boxes_count,
@@ -199,7 +201,7 @@ export const generateTemplate = async ({
     if (insertErr) throw insertErr;
 
     // 7. Update Version Totals
-    grandTotal = totalPersonnel + totalFuel + totalUpakiaji + totalTahadhari + totalNauli;
+    const grandTotal = totalPersonnel + totalFuel + totalUpakiaji + totalTahadhari + totalNauli;
     await supabase
       .from('transportation_template_versions')
       .update({
