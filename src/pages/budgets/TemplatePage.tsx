@@ -1,28 +1,35 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ChevronRight, 
-  Printer, 
-  Download, 
-  Plus, 
-  Trash2, 
-  Users, 
-  CreditCard, 
-  Calculator,
-  Truck,
-  Save,
-  CheckCircle2,
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
   RefreshCw,
-  History,
-  AlertCircle,
+  Printer,
+  CheckCircle2,
   Lock,
-  Unlock
-} from 'lucide-react';
+  Unlock,
+  Plus,
+  ChevronDown,
+  ChevronRight,
+  Edit,
+  History,
+  Calculator,
+  AlertTriangle,
+  X,
+  Save,
+  Loader2,
+  Truck,
+  Shield,
+  BadgeCheck,
+  UserCheck,
+  Package,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -31,464 +38,229 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+import { generateTemplate, appendChangeLog } from "@/utils/generateTemplate";
+import { useAuth } from "@/providers/AuthProvider";
 import Spinner from "@/components/Spinner";
 
-const RATES = {
-  EXAM_OFFICER: 170000,
-  POLICE: 170000,
-  SECURITY: 170000,
-  DRIVER: 150000,
-  LOADING_PER_ROUTE: 20000 * 30,
-  PADLOCKS_PER_ROUTE: 6 * 4 * 10000,
+const ROLE_LABELS: Record<string, string> = {
+  exam_officer: "Afisa Mitihani",
+  police_officer: "Askari Polisi",
+  security_officer: "Afisa Usalama",
+  driver: "Dereva",
+  loading: "Upakiaji (Vibarua)",
+  padlock: "Padlocks & Seals",
 };
+
+const ROLE_ICONS: Record<string, React.ReactNode> = {
+  exam_officer: <BadgeCheck className="h-3.5 w-3.5" />,
+  police_officer: <Shield className="h-3.5 w-3.5" />,
+  security_officer: <UserCheck className="h-3.5 w-3.5" />,
+  driver: <Truck className="h-3.5 w-3.5" />,
+  loading: <Package className="h-3.5 w-3.5" />,
+  padlock: <Lock className="h-3.5 w-3.5" />,
+};
+
+function fmt(n: number) {
+  return (n || 0).toLocaleString("sw-TZ");
+}
 
 const TemplatePage = () => {
   const { id: budgetId } = useParams();
   const navigate = useNavigate();
-  
+  const { session } = useAuth();
+  const userId = session?.user?.id || "";
+  const userEmail = session?.user?.email || "";
+
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [budget, setBudget] = useState<any>(null);
   const [template, setTemplate] = useState<any>(null);
-  const [currentVersion, setCurrentVersion] = useState<any>(null);
-  const [personnel, setPersonnel] = useState<any[]>([]);
-  const [otherCosts, setOtherCosts] = useState<any[]>([]);
+  const [version, setVersion] = useState<any>(null);
+  const [lineItems, setLineItems] = useState<any[]>([]);
+  const [allVersions, setAllVersions] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [routeMap, setRouteMap] = useState<Map<string, any>>(new Map());
+  const [editItem, setEditItem] = useState<any>(null);
+  const [collapsedRoutes, setCollapsedRoutes] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: budgetData } = await supabase
-        .from('budgets')
-        .select('*')
-        .eq('id', budgetId)
-        .single();
+      const { data: budgetData } = await supabase.from("budgets").select("*").eq("id", budgetId).single();
       setBudget(budgetData);
 
-      const { data: templateData } = await supabase
-        .from('transportation_templates')
-        .select('*')
-        .eq('budget_id', budgetId)
-        .maybeSingle();
-      
+      const { data: templateData } = await supabase.from("transportation_templates").select("*").eq("budget_id", budgetId).maybeSingle();
+      setTemplate(templateData);
+
       if (templateData) {
-        setTemplate(templateData);
-        
-        // Fetch the latest current version
-        const { data: versionData } = await supabase
-          .from('transportation_template_versions')
-          .select('*')
-          .eq('template_id', templateData.id)
-          .eq('is_current', true)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (versionData) {
-          setCurrentVersion(versionData);
+        const { data: versions } = await supabase.from("transportation_template_versions").select("*").eq("template_id", templateData.id).order("version_num", { ascending: false });
+        setAllVersions(versions || []);
+        const current = (versions || []).find((v: any) => v.is_current);
+        setVersion(current || null);
+
+        if (current) {
+          const { data: items } = await supabase.from("transportation_template_line_items").select("*").eq("template_version_id", current.id).order("created_at", { ascending: true });
+          setLineItems(items || []);
           
-          const [pRes, oRes] = await Promise.all([
-            supabase.from('transportation_template_personnel').select('*').eq('template_version_id', versionData.id),
-            supabase.from('transportation_template_other_costs').select('*').eq('template_version_id', versionData.id)
-          ]);
-          
-          setPersonnel(pRes.data || []);
-          setOtherCosts(oRes.data || []);
-        } else {
-          setCurrentVersion(null);
+          const routeIds = [...new Set((items || []).map(i => i.route_id))];
+          const { data: routes } = await supabase.from("transportation_routes").select("*").in("id", routeIds);
+          setRouteMap(new Map((routes || []).map(r => [r.id, r])));
         }
       }
-    } catch (err: any) {
-      console.error("Fetch error:", err);
-      showError("Failed to load template data");
+    } catch (err) {
+      showError("Imeshindwa kupakia template");
     } finally {
       setLoading(false);
     }
   }, [budgetId]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleGenerateTemplate = async () => {
+  const routeGroups = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    lineItems.forEach(item => {
+      const arr = groups.get(item.route_id) || [];
+      arr.push(item);
+      groups.set(item.route_id, arr);
+    });
+    return Array.from(groups.entries()).map(([routeId, items]) => ({
+      route: routeMap.get(routeId) || { name: "Unknown Route" },
+      items,
+      total: items.reduce((sum, i) => sum + i.total_cost, 0)
+    }));
+  }, [lineItems, routeMap]);
+
+  const handleGenerate = async () => {
     setGenerating(true);
-    try {
-      // 1. Ensure Template Header exists
-      let tId = template?.id;
-      if (!tId) {
-        const { data: newT, error: tErr } = await supabase
-          .from('transportation_templates')
-          .insert({ budget_id: budgetId, status: 'draft' })
-          .select()
-          .single();
-        if (tErr) throw tErr;
-        tId = newT.id;
-      }
-
-      // 2. Get Action Plan Data
-      const { data: routes } = await supabase
-        .from('transportation_routes')
-        .select(`
-          *,
-          transportation_route_stops (*),
-          transportation_route_vehicles (*)
-        `)
-        .eq('budget_id', budgetId);
-
-      if (!routes || routes.length === 0) {
-        throw new Error("No Action Plan found. Please create routes first.");
-      }
-
-      // 3. Deactivate old versions
-      await supabase
-        .from('transportation_template_versions')
-        .update({ is_current: false })
-        .eq('template_id', tId);
-
-      // 4. Create New Version
-      const { data: version, error: vErr } = await supabase
-        .from('transportation_template_versions')
-        .insert({
-          template_id: tId,
-          version_num: (currentVersion?.version_num || 0) + 1,
-          is_current: true,
-          label: `Auto-generated (${new Date().toLocaleDateString()})`
-        })
-        .select()
-        .single();
-      
-      if (vErr) throw vErr;
-
-      // 5. Generate Personnel Rows
-      const personnelRows: any[] = [];
-      let totalPersonnelCost = 0;
-
-      routes.forEach(route => {
-        const routeDays = route.transportation_route_stops.length + 2;
-
-        // Police (2 per route)
-        const policeCost = 2 * routeDays * RATES.POLICE;
-        personnelRows.push({
-          template_version_id: version.id,
-          route_id: route.id,
-          role: 'police_officer',
-          quantity: 2,
-          days: routeDays,
-          allowance_per_day: RATES.POLICE,
-          allowance_transit_per_day: RATES.POLICE,
-          total_cost: policeCost
-        });
-        totalPersonnelCost += policeCost;
-
-        // Security (1 per route)
-        const securityCost = 1 * routeDays * RATES.SECURITY;
-        personnelRows.push({
-          template_version_id: version.id,
-          route_id: route.id,
-          role: 'security_officer',
-          quantity: 1,
-          days: routeDays,
-          allowance_per_day: RATES.SECURITY,
-          allowance_transit_per_day: RATES.SECURITY,
-          total_cost: securityCost
-        });
-        totalPersonnelCost += securityCost;
-
-        // Drivers
-        route.transportation_route_vehicles.forEach((v: any) => {
-          const emergency = v.vehicle_type === 'TRUCK_AND_TRAILER' ? 100000 : 50000;
-          const driverCost = (v.quantity * routeDays * RATES.DRIVER) + (v.quantity * emergency);
-          personnelRows.push({
-            template_version_id: version.id,
-            route_id: route.id,
-            role: 'driver',
-            vehicle_type: v.vehicle_type.toLowerCase().replace('_and_trailer', '_trailer'),
-            quantity: v.quantity,
-            days: routeDays,
-            allowance_per_day: RATES.DRIVER,
-            emergency_allowance: emergency,
-            total_cost: driverCost
-          });
-          totalPersonnelCost += driverCost;
-        });
-
-        // Exam Officers
-        route.transportation_route_stops.forEach((stop: any) => {
-          const officerCost = (1 * 3 * RATES.EXAM_OFFICER) + (1 * 2 * RATES.EXAM_OFFICER) + 20000 + 50000;
-          personnelRows.push({
-            template_version_id: version.id,
-            route_id: route.id,
-            region_name: stop.region_name,
-            role: 'examination_officer',
-            quantity: 1,
-            days: 3,
-            transit_days: 2,
-            allowance_per_day: RATES.EXAM_OFFICER,
-            allowance_transit_per_day: RATES.EXAM_OFFICER,
-            unloading_cash: 20000,
-            fare_return: 50000,
-            total_cost: officerCost
-          });
-          totalPersonnelCost += officerCost;
-        });
-      });
-
-      // 6. Generate Operational Costs
-      const loadingCost = routes.length * RATES.LOADING_PER_ROUTE;
-      const padlockCost = routes.length * RATES.PADLOCKS_PER_ROUTE;
-      
-      const otherCostRows = [
-        {
-          template_version_id: version.id,
-          item_name: 'Loading Labor (Vibarua)',
-          description: `Loading costs for ${routes.length} routes (30 people per route)`,
-          quantity: routes.length,
-          unit_cost: RATES.LOADING_PER_ROUTE,
-          total_cost: loadingCost,
-          category: 'operational'
-        },
-        {
-          template_version_id: version.id,
-          item_name: 'Padlocks & Security Seals',
-          description: `Security hardware for ${routes.length} routes`,
-          quantity: routes.length,
-          unit_cost: RATES.PADLOCKS_PER_ROUTE,
-          total_cost: padlockCost,
-          category: 'security'
-        }
-      ];
-      const totalOtherCost = loadingCost + padlockCost;
-
-      // 7. Bulk Insert
-      await Promise.all([
-        supabase.from('transportation_template_personnel').insert(personnelRows),
-        supabase.from('transportation_template_other_costs').insert(otherCostRows),
-        supabase.from('transportation_template_versions').update({
-          total_personnel_cost: totalPersonnelCost,
-          total_other_cost: totalOtherCost,
-          grand_total: totalPersonnelCost + totalOtherCost
-        }).eq('id', version.id)
-      ]);
-      
-      showSuccess("Financial template generated successfully!");
-      await fetchData();
-    } catch (err: any) {
-      showError(err.message);
-    } finally {
-      setGenerating(false);
-    }
+    const res = await generateTemplate({ budgetId: budgetId!, currentVersionNum: version?.version_num || 0, currentTemplateId: template?.id, userId, userEmail });
+    if (res.success) { showSuccess("Template imezalishwa upya!"); fetchData(); }
+    else showError(res.error || "Imeshindwa kuzalisha template");
+    setGenerating(false);
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center"><Spinner size="lg" label="Loading financial template..." /></div>;
+  if (loading) return <div className="h-screen flex items-center justify-center"><Spinner size="lg" label="Inapakia template..." /></div>;
 
-  if (!template || !currentVersion) {
+  if (!template || !version) {
     return (
       <div className="h-[600px] flex flex-col items-center justify-center gap-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-        <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center">
-          <Calculator className="w-10 h-10" />
-        </div>
-        <div className="text-center space-y-2">
-          <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900">No Template Generated</h2>
-          <p className="text-slate-500 max-w-md mx-auto">Generate a financial template based on your current Action Plan using standard government rates.</p>
-        </div>
-        <Button 
-          onClick={handleGenerateTemplate} 
-          disabled={generating}
-          className="h-14 px-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-100"
-        >
-          {generating ? <RefreshCw className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
-          Generate Financial Template
+        <Calculator className="w-16 h-16 text-indigo-600" />
+        <div className="text-center"><h2 className="text-2xl font-bold">Hakuna Template</h2><p className="text-slate-500 text-sm">Zindua template ya kifedha kulingana na Mpango wa Utekelezaji.</p></div>
+        <Button onClick={handleGenerate} disabled={generating} className="h-14 px-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-xl">
+          {generating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />} Zindua Template
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 pb-20">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+    <div className="space-y-6 pb-20">
+      <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg">
-            <Calculator className="w-7 h-7" />
-          </div>
+          <div className="w-11 h-11 bg-slate-900 rounded-xl flex items-center justify-center"><Calculator className="text-white w-5 h-5" /></div>
           <div>
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
-              <span>v{currentVersion.version_num}</span>
-              <span className="w-1 h-1 bg-slate-300 rounded-full" />
-              <span className={currentVersion.locked ? "text-red-500" : "text-emerald-500"}>
-                {currentVersion.locked ? "LOCKED" : "DRAFT"}
-              </span>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              v{version.version_num} <span className="w-1 h-1 bg-slate-300 rounded-full" /> 
+              <span className={version.locked ? "text-red-500" : "text-emerald-500"}>{version.locked ? "IMEFUNGWA" : "RASIMU"}</span>
             </div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
-              {budget?.title}
-            </h1>
+            <h1 className="text-lg font-bold">{budget?.title}</h1>
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="rounded-xl h-11 px-5 border-slate-200 font-bold uppercase text-[10px] tracking-widest gap-2">
-            <Printer className="w-4 h-4" /> Print
-          </Button>
-          <Button 
-            onClick={handleGenerateTemplate}
-            disabled={generating || currentVersion.locked}
-            className="rounded-xl h-11 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-indigo-100"
-          >
-            <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} /> Refresh from Plan
-          </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)}><History className="w-4 h-4 mr-2" /> Historia</Button>
+          {!version.locked && <Button variant="outline" size="sm" onClick={handleGenerate} disabled={generating}><RefreshCw className={`w-4 h-4 mr-2 ${generating ? 'animate-spin' : ''}`} /> Sasisha</Button>}
+          <Button variant="outline" size="sm"><Printer className="w-4 h-4 mr-2" /> Chapisha</Button>
         </div>
       </div>
 
-      {/* TOTALS CARD */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-slate-900 text-white rounded-[2rem] border-none shadow-2xl shadow-slate-200 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-8 opacity-10"><Calculator size={120} /></div>
-          <CardContent className="p-8">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Grand Total Budget</p>
-            <h2 className="text-4xl font-black tracking-tighter">
-              TZS {(currentVersion.grand_total || 0).toLocaleString()}
-            </h2>
-            <div className="mt-6 flex items-center gap-2">
-              <Badge className="bg-white/10 text-white border-none font-bold text-[9px]">ESTIMATED</Badge>
-              <span className="text-[10px] text-slate-500 font-medium italic">Based on standard rates</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white rounded-[2rem] border-slate-100 shadow-sm p-8 flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Personnel Costs</p>
-            <h3 className="text-2xl font-black text-slate-900">
-              TZS {(currentVersion.total_personnel_cost || 0).toLocaleString()}
-            </h3>
-          </div>
-          <div className="flex items-center gap-2 text-emerald-600">
-            <Users className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">{personnel.length} Line Items</span>
-          </div>
-        </Card>
-
-        <Card className="bg-white rounded-[2rem] border-slate-100 shadow-sm p-8 flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Operational Costs</p>
-            <h3 className="text-2xl font-black text-slate-900">
-              TZS {(currentVersion.total_other_cost || 0).toLocaleString()}
-            </h3>
-          </div>
-          <div className="flex items-center gap-2 text-indigo-600">
-            <CreditCard className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">{otherCosts.length} Line Items</span>
-          </div>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <TotalCard label="Jumla Kuu" value={version.grand_total} highlight />
+        <TotalCard label="Wafanyakazi" value={version.total_personnel} />
+        <TotalCard label="Mafuta" value={version.total_fuel} />
+        <TotalCard label="Upakuaji" value={version.total_upakiaji} />
+        <TotalCard label="Tahadhari" value={version.total_tahadhari} />
+        <TotalCard label="Nauli" value={version.total_nauli} />
+        <TotalCard label="Uendeshaji" value={version.total_operational} />
       </div>
 
-      {/* EDITOR TABS */}
-      <Tabs defaultValue="personnel" className="space-y-6">
-        <TabsList className="bg-white p-1.5 rounded-2xl border border-slate-100 h-14 shadow-sm">
-          <TabsTrigger value="personnel" className="rounded-xl px-8 font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-            <Users className="w-4 h-4 mr-2" /> Personnel Allowances
-          </TabsTrigger>
-          <TabsTrigger value="operational" className="rounded-xl px-8 font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-            <CreditCard className="w-4 h-4 mr-2" /> Operational Costs
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="personnel">
-          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
-            <Table>
-              <TableHeader className="bg-slate-50/50">
-                <TableRow>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest pl-8">Role / Category</TableHead>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Qty</TableHead>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Days</TableHead>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Rate (TZS)</TableHead>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Special/Transit</TableHead>
-                  <TableHead className="text-right text-[9px] font-black uppercase tracking-widest pr-8">Total Cost</TableHead>
+      <Card className="overflow-hidden border-slate-200">
+        <Table>
+          <TableHeader className="bg-slate-50">
+            <TableRow>
+              <TableHead className="w-10"></TableHead>
+              <TableHead className="text-[10px] uppercase font-bold">Muhusika</TableHead>
+              <TableHead className="text-center text-[10px] uppercase font-bold">Idadi</TableHead>
+              <TableHead className="text-center text-[10px] uppercase font-bold">Siku</TableHead>
+              <TableHead className="text-right text-[10px] uppercase font-bold">Posho</TableHead>
+              <TableHead className="text-right text-[10px] uppercase font-bold">Mafuta</TableHead>
+              <TableHead className="text-right text-[10px] uppercase font-bold">Upakuaji</TableHead>
+              <TableHead className="text-right text-[10px] uppercase font-bold">Tahadhari</TableHead>
+              <TableHead className="text-right text-[10px] uppercase font-bold">Nauli</TableHead>
+              <TableHead className="text-right text-[10px] uppercase font-bold">Jumla</TableHead>
+              <TableHead className="w-10"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {routeGroups.map(group => (
+              <React.Fragment key={group.route.id}>
+                <TableRow className="bg-slate-50/50 cursor-pointer" onClick={() => {
+                  const next = new Set(collapsedRoutes);
+                  if (next.has(group.route.id)) next.delete(group.route.id); else next.add(group.route.id);
+                  setCollapsedRoutes(next);
+                }}>
+                  <TableCell>{collapsedRoutes.has(group.route.id) ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</TableCell>
+                  <TableCell colSpan={8} className="font-bold text-xs uppercase tracking-wider">Msafara: {group.route.name}</TableCell>
+                  <TableCell className="text-right font-bold text-xs">TZS {fmt(group.total)}</TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {personnel.map((p) => (
-                  <TableRow key={p.id} className="hover:bg-slate-50/30 group">
-                    <TableCell className="pl-8 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-black text-slate-900 uppercase text-xs tracking-tight">
-                          {p.role.replace(/_/g, ' ')}
-                        </span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                          {p.region_name || 'Route Wide'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-bold text-slate-700">{p.quantity}</TableCell>
-                    <TableCell className="font-bold text-slate-700">{p.days + (p.transit_days || 0)}</TableCell>
-                    <TableCell className="font-bold text-slate-700">{p.allowance_per_day.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        {p.unloading_cash > 0 && <Badge variant="outline" className="text-[8px] font-bold">UNLOADING: {p.unloading_cash.toLocaleString()}</Badge>}
-                        {p.emergency_allowance > 0 && <Badge variant="outline" className="text-[8px] font-bold">EMERGENCY: {p.emergency_allowance.toLocaleString()}</Badge>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right pr-8 font-black text-slate-900">
-                      TZS {(p.total_cost || 0).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="operational">
-          <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden">
-            <Table>
-              <TableHeader className="bg-slate-50/50">
-                <TableRow>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest pl-8">Item Name</TableHead>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Description</TableHead>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Qty</TableHead>
-                  <TableHead className="text-[9px] font-black uppercase tracking-widest">Unit Cost</TableHead>
-                  <TableHead className="text-right text-[9px] font-black uppercase tracking-widest pr-8">Total Cost</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {otherCosts.map((item) => (
+                {!collapsedRoutes.has(group.route.id) && group.items.map(item => (
                   <TableRow key={item.id} className="hover:bg-slate-50/30 group">
-                    <TableCell className="pl-8 py-4">
-                      <span className="font-black text-slate-900 uppercase text-xs tracking-tight">{item.item_name}</span>
+                    <TableCell></TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">{ROLE_ICONS[item.role]}</span>
+                        <div>
+                          <div className="text-xs font-medium">{ROLE_LABELS[item.role] || item.role}</div>
+                          {item.region_name && <div className="text-[10px] text-slate-400">{item.region_name}</div>}
+                        </div>
+                      </div>
                     </TableCell>
-                    <TableCell className="text-[10px] text-slate-500 font-medium">{item.description}</TableCell>
-                    <TableCell className="font-bold text-slate-700">{item.quantity}</TableCell>
-                    <TableCell className="font-bold text-slate-700">{item.unit_cost.toLocaleString()}</TableCell>
-                    <TableCell className="text-right pr-8 font-black text-slate-900">
-                      TZS {(item.total_cost || 0).toLocaleString()}
+                    <TableCell className="text-center text-xs">{item.quantity || item.item_quantity || "—"}</TableCell>
+                    <TableCell className="text-center text-xs">{item.days ? `${item.days}d` : "—"}</TableCell>
+                    <TableCell className="text-right text-xs">{item.posho ? fmt(item.posho) : "—"}</TableCell>
+                    <TableCell className="text-right text-xs">{item.fuel_cost ? fmt(item.fuel_cost) : "—"}</TableCell>
+                    <TableCell className="text-right text-xs">{item.unloading_cash || item.role === 'loading' ? fmt(item.role === 'loading' ? item.operational_total : item.unloading_cash) : "—"}</TableCell>
+                    <TableCell className="text-right text-xs">{item.emergency_allowance || item.role === 'padlock' ? fmt(item.role === 'padlock' ? item.operational_total : item.emergency_allowance) : "—"}</TableCell>
+                    <TableCell className="text-right text-xs">{item.fare_return ? fmt(item.fare_return) : "—"}</TableCell>
+                    <TableCell className="text-right text-xs font-bold">TZS {fmt(item.total_cost)}</TableCell>
+                    <TableCell>
+                      {!version.locked && <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => setEditItem(item)}><Edit className="h-3 w-3" /></Button>}
                     </TableCell>
                   </TableRow>
                 ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </React.Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
 
-      {/* FINAL ACTIONS */}
-      <div className="flex justify-center pt-10">
-        <Button 
-          size="lg" 
-          disabled={currentVersion.locked}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-12 rounded-2xl shadow-xl shadow-emerald-100 font-black uppercase text-xs tracking-widest h-14"
-          onClick={() => {
-            showSuccess("Budget finalized and submitted for approval!");
-            navigate('/dashboard/budgets');
-          }}
-        >
-          <CheckCircle2 className="w-5 h-5 mr-2" /> Finalize & Submit for Approval
+      <div className="flex justify-center pt-8">
+        <Button size="lg" disabled={version.locked} className="bg-emerald-600 hover:bg-emerald-700 text-white px-12 rounded-2xl shadow-xl font-bold h-14" onClick={() => { showSuccess("Bajeti imekamilishwa!"); navigate("/dashboard/budgets"); }}>
+          <CheckCircle2 className="w-5 h-5 mr-2" /> Kamilisha na Wasilisha
         </Button>
       </div>
     </div>
   );
 };
+
+function TotalCard({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <div className={`p-4 rounded-xl border ${highlight ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200'}`}>
+      <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${highlight ? 'text-slate-400' : 'text-slate-500'}`}>{label}</div>
+      <div className="text-sm font-bold">TZS {fmt(value)}</div>
+    </div>
+  );
+}
 
 export default TemplatePage;
