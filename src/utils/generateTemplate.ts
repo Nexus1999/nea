@@ -146,6 +146,7 @@ export const generateTemplate = async ({
             role: 'emergency',
             vehicle_type: v.vehicle_type,
             quantity: v.quantity,
+            days: 0, // Required field
             emergency_allowance: emergency,
             total_cost: emergency
           });
@@ -168,6 +169,7 @@ export const generateTemplate = async ({
           role: 'fuel',
           vehicle_type: v.vehicle_type,
           quantity: v.quantity,
+          days: 0, // Required field
           distance_km: estKm,
           fuel_liters: Math.round(liters),
           fuel_cost: Math.round(fuelCost),
@@ -186,6 +188,7 @@ export const generateTemplate = async ({
           role: 'loading',
           region_name: stop.region_name,
           item_quantity: stop.boxes_count,
+          days: 0, // Required field
           unit_cost: rates.unloading_rate_per_box,
           operational_total: unloading,
           total_cost: unloading
