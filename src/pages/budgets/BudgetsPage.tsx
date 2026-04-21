@@ -160,16 +160,6 @@ const BudgetsPage = () => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-2xl font-bold">Budgets</CardTitle>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 gap-1" 
-            onClick={() => navigate('/dashboard/budgets/settings')}
-            disabled={loading}
-          >
-            <Settings2 className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Budget Settings</span>
-          </Button>
           <Button size="sm" className="h-8 gap-1" onClick={() => setIsDrawerOpen(true)} disabled={loading}>
             <PlusCircle className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Create Budget</span>
@@ -282,7 +272,18 @@ const BudgetsPage = () => {
                           <Calculator className="h-4 w-4" />
                         </Button>
 
-                        {/* 5. DELETE BUTTON */}
+                        {/* 5. SETTINGS BUTTON */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                          title="Budget Settings"
+                          onClick={() => navigate(`/dashboard/budgets/settings/${budget.id}`)}
+                        >
+                          <Settings2 className="h-4 w-4" />
+                        </Button>
+
+                        {/* 6. DELETE BUTTON */}
                         <Button
                           variant="ghost"
                           size="icon"

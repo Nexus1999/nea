@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,32 +14,37 @@ import {
   Calculator,
   Users,
   Truck,
-  Fuel
+  Fuel,
+  ArrowLeft
 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
 
 const BudgetSettingsPage = () => {
+  const { id: budgetId } = useParams();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rates, setRates] = useState<any>(null);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [budget, setBudget] = useState<any>(null);
 
-  const fetchRates = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      // 1. Fetch Budget Info
+      const { data: budgetData } = await supabase
+        .from('budgets')
+        .select('*')
+        .eq('id', budgetId)
+        .single();
+      setBudget(budgetData);
+
+      // 2. Fetch Rates for this specific budget
       const { data, error } = await supabase
         .from('transportation_rates')
         .select('*')
-        .eq('effective_year', parseInt(selectedYear))
+        .eq('budget_id', budgetId)
         .maybeSingle();
 
       if (error) throw error;
@@ -46,9 +52,10 @@ const BudgetSettingsPage = () => {
       if (data) {
         setRates(data);
       } else {
-        // Default values if no rates exist for this year
+        // Default values if no rates exist for this budget
         setRates({
-          effective_year: parseInt(selectedYear),
+          budget_id: budgetId,
+          effective_year: budgetData?.year || new Date().getFullYear(),
           exam_officer_rate: 170000,
           police_rate: 170000,
           security_rate: 170000,
@@ -67,25 +74,25 @@ const BudgetSettingsPage = () => {
         });
       }
     } catch (err: any) {
-      showError("Failed to fetch rates");
+      showError("Failed to fetch budget settings");
     } finally {
       setLoading(false);
     }
-  }, [selectedYear]);
+  }, [budgetId]);
 
   useEffect(() => {
-    fetchRates();
-  }, [fetchRates]);
+    fetchData();
+  }, [fetchData]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const { error } = await supabase
         .from('transportation_rates')
-        .upsert(rates, { onConflict: 'effective_year' });
+        .upsert(rates, { onConflict: 'budget_id' });
 
       if (error) throw error;
-      showSuccess("Rates updated successfully");
+      showSuccess("Budget rates updated successfully");
     } catch (err: any) {
       showError(err.message || "Failed to save rates");
     } finally {
@@ -99,14 +106,17 @@ const BudgetSettingsPage = () => {
     <div className="space-y-8 pb-20">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
         <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/budgets')} className="rounded-full">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
           <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg">
             <Settings2 className="w-7 h-7" />
           </div>
           <div>
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">
-              <span>Configuration</span>
+              <span>{budget?.title}</span>
               <ChevronRight className="w-3 h-3" />
-              <span>Allowances & Rates</span>
+              <span>Rates & Allowances</span>
             </div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
               Budget Settings
@@ -114,29 +124,14 @@ const BudgetSettingsPage = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Fiscal Year</Label>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-32 h-11 rounded-xl border-slate-200 font-bold">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[2023, 2024, 2025, 2026].map(y => (
-                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button 
-            onClick={handleSave} 
-            disabled={saving}
-            className="rounded-xl h-11 px-8 bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase text-[10px] tracking-widest gap-2 shadow-lg"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save Changes
-          </Button>
-        </div>
+        <Button 
+          onClick={handleSave} 
+          disabled={saving}
+          className="rounded-xl h-11 px-8 bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase text-[10px] tracking-widest gap-2 shadow-lg"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save Changes
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

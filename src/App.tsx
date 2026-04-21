@@ -130,7 +130,7 @@ const App = () => (
 
               {/* Budget Module Routes */}
               <Route path="budgets" element={<BudgetsPage />} />
-              <Route path="budgets/settings" element={<BudgetSettingsPage />} />
+              <Route path="budgets/settings/:id" element={<BudgetSettingsPage />} />
               <Route path="budgets/participants" element={<ParticipantsPage />} />
               <Route path="budgets/overview/:id" element={<BudgetOverviewPage />} />
               <Route path="budgets/action-plan/:id" element={<ActionPlanPage />} />
