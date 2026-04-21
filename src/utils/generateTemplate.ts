@@ -18,18 +18,29 @@ export const generateTemplate = async ({
   userEmail
 }: GenerateTemplateProps) => {
   try {
-    // 1. Fetch Rates for this budget
-    const { data: rates, error: ratesError } = await supabase
+    // 1. Get or Create Template
+    let templateId = currentTemplateId;
+    if (!templateId) {
+      const { data: newTemplate, error: tError } = await supabase
+        .from('transportation_templates')
+        .insert({ budget_id: budgetId, user_id: userId })
+        .select()
+        .single();
+      if (tError) throw tError;
+      templateId = newTemplate.id;
+    }
+
+    // 2. Fetch Rates
+    const { data: rates, error: rError } = await supabase
       .from('transportation_rates')
       .select('*')
       .eq('budget_id', budgetId)
       .maybeSingle();
 
-    if (ratesError || !rates) {
-      throw new Error("Tafadhali weka viwango vya malipo (Rates) kwenye mipangilio ya bajeti kwanza.");
-    }
+    if (rError) throw rError;
+    if (!rates) throw new Error("Please configure budget rates first.");
 
-    // 2. Fetch Routes and their details
+    // 3. Fetch Routes with Vehicles and Stops
     const { data: routes, error: routesError } = await supabase
       .from('transportation_routes')
       .select(`
@@ -40,25 +51,11 @@ export const generateTemplate = async ({
       .eq('budget_id', budgetId);
 
     if (routesError) throw routesError;
-    if (!routes || routes.length === 0) {
-      throw new Error("Hakuna misafara iliyopangwa. Tafadhali panga misafara kwanza.");
-    }
-
-    // 3. Ensure Template exists
-    let templateId = currentTemplateId;
-    if (!templateId) {
-      const { data: newTemp, error: tempErr } = await supabase
-        .from('transportation_templates')
-        .insert({ budget_id: budgetId, created_by: userId })
-        .select()
-        .single();
-      if (tempErr) throw tempErr;
-      templateId = newTemp.id;
-    }
+    if (!routes || routes.length === 0) throw new Error("No routes found to generate template.");
 
     // 4. Create New Version
     const nextVersion = currentVersionNum + 1;
-    const { data: version, error: verErr } = await supabase
+    const { data: version, error: vError } = await supabase
       .from('transportation_template_versions')
       .insert({
         template_id: templateId,
@@ -69,9 +66,10 @@ export const generateTemplate = async ({
       })
       .select()
       .single();
-    if (verErr) throw verErr;
 
-    // Set previous versions to not current
+    if (vError) throw vError;
+
+    // Deactivate old versions
     await supabase
       .from('transportation_template_versions')
       .update({ is_current: false })
@@ -79,162 +77,158 @@ export const generateTemplate = async ({
       .neq('id', version.id);
 
     const lineItems: any[] = [];
+    let grandTotal = 0;
     let totalPersonnel = 0;
     let totalFuel = 0;
     let totalUpakiaji = 0;
     let totalTahadhari = 0;
-    let totalNauli = 0;
 
     // 5. Process Each Route
     for (const route of routes) {
       const stops = route.transportation_route_stops || [];
       const vehicles = route.transportation_route_vehicles || [];
       
-      // Calculate duration (days)
-      const start = new Date(route.start_date);
-      const endStops = stops.map(s => new Date(s.delivery_date));
-      const maxEnd = new Date(Math.max(...endStops.map(d => d.getTime())));
-      const durationDays = Math.ceil((maxEnd.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      // Safe duration calculation
+      let durationDays = 1; 
+      if (stops.length > 0) {
+        const start = new Date(route.start_date);
+        const endDates = stops
+          .map(s => new Date(s.delivery_date))
+          .filter(d => !isNaN(d.getTime()));
+        
+        if (endDates.length > 0) {
+          const maxEndTime = Math.max(...endDates.map(d => d.getTime()));
+          const startTime = start.getTime();
+          
+          if (!isNaN(startTime) && !isNaN(maxEndTime)) {
+            durationDays = Math.ceil((maxEndTime - startTime) / (1000 * 60 * 60 * 24)) + 1;
+            durationDays = Math.max(1, durationDays);
+          }
+        }
+      }
 
       // A. Personnel Costs
-      const roles = [
-        { role: 'exam_officer', rate: rates.exam_officer_rate, qty: 2 },
+      const personnelRoles = [
+        { role: 'exam_officer', rate: rates.exam_officer_rate, qty: 1 },
         { role: 'police_officer', rate: rates.police_rate, qty: 2 },
         { role: 'security_officer', rate: rates.security_rate, qty: 1 },
+        { role: 'driver', rate: rates.driver_rate, qty: 1 }
       ];
 
-      for (const r of roles) {
-        const posho = r.rate * durationDays * r.qty;
+      for (const p of personnelRoles) {
+        const cost = p.rate * p.qty * durationDays;
         lineItems.push({
           template_version_id: version.id,
           route_id: route.id,
           category: 'PERSONNEL',
-          role: r.role,
-          quantity: r.qty,
+          role: p.role,
+          quantity: p.qty,
           days: durationDays,
-          allowance_per_day: r.rate,
-          posho: posho,
-          total_cost: posho
+          posho: p.rate,
+          total_cost: cost
         });
-        totalPersonnel += posho;
+        totalPersonnel += cost;
       }
 
-      // B. Vehicle Specific Costs
+      // B. Fuel Costs
       for (const v of vehicles) {
-        // Driver for each truck
-        if (v.vehicle_type.includes('TRUCK')) {
-          const driverPosho = rates.driver_rate * durationDays * v.quantity;
-          lineItems.push({
-            template_version_id: version.id,
-            route_id: route.id,
-            category: 'PERSONNEL',
-            role: 'driver',
-            quantity: v.quantity,
-            days: durationDays,
-            allowance_per_day: rates.driver_rate,
-            posho: driverPosho,
-            total_cost: driverPosho
-          });
-          totalPersonnel += driverPosho;
+        let consumption = rates.fuel_consumption_tt;
+        if (v.vehicle_type === 'STANDARD_TRUCK') consumption = rates.fuel_consumption_truck;
+        if (v.vehicle_type === 'ESCORT_VEHICLE') consumption = rates.fuel_consumption_escort;
 
-          // Emergency Allowance
-          const emergency = (v.vehicle_type === 'TRUCK_AND_TRAILER' ? rates.emergency_tt : rates.emergency_standard) * v.quantity;
-          lineItems.push({
-            template_version_id: version.id,
-            route_id: route.id,
-            category: 'TAHADHARI',
-            role: 'emergency',
-            vehicle_type: v.vehicle_type,
-            quantity: v.quantity,
-            days: 0, // Required field
-            emergency_allowance: emergency,
-            total_cost: emergency
-          });
-          totalTahadhari += emergency;
-        }
-
-        // Fuel Calculation
-        const consumption = v.vehicle_type === 'TRUCK_AND_TRAILER' ? rates.fuel_consumption_tt : 
-                           v.vehicle_type === 'STANDARD_TRUCK' ? rates.fuel_consumption_truck : 
-                           rates.fuel_consumption_escort;
-        
-        const estKm = 1200; // Default fallback
-        const liters = (estKm / consumption) * v.quantity;
-        const fuelCost = liters * rates.fuel_price_per_liter;
+        const estKm = 1200; // Placeholder for distance logic
+        const fuelLiters = estKm / consumption;
+        const fuelCost = Math.round(fuelLiters * rates.fuel_price_per_liter * v.quantity);
 
         lineItems.push({
           template_version_id: version.id,
           route_id: route.id,
           category: 'FUEL',
-          role: 'fuel',
-          vehicle_type: v.vehicle_type,
+          role: v.vehicle_type.toLowerCase(),
           quantity: v.quantity,
-          days: 0, // Required field
-          distance_km: estKm,
-          fuel_liters: Math.round(liters),
-          fuel_cost: Math.round(fuelCost),
-          total_cost: Math.round(fuelCost)
+          days: 0, // Explicitly 0 to avoid null constraint
+          fuel_cost: fuelCost,
+          total_cost: fuelCost
         });
         totalFuel += fuelCost;
+
+        // C. Emergency Allowance
+        const emergencyRate = v.vehicle_type === 'TRUCK_AND_TRAILER' ? rates.emergency_tt : rates.emergency_standard;
+        const emergencyTotal = emergencyRate * v.quantity;
+        lineItems.push({
+          template_version_id: version.id,
+          route_id: route.id,
+          category: 'TAHADHARI',
+          role: 'emergency',
+          quantity: v.quantity,
+          days: 0,
+          emergency_allowance: emergencyTotal,
+          total_cost: emergencyTotal
+        });
+        totalTahadhari += emergencyTotal;
       }
 
-      // C. Unloading (Vibarua) per Stop
-      for (const stop of stops) {
-        const unloading = (stop.boxes_count || 0) * rates.unloading_rate_per_box;
+      // D. Unloading (Upakiaji)
+      const totalBoxes = stops.reduce((sum, s) => sum + (s.boxes_count || 0), 0);
+      const unloadingCost = totalBoxes * rates.unloading_rate_per_box;
+      if (unloadingCost > 0) {
         lineItems.push({
           template_version_id: version.id,
           route_id: route.id,
           category: 'UPAKIAJI',
           role: 'loading',
-          region_name: stop.region_name,
-          item_quantity: stop.boxes_count,
-          days: 0, // Required field
-          unit_cost: rates.unloading_rate_per_box,
-          operational_total: unloading,
-          total_cost: unloading
+          quantity: totalBoxes,
+          days: 0,
+          unloading_cash: unloadingCost,
+          total_cost: unloadingCost
         });
-        totalUpakiaji += unloading;
+        totalUpakiaji += unloadingCost;
       }
     }
 
     // 6. Bulk Insert Line Items
-    const { error: insertErr } = await supabase
+    const { error: itemsError } = await supabase
       .from('transportation_template_line_items')
       .insert(lineItems);
-    if (insertErr) throw insertErr;
+
+    if (itemsError) throw itemsError;
 
     // 7. Update Version Totals
-    const grandTotal = totalPersonnel + totalFuel + totalUpakiaji + totalTahadhari + totalNauli;
+    grandTotal = totalPersonnel + totalFuel + totalUpakiaji + totalTahadhari;
     await supabase
       .from('transportation_template_versions')
       .update({
+        grand_total: grandTotal,
         total_personnel: totalPersonnel,
         total_fuel: totalFuel,
         total_upakiaji: totalUpakiaji,
-        total_tahadhari: totalTahadhari,
-        total_nauli: totalNauli,
-        grand_total: grandTotal
+        total_tahadhari: totalTahadhari
       })
       .eq('id', version.id);
 
     return { success: true };
   } catch (error: any) {
-    console.error("Generation Error:", error);
+    console.error("Template Generation Error:", error);
     return { success: false, error: error.message };
   }
 };
 
-export const appendChangeLog = async (versionId: string, logEntry: any) => {
-  const { data } = await supabase
+export const appendChangeLog = async (versionId: string, message: string, userEmail: string) => {
+  const { data: version } = await supabase
     .from('transportation_template_versions')
     .select('change_log')
     .eq('id', versionId)
     .single();
-  
-  const newLog = [...(data?.change_log || []), { ...logEntry, timestamp: new Date().toISOString() }];
-  
+
+  const logs = version?.change_log || [];
+  const newLog = {
+    timestamp: new Date().toISOString(),
+    user: userEmail,
+    message
+  };
+
   await supabase
     .from('transportation_template_versions')
-    .update({ change_log: newLog })
+    .update({ change_log: [...logs, newLog] })
     .eq('id', versionId);
 };
