@@ -75,6 +75,7 @@ const navItems = [
       { path: '/dashboard/settings/examinations', label: 'Examinations', icon: BookOpen, key: 'SettingsExaminations' },
       { path: '/dashboard/settings/subjects', label: 'Subjects', icon: GraduationCap, key: 'SettingsSubjects' },
       { path: '/dashboard/settings/regional-distances', label: 'Regional Distances', icon: Navigation, key: 'SettingsDistances' },
+      { path: '/dashboard/settings/transport-guidelines', label: 'Transport Guidelines', icon: Shield, key: 'SettingsTransportGuidelines' },
     ]
   },
   { path: '/dashboard/profile', label: 'Profile', icon: User, key: 'Profile' },
