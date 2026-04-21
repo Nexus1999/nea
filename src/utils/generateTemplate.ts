@@ -122,13 +122,12 @@ export const generateTemplate = async ({
       // Determine if route uses heavy vehicles
       const hasHeavyTruck = vehicles.some(v => v.vehicle_type === 'TRUCK_AND_TRAILER' || v.vehicle_type === 'STANDARD_TRUCK');
 
-      // Track max days and distance for the route based on guidelines
       let maxRouteDays = 1;
       let routeDistance = 0;
       let routePoliceCount = 2;
       let routeSecurityCount = 1;
 
-      // ── A. REGIONAL EXAM OFFICERS & UNLOADING ──────────────────
+      // ── A. REGIONAL EXAM OFFICERS (One per region in route) ──
       for (const stop of stops) {
         const regionId = regions.find(r => r.name.toUpperCase() === stop.region_name.toUpperCase())?.id;
         if (!regionId) continue;
@@ -187,9 +186,70 @@ export const generateTemplate = async ({
         totalNauli += eoNauli;
       }
 
-      // ── B. GLOBAL PERSONNEL (Police & Security) ────────────────
+      // ── B. DRIVERS (One row per vehicle) ──
       const transitDays = Math.max(0, Math.ceil(maxRouteDays * 0.2));
 
+      for (const v of vehicles) {
+        const driverRate = rates.driver_rate || 0;
+        const driverCost = driverRate * (maxRouteDays + transitDays);
+        
+        const vehicleLabel = v.vehicle_type
+          ? v.vehicle_type.toLowerCase().split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+          : "Gari";
+
+        const dItem = createBaseItem(route.id, "personnel", "driver");
+        Object.assign(dItem, {
+          vehicle_type: v.vehicle_type,
+          vehicle_label: vehicleLabel,
+          quantity: v.quantity || 1,
+          days: maxRouteDays,
+          transit_days: transitDays,
+          posho: driverRate,
+          allowance_per_day: driverRate,
+          total_cost: driverCost
+        });
+        lineItems.push(dItem);
+        totalPersonnel += driverCost;
+      }
+
+      // ── C. VEHICLES / FUEL (One row per vehicle for fuel & emergency) ──
+      for (const v of vehicles) {
+        const isTruck = v.vehicle_type === 'TRUCK_AND_TRAILER' || v.vehicle_type === 'STANDARD_TRUCK';
+        
+        // Fuel
+        let consumption = rates.fuel_consumption_tt || 1;
+        if (v.vehicle_type === "STANDARD_TRUCK") consumption = rates.fuel_consumption_truck || 1;
+        if (v.vehicle_type === "ESCORT_VEHICLE") consumption = rates.fuel_consumption_escort || 1;
+
+        const fuelLiters = Math.round((routeDistance / consumption) * (v.quantity || 1));
+        const fuelCost = Math.round(fuelLiters * (rates.fuel_price_per_liter || 0));
+
+        // Emergency
+        const emergencyRate = isTruck ? (rates.emergency_tt || 0) : (rates.emergency_standard || 0);
+        const emergencyTotal = emergencyRate * (v.quantity || 1);
+
+        const vehicleLabel = v.vehicle_type
+          ? v.vehicle_type.toLowerCase().split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+          : "Gari";
+
+        const fItem = createBaseItem(route.id, "fuel", "fuel");
+        Object.assign(fItem, {
+          vehicle_type: v.vehicle_type,
+          vehicle_label: vehicleLabel,
+          quantity: v.quantity || 1,
+          distance_km: routeDistance,
+          fuel_liters: fuelLiters,
+          fuel_cost: fuelCost,
+          emergency_allowance: emergencyTotal,
+          total_cost: fuelCost + emergencyTotal
+        });
+        lineItems.push(fItem);
+
+        totalFuel += fuelCost;
+        totalTahadhari += emergencyTotal;
+      }
+
+      // ── D. GLOBAL PERSONNEL (Police & Security) ──
       // Police
       for (let p = 0; p < routePoliceCount; p++) {
         const pPosho = rates.police_rate || 0;
@@ -222,52 +282,6 @@ export const generateTemplate = async ({
         });
         lineItems.push(sItem);
         totalPersonnel += sCost;
-      }
-
-      // ── C. VEHICLES (Drivers, Fuel, Emergency) ─────────────────
-      for (const v of vehicles) {
-        const isTruck = v.vehicle_type === 'TRUCK_AND_TRAILER' || v.vehicle_type === 'STANDARD_TRUCK';
-        
-        // Driver(s) for this vehicle
-        const driverRate = rates.driver_rate || 0;
-        const driverCost = driverRate * (maxRouteDays + transitDays);
-        
-        // Fuel
-        let consumption = rates.fuel_consumption_tt || 1;
-        if (v.vehicle_type === "STANDARD_TRUCK") consumption = rates.fuel_consumption_truck || 1;
-        if (v.vehicle_type === "ESCORT_VEHICLE") consumption = rates.fuel_consumption_escort || 1;
-
-        const fuelLiters = Math.round((routeDistance / consumption) * (v.quantity || 1));
-        const fuelCost = Math.round(fuelLiters * (rates.fuel_price_per_liter || 0));
-
-        // Emergency
-        const emergencyRate = isTruck ? (rates.emergency_tt || 0) : (rates.emergency_standard || 0);
-        const emergencyTotal = emergencyRate * (v.quantity || 1);
-
-        const vehicleLabel = v.vehicle_type
-          ? v.vehicle_type.toLowerCase().split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
-          : "Gari";
-
-        const vItem = createBaseItem(route.id, "personnel", "driver");
-        Object.assign(vItem, {
-          vehicle_type: v.vehicle_type,
-          vehicle_label: vehicleLabel,
-          quantity: v.quantity || 1,
-          days: maxRouteDays,
-          transit_days: transitDays,
-          posho: driverRate,
-          allowance_per_day: driverRate,
-          distance_km: routeDistance,
-          fuel_liters: fuelLiters,
-          fuel_cost: fuelCost,
-          emergency_allowance: emergencyTotal,
-          total_cost: driverCost + fuelCost + emergencyTotal
-        });
-        lineItems.push(vItem);
-
-        totalPersonnel += driverCost;
-        totalFuel += fuelCost;
-        totalTahadhari += emergencyTotal;
       }
     }
 
