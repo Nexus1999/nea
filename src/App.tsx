@@ -54,6 +54,9 @@ import BudgetSettingsPage from "./pages/budgets/BudgetSettingsPage";
 import ParticipantsPage from "./pages/budgets/ParticipantsPage";
 import AssignmentPage from "./pages/budgets/AssignmentPage";
 
+// Stationeries Module Pages
+import StationeriesPage from "./pages/stationeries/stationeries";
+
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -140,6 +143,11 @@ const App = () => (
               <Route path="budgets/transportation/ai-suggester/:id" element={<AISuggesterPage />} />
               <Route path="budgets/template/:id" element={<TemplatePage />} />
               <Route path="budgets/assignments/:id" element={<AssignmentPage />} />
+
+
+               {/* Stationery Module Routes */}
+               <Route path="stationeries" element={<StationeriesPage />} />
+
 
               {/* Add more routes as needed */}
               <Route path="*" element={<div className="p-4">Page under construction</div>} />
