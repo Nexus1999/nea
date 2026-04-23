@@ -43,9 +43,8 @@ import { cn } from "@/lib/utils";
 import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
 import StationeryFormDrawer, { StationeryFormValues } from "@/components/stationeries/StationeryFormDrawer";
-import ReoDeoExtraModal from "@/components/stationeries/ReoDeoExtraModal";
-import BoxLimitsModal from "@/components/stationeries/BoxLimitsModal";
-import CenterMultipliersModal from "@/components/stationeries/CenterMultipliersModal";
+import ReoDeoExtraDrawer from "@/components/stationeries/ReoDeoExtraDrawer";
+import CenterMultipliersDrawer from "@/components/stationeries/CenterMultipliersDrawer";
 import { Stationery } from "@/types/stationeries";
 
 const StationeriesPage = () => {
@@ -54,9 +53,8 @@ const StationeriesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStationery, setEditingStationery] = useState<StationeryFormValues | undefined>(undefined);
   
-  const [isReoDeoModalOpen, setIsReoDeoModalOpen] = useState(false);
-  const [isBoxLimitsModalOpen, setIsBoxLimitsModalOpen] = useState(false);
-  const [isCenterMultipliersModalOpen, setIsCenterMultipliersModalOpen] = useState(false);
+  const [isReoDeoDrawerOpen, setIsReoDeoDrawerOpen] = useState(false);
+  const [isCenterMultipliersDrawerOpen, setIsCenterMultipliersDrawerOpen] = useState(false);
   const [selectedStationery, setSelectedStationery] = useState<Stationery | null>(null);
 
   const [search, setSearch] = useState('');
@@ -230,13 +228,13 @@ const StationeriesPage = () => {
                         </Button>
                         <Button
                           variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                          title="REO/DEO Extra" onClick={() => { setSelectedStationery(s); setIsReoDeoModalOpen(true); }}
+                          title="REO/DEO Extra" onClick={() => { setSelectedStationery(s); setIsReoDeoDrawerOpen(true); }}
                         >
                           <Users className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                          title="Center Multipliers" onClick={() => { setSelectedStationery(s); setIsCenterMultipliersModalOpen(true); }}
+                          title="Center Multipliers" onClick={() => { setSelectedStationery(s); setIsCenterMultipliersDrawerOpen(true); }}
                         >
                           <Calculator className="h-4 w-4" />
                         </Button>
@@ -283,16 +281,16 @@ const StationeriesPage = () => {
         onSuccess={fetchStationeries}
       />
 
-      <ReoDeoExtraModal
-        open={isReoDeoModalOpen}
-        onOpenChange={setIsReoDeoModalOpen}
+      <ReoDeoExtraDrawer
+        open={isReoDeoDrawerOpen}
+        onOpenChange={setIsReoDeoDrawerOpen}
         stationery={selectedStationery}
         onSuccess={fetchStationeries}
       />
 
-      <CenterMultipliersModal
-        open={isCenterMultipliersModalOpen}
-        onOpenChange={setIsCenterMultipliersModalOpen}
+      <CenterMultipliersDrawer
+        open={isCenterMultipliersDrawerOpen}
+        onOpenChange={setIsCenterMultipliersDrawerOpen}
         stationery={selectedStationery}
         onSuccess={fetchStationeries}
       />
