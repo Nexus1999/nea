@@ -171,7 +171,7 @@ const CenterMultipliersDrawer: React.FC<CenterMultipliersDrawerProps> = ({
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 px-8 py-6 space-y-5 overflow-y-auto">
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 {Object.keys(schema.shape).map((key) => (
                   <FormField
                     key={key}
@@ -179,7 +179,7 @@ const CenterMultipliersDrawer: React.FC<CenterMultipliersDrawerProps> = ({
                     name={key as any}
                     render={({ field }) => (
                       <FormItem className="space-y-1.5">
-                        <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                           {key.replace(/_/g, ' ')}
                         </FormLabel>
                         <FormControl>

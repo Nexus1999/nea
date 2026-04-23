@@ -43,8 +43,8 @@ type BoxLimitsFormValues = z.infer<typeof boxLimitsSchema>;
 
 const FIELD_DISPLAY_NAMES: Record<keyof BoxLimitsFormValues, string> = {
   fbm1: 'FBM1 Limit', fbm2: 'FBM2 Limit', tr: 'TR Limit', twm: 'TWM Limit', bkm: 'BKM Limit',
-  normalbooklets: 'Normal Booklets Limit', graphbooklets: 'Graph Booklets Limit',
-  normalloosesheets: 'Normal Loose Sheets Limit', graphloosesheets: 'Graph Loose Sheets Limit',
+  normalbooklets: 'Normal Booklets', graphbooklets: 'Graph Booklets',
+  normalloosesheets: 'Normal Loose Sheets', graphloosesheets: 'Graph Loose Sheets',
 };
 
 const defaultBoxLimitsValues: BoxLimitsFormValues = {
@@ -151,7 +151,7 @@ const BoxLimitsDrawer: React.FC<BoxLimitsDrawerProps> = ({ open, onOpenChange, s
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 px-8 py-6 space-y-5 overflow-y-auto">
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 {fieldsToRender.map((fieldName) => (
                   <FormField
                     key={fieldName}
@@ -159,7 +159,7 @@ const BoxLimitsDrawer: React.FC<BoxLimitsDrawerProps> = ({ open, onOpenChange, s
                     name={fieldName}
                     render={({ field }) => (
                       <FormItem className="space-y-1.5">
-                        <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                           {FIELD_DISPLAY_NAMES[fieldName]}
                         </FormLabel>
                         <FormControl>

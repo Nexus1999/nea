@@ -83,6 +83,16 @@ const getCategoriesForExam = (examCode: string | undefined) => {
   }
 };
 
+const categoryQueryMap: Record<string, string> = {
+  stationeries: 'stationeries',
+  district_stationeries: 'district_stationeries',
+  arabic_booklets: 'Arabic Booklets',
+  ict_covers: 'ICT Covers',
+  fine_arts_booklets: 'Fine Arts Booklets',
+  braille_stationeries: 'Braille Stationeries',
+  kitbags: 'kitbags'
+};
+
 const LabelsManagementPage: React.FC = () => {
   const { masterSummaryId } = useParams<{ masterSummaryId: string }>();
   const navigate = useNavigate();
@@ -154,11 +164,12 @@ const LabelsManagementPage: React.FC = () => {
     if (!masterSummary) return;
     setLoading(true);
     try {
+      const dbCategory = categoryQueryMap[activeTab] || activeTab;
       const { data, error } = await supabase
         .from('labels')
         .select('*')
         .eq('mid', masterSummary.id)
-        .eq('category', activeTab)
+        .eq('category', dbCategory)
         .order('region', { ascending: true })
         .order('district', { ascending: true })
         .order('center_number', { ascending: true });
@@ -243,7 +254,8 @@ const LabelsManagementPage: React.FC = () => {
     if (!masterSummary) return;
     setIsGeneratingLabels(true);
     try {
-      const query = supabase.from('labels').delete().eq('mid', masterSummary.id).eq('category', activeTab);
+      const dbCategory = categoryQueryMap[activeTab] || activeTab;
+      const query = supabase.from('labels').delete().eq('mid', masterSummary.id).eq('category', dbCategory);
       if (selectedRegion !== 'All') query.eq('region', selectedRegion);
       await query;
       setAllLabels([]);

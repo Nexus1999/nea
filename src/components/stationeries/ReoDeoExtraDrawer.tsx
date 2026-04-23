@@ -122,10 +122,10 @@ const ReoDeoExtraDrawer: React.FC<ReoDeoExtraDrawerProps> = ({ open, onOpenChang
           </div>
         ) : (
           <div className="flex-1 px-8 py-6 space-y-5 overflow-y-auto">
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               {filteredItems.map(item => (
                 <div key={item.key} className="space-y-1.5">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">{item.name} (%)</Label>
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{item.name} (%)</Label>
                   <Input
                     type="number"
                     step="0.1"
