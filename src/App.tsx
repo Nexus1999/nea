@@ -56,6 +56,9 @@ import AssignmentPage from "./pages/budgets/AssignmentPage";
 
 // Stationeries Module Pages
 import StationeriesPage from "./pages/stationeries/stationeries";
+import StationeryReportsPage from "./pages/stationeries/StationeryReportsPage";
+import StationerySummaryPage from "./pages/stationeries/StationerySummaryPage";
+import LabelsManagementPage from "./pages/stationeries/LabelsManagementPage";
 
 const queryClient = new QueryClient();
 
@@ -147,6 +150,9 @@ const App = () => (
 
                {/* Stationery Module Routes */}
                <Route path="stationeries" element={<StationeriesPage />} />
+              <Route path="stationeries/reports/:id" element={<StationeryReportsPage />} />
+              <Route path="stationeries/summary/:id" element={<StationerySummaryPage />} />
+              <Route path="stationeries/labels-management" element={<LabelsManagementPage />} />
 
 
               {/* Add more routes as needed */}

@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Lock, Search, PlusCircle, Filter, 
-  CheckCircle2, Shield, Settings, Database, 
-  Users, RefreshCw, Edit, Trash2, ShieldCheck,
-  LayoutGrid, List
+  Shield, Settings, Database, 
+  RefreshCw, Edit, Trash2, ShieldCheck,
+  LayoutGrid, List, Package, FileText, Tags
 } from "lucide-react";
 import {
   Table,
@@ -35,7 +35,6 @@ const Permissions = () => {
   const [search, setSearch] = useState('');
   const [moduleFilter, setModuleFilter] = useState('all');
   
-  // Drawer states
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState<any>(null);
@@ -64,7 +63,7 @@ const Permissions = () => {
   const handleDelete = async (permission: any) => {
     const result = await showStyledSwal({
       title: 'Delete Permission?',
-      html: `Are you sure you want to delete <b>${permission.name}</b>? This will remove it from all assigned roles.`,
+      html: `Are you sure you want to delete <b>${permission.name}</b>?`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, delete it!',
@@ -92,6 +91,7 @@ const Permissions = () => {
     switch (module) {
       case 'Security': return <Shield className="h-3 w-3" />;
       case 'Master Summaries': return <Database className="h-3 w-3" />;
+      case 'Stationery': return <Package className="h-3 w-3" />;
       case 'Settings': return <Settings className="h-3 w-3" />;
       case 'Reports': return <List className="h-3 w-3" />;
       default: return <Lock className="h-3 w-3" />;
@@ -103,6 +103,7 @@ const Permissions = () => {
     switch (module) {
       case 'Security': return "bg-blue-50 text-blue-700 border-blue-100";
       case 'Master Summaries': return "bg-emerald-50 text-emerald-700 border-emerald-100";
+      case 'Stationery': return "bg-indigo-50 text-indigo-700 border-indigo-100";
       case 'Settings': return "bg-orange-50 text-orange-700 border-orange-100";
       case 'Reports': return "bg-purple-50 text-purple-700 border-purple-100";
       default: return "bg-slate-50 text-slate-700 border-slate-100";
@@ -123,7 +124,7 @@ const Permissions = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">Permissions</h2>
-          <p className="text-muted-foreground mt-1">Role-based access control — manage and assign permissions to roles.</p>
+          <p className="text-muted-foreground mt-1">Manage and assign permissions to roles.</p>
         </div>
         <div className="flex gap-2">
           <Button 
@@ -157,17 +158,9 @@ const Permissions = () => {
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={fetchPermissions} 
-              disabled={loading}
-              className="h-10 w-10 rounded-xl"
-            >
-              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" onClick={fetchPermissions} disabled={loading} className="h-10 w-10 rounded-xl">
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+          </Button>
         </div>
 
         <TabsContent value="list" className="space-y-4 mt-0">
@@ -207,16 +200,13 @@ const Permissions = () => {
                         <TableHead className="font-bold text-[10px] uppercase tracking-widest text-slate-500">Permission Key</TableHead>
                         <TableHead className="font-bold text-[10px] uppercase tracking-widest text-slate-500">Module</TableHead>
                         <TableHead className="font-bold text-[10px] uppercase tracking-widest text-slate-500">Description</TableHead>
-                        <TableHead className="font-bold text-[10px] uppercase tracking-widest text-slate-500">Status</TableHead>
                         <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest text-slate-500">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredPermissions.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-20 text-slate-400 text-sm">
-                            No permissions found matching your criteria.
-                          </TableCell>
+                          <TableCell colSpan={5} className="text-center py-20 text-slate-400 text-sm">No permissions found.</TableCell>
                         </TableRow>
                       ) : (
                         filteredPermissions.map((perm, index) => (
@@ -235,12 +225,6 @@ const Permissions = () => {
                             </TableCell>
                             <TableCell className="text-sm text-slate-600 max-w-[300px] truncate">
                               {perm.description || `Access to ${perm.name}`}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-[11px] uppercase tracking-wider">
-                                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                Active
-                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
