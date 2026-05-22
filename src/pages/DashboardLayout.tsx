@@ -14,7 +14,7 @@ import { showSuccess, showError } from '../utils/toast';
 import NectaLogo from '../components/NectaLogo';
 import DynamicBreadcrumbs from '../components/DynamicBreadcrumbs';
 
-// ── Nav Items (unchanged) ─────────────────────────────────────
+// ── Nav Items ─────────────────────────────────────────────────
 export const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: Home, key: 'Dashboard', exact: true },
   { path: '/dashboard/timetables', label: 'Timetables', icon: Clock, key: 'Timetables', permission: 'Timetables:view' },
@@ -85,11 +85,13 @@ const NavGroup = ({
   isCollapsed,
   isOpen,
   onToggle,
+  onCloseMobile,
 }: {
   item: typeof navItems[0] & { subItems?: any[] };
   isCollapsed: boolean;
   isOpen: boolean;
   onToggle: () => void;
+  onCloseMobile: () => void;
 }) => {
   const location = useLocation();
   const isParentActive = location.pathname.startsWith(item.path);
@@ -133,6 +135,7 @@ const NavGroup = ({
                   <Link
                     key={sub.key}
                     to={sub.path}
+                    onClick={onCloseMobile}
                     className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
                       isActive
                         ? 'bg-white/15 text-white font-semibold'
@@ -277,6 +280,7 @@ const DashboardLayout = () => {
                 isCollapsed={isCollapsed}
                 isOpen={isOpen}
                 onToggle={() => toggleGroup(item.key)}
+                onCloseMobile={() => setMobileSidebarOpen(false)}
               />
             );
           }
