@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  Search, RefreshCw, Monitor, Smartphone, Globe, ShieldAlert, ShieldCheck, Clock, User, Trash2
+  Search, RefreshCw, Monitor, Smartphone, Globe, User, Trash2
 } from "lucide-react";
 import {
   Table,
@@ -78,19 +78,41 @@ const Sessions = () => {
   const fetchSessions = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1. Fetch sessions
+      const { data: sessionsData, error: sessionsError } = await supabase
         .from('user_sessions')
-        .select(`
-          *,
-          profiles:user_id (
-            username,
-            email
-          )
-        `)
+        .select('*')
         .order('login_time', { ascending: false });
 
-      if (error) throw error;
-      setSessions(data || []);
+      if (sessionsError) throw sessionsError;
+
+      if (!sessionsData || sessionsData.length === 0) {
+        setSessions([]);
+        return;
+      }
+
+      // 2. Fetch profiles for the user IDs in sessions
+      const userIds = Array.from(new Set(sessionsData.map(s => s.user_id)));
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, email')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Create a map of profiles for quick lookup
+      const profilesMap = (profilesData || []).reduce((acc: Record<string, any>, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {});
+
+      // 3. Merge sessions with profiles
+      const mergedSessions = sessionsData.map(session => ({
+        ...session,
+        profiles: profilesMap[session.user_id] || { email: 'Unknown User', username: 'unknown' }
+      }));
+
+      setSessions(mergedSessions);
     } catch (err: any) {
       showError(err.message);
     } finally {
