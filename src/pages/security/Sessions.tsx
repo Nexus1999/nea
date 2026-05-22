@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  Search, RefreshCw, Monitor, Smartphone, Globe, ShieldAlert, ShieldCheck, Clock, User
+  Search, RefreshCw, Monitor, Smartphone, Globe, ShieldAlert, ShieldCheck, Clock, User, Trash2
 } from "lucide-react";
 import {
   Table,
@@ -21,6 +21,8 @@ import { format } from "date-fns";
 import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
 import PaginationControls from "@/components/ui/pagination-controls";
+import { showSuccess, showError } from "@/utils/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const parseUserAgent = (ua: string) => {
   if (!ua) return { browser: 'Unknown Browser', os: 'Unknown OS', isMobile: false };
@@ -59,53 +61,84 @@ const parseUserAgent = (ua: string) => {
 };
 
 const Sessions = () => {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
   useEffect(() => {
-    fetchSessionLogs();
+    fetchSessions();
   }, []);
 
-  const fetchSessionLogs = async () => {
+  const fetchSessions = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('datachange_logs')
-        .select('*')
-        .eq('table_name', 'auth.sessions')
-        .order('changed_at', { ascending: false });
+        .from('user_sessions')
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            email
+          )
+        `)
+        .order('login_time', { ascending: false });
 
       if (error) throw error;
-      setLogs(data || []);
-    } catch (err) {
-      console.error("Error fetching session logs:", err);
+      setSessions(data || []);
+    } catch (err: any) {
+      showError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
-      const data = log.new_data || log.old_data || {};
-      const user = data.user || '';
-      const ip = data.ip_address || '';
-      const event = data.event || '';
+  const handleRevokeSession = (session: any) => {
+    setSelectedSession(session);
+    setConfirmOpen(true);
+  };
+
+  const confirmRevoke = async () => {
+    if (!selectedSession) return;
+    setConfirmOpen(false);
+    try {
+      const { error } = await supabase
+        .from('user_sessions')
+        .update({
+          is_active: false,
+          logout_time: new Date().toISOString()
+        })
+        .eq('id', selectedSession.id);
+
+      if (error) throw error;
+      showSuccess("Session revoked successfully");
+      fetchSessions();
+    } catch (err: any) {
+      showError(err.message);
+    }
+  };
+
+  const filteredSessions = useMemo(() => {
+    return sessions.filter(session => {
+      const userEmail = session.profiles?.email || '';
+      const username = session.profiles?.username || '';
+      const ip = session.ip_address || '';
       
       return (
-        user.toLowerCase().includes(search.toLowerCase()) ||
-        ip.toLowerCase().includes(search.toLowerCase()) ||
-        event.toLowerCase().includes(search.toLowerCase())
+        userEmail.toLowerCase().includes(search.toLowerCase()) ||
+        username.toLowerCase().includes(search.toLowerCase()) ||
+        ip.toLowerCase().includes(search.toLowerCase())
       );
     });
-  }, [logs, search]);
+  }, [sessions, search]);
 
-  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
-  const currentLogs = filteredLogs.slice(
+  const totalPages = Math.ceil(filteredSessions.length / itemsPerPage);
+  const currentSessions = filteredSessions.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -114,29 +147,29 @@ const Sessions = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-gray-900">Session Management</h2>
-        <p className="text-muted-foreground mt-1">Monitor active user sessions, logins, and authentication events.</p>
+        <p className="text-muted-foreground mt-1">Monitor active user sessions, logins, and force-revoke sessions in real-time.</p>
       </div>
 
       <Card className="w-full relative min-h-[500px]">
         {loading && (
           <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-[50] rounded-lg">
-            <Spinner label="Loading session logs..." size="lg" />
+            <Spinner label="Loading sessions..." size="lg" />
           </div>
         )}
 
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
           <div>
-            <CardTitle className="text-xl font-bold">Authentication History</CardTitle>
-            <CardDescription>Real-time tracking of user sign-ins, sign-outs, and token refreshes.</CardDescription>
+            <CardTitle className="text-xl font-bold">Active Sessions & History</CardTitle>
+            <CardDescription>Real-time tracking of user sign-ins, device details, and active connections.</CardDescription>
           </div>
           
           <Button 
             variant="outline" 
-            onClick={fetchSessionLogs}
+            onClick={fetchSessions}
             disabled={loading}
           >
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-            Refresh Logs
+            Refresh Sessions
           </Button>
         </CardHeader>
 
@@ -145,7 +178,7 @@ const Sessions = () => {
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by user email, IP address, or event..."
+                placeholder="Search by user email, username, or IP address..."
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -161,34 +194,32 @@ const Sessions = () => {
               <TableHeader className="bg-gray-50">
                 <TableRow>
                   <TableHead className="w-[60px]">SN</TableHead>
-                  <TableHead>Timestamp</TableHead>
                   <TableHead>User</TableHead>
-                  <TableHead>Event</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Login Time</TableHead>
+                  <TableHead>Last Active</TableHead>
                   <TableHead>Device / OS</TableHead>
                   <TableHead>Browser</TableHead>
                   <TableHead>IP Address</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentLogs.length === 0 ? (
+                {currentSessions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                      No session logs found.
+                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                      No sessions found.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  currentLogs.map((log, index) => {
-                    const data = log.new_data || log.old_data || {};
-                    const { browser, os, isMobile } = parseUserAgent(data.user_agent);
+                  currentSessions.map((session, index) => {
+                    const { browser, os, isMobile } = parseUserAgent(session.user_agent);
+                    const isCurrentSession = session.id === localStorage.getItem("current_user_session_id");
 
                     return (
-                      <TableRow key={log.id}>
+                      <TableRow key={session.id} className={cn(isCurrentSession && "bg-blue-50/30")}>
                         <TableCell className="text-muted-foreground font-medium">
                           {((currentPage - 1) * itemsPerPage) + index + 1}
-                        </TableCell>
-
-                        <TableCell className="text-xs font-mono text-slate-600">
-                          {format(new Date(log.changed_at), 'yyyy-MM-dd HH:mm:ss')}
                         </TableCell>
 
                         <TableCell>
@@ -196,19 +227,35 @@ const Sessions = () => {
                             <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold">
                               <User className="h-3.5 w-3.5 text-slate-500" />
                             </div>
-                            <span className="font-medium text-sm">{data.user || 'Unknown User'}</span>
+                            <div>
+                              <span className="font-medium text-sm block">{session.profiles?.email || 'Unknown User'}</span>
+                              {session.profiles?.username && (
+                                <span className="text-xs text-slate-400">@{session.profiles.username}</span>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
 
                         <TableCell>
                           <Badge className={cn(
                             "font-medium text-xs uppercase tracking-wider border",
-                            data.event === 'SIGNED_IN' && "bg-emerald-50 text-emerald-700 border-emerald-100",
-                            data.event === 'SIGNED_OUT' && "bg-rose-50 text-rose-700 border-rose-100",
-                            data.event === 'TOKEN_REFRESHED' && "bg-blue-50 text-blue-700 border-blue-100"
+                            session.is_active 
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+                              : "bg-slate-50 text-slate-500 border-slate-100"
                           )}>
-                            {data.event?.replace('_', ' ') || 'UNKNOWN'}
+                            {session.is_active ? 'Active' : 'Inactive'}
                           </Badge>
+                          {isCurrentSession && (
+                            <span className="ml-2 text-[10px] font-bold text-blue-600 uppercase tracking-wider">Current</span>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="text-xs font-mono text-slate-600">
+                          {format(new Date(session.login_time), 'yyyy-MM-dd HH:mm:ss')}
+                        </TableCell>
+
+                        <TableCell className="text-xs font-mono text-slate-600">
+                          {format(new Date(session.last_seen), 'yyyy-MM-dd HH:mm:ss')}
                         </TableCell>
 
                         <TableCell>
@@ -226,7 +273,21 @@ const Sessions = () => {
                         </TableCell>
 
                         <TableCell className="text-xs font-mono text-slate-500">
-                          {data.ip_address || 'N/A'}
+                          {session.ip_address || 'N/A'}
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          {session.is_active && !isCurrentSession && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-600 hover:bg-red-50"
+                              onClick={() => handleRevokeSession(session)}
+                              title="Revoke Session"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -247,6 +308,16 @@ const Sessions = () => {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title="Revoke User Session?"
+        message={`Are you sure you want to force-terminate the session for <b>${selectedSession?.profiles?.email || 'this user'}</b>? They will be logged out immediately.`}
+        confirmText="Yes, Revoke Session"
+        isDestructive={true}
+        onConfirm={confirmRevoke}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 };

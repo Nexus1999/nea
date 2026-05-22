@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import { logDataChange } from "@/utils/auditLogger";
 
 export const useSessionMonitor = () => {
-  const lastEventRef = useRef<string | null>(null);
+  const currentSessionIdRef = useRef<string | null>(localStorage.getItem("current_user_session_id"));
+  const heartbeatIntervalRef = useRef<any>(null);
 
   useEffect(() => {
     const fetchIpAddress = async () => {
@@ -18,33 +18,106 @@ export const useSessionMonitor = () => {
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Prevent duplicate logging for the same event in rapid succession
-      if (lastEventRef.current === event) return;
-      lastEventRef.current = event;
+    const startHeartbeat = (sessionId: string) => {
+      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+      
+      // Update last_seen every 2 minutes
+      heartbeatIntervalRef.current = setInterval(async () => {
+        try {
+          await supabase
+            .from('user_sessions')
+            .update({ last_seen: new Date().toISOString() })
+            .eq('id', sessionId);
+        } catch (err) {
+          console.error("Failed to update session heartbeat:", err);
+        }
+      }, 2 * 60 * 1000);
+    };
 
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+    const stopHeartbeat = () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
         const ipAddress = await fetchIpAddress();
         const userAgent = navigator.userAgent;
-        const userEmail = session?.user?.email || 'Unknown User';
-        const userId = session?.user?.id || 'N/A';
 
         try {
-          await logDataChange({
-            table_name: 'auth.sessions',
-            record_id: userId,
-            action_type: event === 'SIGNED_OUT' ? 'DELETE' : 'INSERT',
-            old_data: event === 'SIGNED_OUT' ? { event, user: userEmail, user_agent: userAgent, ip_address: ipAddress } : null,
-            new_data: event !== 'SIGNED_OUT' ? { event, user: userEmail, user_agent: userAgent, ip_address: ipAddress } : null,
-          });
+          const { data, error } = await supabase
+            .from('user_sessions')
+            .insert({
+              user_id: session.user.id,
+              session_token: session.access_token,
+              ip_address: ipAddress,
+              user_agent: userAgent,
+              is_active: true,
+              login_time: new Date().toISOString(),
+              last_seen: new Date().toISOString()
+            })
+            .select('id')
+            .single();
+
+          if (error) throw error;
+
+          if (data) {
+            currentSessionIdRef.current = data.id;
+            localStorage.setItem("current_user_session_id", data.id);
+            startHeartbeat(data.id);
+          }
         } catch (err) {
-          console.error("Failed to log session event to audit trail:", err);
+          console.error("Failed to register user session:", err);
+        }
+      }
+
+      if (event === 'TOKEN_REFRESHED' && session?.user && currentSessionIdRef.current) {
+        try {
+          await supabase
+            .from('user_sessions')
+            .update({
+              session_token: session.access_token,
+              last_seen: new Date().toISOString()
+            })
+            .eq('id', currentSessionIdRef.current);
+        } catch (err) {
+          console.error("Failed to update refreshed token session:", err);
+        }
+      }
+
+      if (event === 'SIGNED_OUT') {
+        const sessionId = currentSessionIdRef.current || localStorage.getItem("current_user_session_id");
+        stopHeartbeat();
+        
+        if (sessionId) {
+          try {
+            await supabase
+              .from('user_sessions')
+              .update({
+                is_active: false,
+                logout_time: new Date().toISOString()
+              })
+              .eq('id', sessionId);
+          } catch (err) {
+            console.error("Failed to mark session as logged out:", err);
+          } finally {
+            currentSessionIdRef.current = null;
+            localStorage.removeItem("current_user_session_id");
+          }
         }
       }
     });
 
+    // Resume heartbeat if session ID exists on mount
+    if (currentSessionIdRef.current) {
+      startHeartbeat(currentSessionIdRef.current);
+    }
+
     return () => {
       subscription.unsubscribe();
+      stopHeartbeat();
     };
   }, []);
 };
