@@ -18,40 +18,6 @@ export const useSessionMonitor = () => {
       }
     };
 
-    const registerSession = async (user: any, accessToken: string) => {
-      // Prevent duplicate registration if we already have an active session ID stored
-      if (currentSessionIdRef.current) return;
-
-      const ipAddress = await fetchIpAddress();
-      const userAgent = navigator.userAgent;
-
-      try {
-        const { data, error } = await supabase
-          .from('user_sessions')
-          .insert({
-            user_id: user.id,
-            session_token: accessToken,
-            ip_address: ipAddress,
-            user_agent: userAgent,
-            is_active: true,
-            login_time: new Date().toISOString(),
-            last_seen: new Date().toISOString()
-          })
-          .select('id')
-          .single();
-
-        if (error) throw error;
-
-        if (data) {
-          currentSessionIdRef.current = data.id;
-          localStorage.setItem("current_user_session_id", data.id);
-          startHeartbeat(data.id);
-        }
-      } catch (err) {
-        console.error("Failed to register user session:", err);
-      }
-    };
-
     const startHeartbeat = (sessionId: string) => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
       
@@ -75,16 +41,36 @@ export const useSessionMonitor = () => {
       }
     };
 
-    // Check current session on mount (handles page refreshes)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        registerSession(session.user, session.access_token);
-      }
-    });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-        await registerSession(session.user, session.access_token);
+      if (event === 'SIGNED_IN' && session?.user) {
+        const ipAddress = await fetchIpAddress();
+        const userAgent = navigator.userAgent;
+
+        try {
+          const { data, error } = await supabase
+            .from('user_sessions')
+            .insert({
+              user_id: session.user.id,
+              session_token: session.access_token,
+              ip_address: ipAddress,
+              user_agent: userAgent,
+              is_active: true,
+              login_time: new Date().toISOString(),
+              last_seen: new Date().toISOString()
+            })
+            .select('id')
+            .single();
+
+          if (error) throw error;
+
+          if (data) {
+            currentSessionIdRef.current = data.id;
+            localStorage.setItem("current_user_session_id", data.id);
+            startHeartbeat(data.id);
+          }
+        } catch (err) {
+          console.error("Failed to register user session:", err);
+        }
       }
 
       if (event === 'TOKEN_REFRESHED' && session?.user && currentSessionIdRef.current) {
