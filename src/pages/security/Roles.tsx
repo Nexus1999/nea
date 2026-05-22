@@ -1,18 +1,27 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  Shield, PlusCircle, Search, Edit, Trash2, 
-  Users, ChevronRight
+  Shield, PlusCircle, Search, Edit, Trash2, Users 
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
 import RoleForm from "@/components/security/RoleForm";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import PaginationControls from "@/components/ui/pagination-controls";
 
 const Roles = () => {
   const [roles, setRoles] = useState<any[]>([]);
@@ -21,7 +30,11 @@ const Roles = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<any>(null);
 
-  // Confirm Dialog State
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
+  // Confirm Dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     title: string;
@@ -67,7 +80,7 @@ const Roles = () => {
   const handleDeleteRole = (role: any) => {
     setConfirmConfig({
       title: 'Delete Role?',
-      message: `Are you sure you want to delete the role ${role.name}? This may affect users assigned to this role.`,
+      message: `Are you sure you want to delete the role <b>${role.name}</b>? This may affect users assigned to this role.`,
       onConfirm: async () => {
         setConfirmOpen(false);
         try {
@@ -83,106 +96,142 @@ const Roles = () => {
     setConfirmOpen(true);
   };
 
-  const filteredRoles = roles.filter(r => 
-    r.name?.toLowerCase().includes(search.toLowerCase())
+  const filteredRoles = useMemo(() => {
+    return roles.filter(r => 
+      r.name?.toLowerCase().includes(search.toLowerCase()) ||
+      r.description?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [roles, search]);
+
+  const totalPages = Math.ceil(filteredRoles.length / itemsPerPage);
+  const currentData = filteredRoles.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900">Roles & Access</h2>
-          <p className="text-muted-foreground mt-1">Define and manage system access roles.</p>
-        </div>
-        <Button onClick={handleAddRole} className="bg-black hover:bg-gray-800 text-white gap-2 h-11 rounded-xl px-6">
-          <PlusCircle className="h-4 w-4" />
-          Create New Role
-        </Button>
-      </div>
+    <>
+      <Card className="w-full relative min-h-[500px]">
+        {loading && (
+          <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-[50] rounded-lg">
+            <Spinner label="Loading roles..." size="lg" />
+          </div>
+        )}
 
-      <Card className="border-none shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input 
-              placeholder="Search roles..." 
-              className="pl-10 h-11 rounded-xl border-slate-200"
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+          <CardTitle className="text-2xl font-bold">Roles Management</CardTitle>
+          <Button
+            onClick={handleAddRole}
+            className="bg-black hover:bg-gray-800"
+          >
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Create New Role
+          </Button>
+        </CardHeader>
+
+        <CardContent>
+          <div className="mb-6">
+            <Input
+              placeholder="Search roles..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="max-w-md"
             />
           </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="py-20 flex justify-center">
-              <Spinner label="Loading roles..." />
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredRoles.length === 0 ? (
-                <div className="col-span-full py-20 text-center text-slate-500">
-                  No roles found.
-                </div>
-              ) : (
-                filteredRoles.map((role) => (
-                  <Card key={role.id} className="border border-slate-100 shadow-sm hover:shadow-md transition-all group">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-600">
-                          <Shield className="h-6 w-6" />
+
+          <div className="border rounded-md">
+            <Table>
+              <TableHeader className="bg-gray-50">
+                <TableRow>
+                  <TableHead className="w-[60px]">SN</TableHead>
+                  <TableHead>Role Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Created On</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                      No roles found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  currentData.map((role, index) => (
+                    <TableRow key={role.id}>
+                      <TableCell className="text-muted-foreground font-medium">
+                        {((currentPage - 1) * itemsPerPage) + index + 1}
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
+                            <Shield className="h-5 w-5" />
+                          </div>
+                          <div className="font-semibold text-gray-900">{role.name}</div>
                         </div>
-                        <div className="flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-slate-400 hover:text-blue-600"
+                      </TableCell>
+
+                      <TableCell className="text-gray-600 max-w-md">
+                        {role.description || <span className="text-muted-foreground italic">No description</span>}
+                      </TableCell>
+
+                      <TableCell className="text-sm text-gray-500">
+                        {new Date(role.created_at).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-600 hover:bg-slate-100"
                             onClick={() => handleEditRole(role)}
+                            title="Edit Role"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-slate-400 hover:text-red-600"
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:bg-red-50"
                             onClick={() => handleDeleteRole(role)}
+                            title="Delete Role"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </div>
-                      
-                      <h3 className="text-xl font-bold text-gray-900 mb-1">{role.name}</h3>
-                      <p className="text-sm text-gray-500 mb-6 line-clamp-2 min-h-[40px]">
-                        {role.description || "No description provided for this role."}
-                      </p>
-                      
-                      <div className="space-y-3 pt-4 border-t border-slate-50">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-500 font-medium flex items-center gap-1">
-                            <Users className="h-3 w-3" /> Created On
-                          </span>
-                          <span className="font-bold text-gray-900">
-                            {new Date(role.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-                      <Button variant="outline" className="w-full mt-6 rounded-xl border-slate-200 group-hover:bg-black group-hover:text-white transition-colors">
-                        Manage Permissions
-                        <ChevronRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+          {!loading && totalPages > 1 && (
+            <div className="mt-4">
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </CardContent>
       </Card>
 
       <RoleForm 
-        open={isFormOpen} 
-        onOpenChange={setIsFormOpen} 
+        isOpen={isFormOpen} 
+        onClose={() => setIsFormOpen(false)} 
         role={selectedRole} 
         onSuccess={fetchRoles} 
       />
@@ -196,7 +245,7 @@ const Roles = () => {
         onConfirm={confirmConfig.onConfirm}
         onCancel={() => setConfirmOpen(false)}
       />
-    </div>
+    </>
   );
 };
 

@@ -1,75 +1,73 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Loader2, Shield, Save } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Shield, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { logDataChange } from "@/utils/auditLogger";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-const roleSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(2, "Role name is required"),
-  description: z.string().optional(),
-});
-
-type RoleFormValues = z.infer<typeof roleSchema>;
-
 interface RoleFormProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  role?: RoleFormValues;
+  isOpen: boolean;
+  onClose: () => void;
+  role?: any;
   onSuccess: () => void;
 }
 
-const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess }) => {
+const RoleForm: React.FC<RoleFormProps> = ({ isOpen, onClose, role, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingValues, setPendingValues] = useState<RoleFormValues | null>(null);
+  const [pendingValues, setPendingValues] = useState<any>(null);
+
   const isEditing = !!role?.id;
 
-  const form = useForm<RoleFormValues>({
-    resolver: zodResolver(roleSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-    },
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
   });
 
   useEffect(() => {
-    if (open) {
+    if (isOpen) {
       if (role) {
-        form.reset(role);
+        setFormData({
+          name: role.name || '',
+          description: role.description || '',
+        });
       } else {
-        form.reset({ name: "", description: "" });
+        setFormData({ name: '', description: '' });
       }
     }
-  }, [open, role, form]);
+  }, [isOpen, role]);
 
-  const onSubmit = (values: RoleFormValues) => {
-    setPendingValues(values);
+  const triggerShake = () => {
+    setShake(true);
+    setTimeout(() => setShake(false), 500);
+  };
+
+  const validate = () => {
+    if (!formData.name.trim()) {
+      triggerShake();
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setPendingValues(formData);
     setConfirmOpen(true);
   };
 
@@ -77,6 +75,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
     if (!pendingValues) return;
     setConfirmOpen(false);
     setLoading(true);
+
     try {
       if (isEditing) {
         const { error } = await supabase
@@ -86,11 +85,12 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
             description: pendingValues.description,
           })
           .eq("id", role.id);
+
         if (error) throw error;
 
         await logDataChange({
           table_name: 'roles',
-          record_id: role.id!,
+          record_id: role.id,
           action_type: 'UPDATE',
           old_data: role,
           new_data: pendingValues
@@ -98,11 +98,15 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
 
         showSuccess("Role updated successfully");
       } else {
-        const { data, error } = await supabase.from("roles").insert({
-          name: pendingValues.name.toUpperCase(),
-          description: pendingValues.description,
-        }).select('id').single();
-        
+        const { data, error } = await supabase
+          .from("roles")
+          .insert({
+            name: pendingValues.name.toUpperCase(),
+            description: pendingValues.description,
+          })
+          .select('id')
+          .single();
+
         if (error) throw error;
 
         await logDataChange({
@@ -114,8 +118,9 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
 
         showSuccess("Role created successfully");
       }
+
       onSuccess();
-      onOpenChange(false);
+      onClose();
     } catch (err: any) {
       showError(err.message);
     } finally {
@@ -125,70 +130,91 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[450px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              {isEditing ? "Edit Role" : "Create New Role"}
-            </DialogTitle>
-            <DialogDescription>
-              Define system access levels and permissions.
-            </DialogDescription>
-          </DialogHeader>
+      <Sheet open={isOpen} onOpenChange={onClose}>
+        <SheetContent className="sm:max-w-[520px] p-0 flex flex-col bg-white overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-4 border-b bg-slate-50/50">
+            <SheetHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 bg-black text-white rounded-md">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <SheetTitle className="text-lg font-bold">
+                  {isEditing ? "Edit Role" : "Create New Role"}
+                </SheetTitle>
+              </div>
+            </SheetHeader>
+          </div>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase">Role Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. ADMINISTRATOR" className="uppercase" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          {/* Form */}
+          <form 
+            onSubmit={handleSubmit} 
+            className={`flex-1 px-8 py-6 space-y-6 overflow-y-auto transition-transform ${shake ? 'animate-shake' : ''}`}
+          >
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">Role Name *</Label>
+              <Input
+                className="h-9 uppercase"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="ADMINISTRATOR"
               />
+            </div>
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase">Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Describe what this role can do..." 
-                        className="resize-none" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">Description</Label>
+              <Textarea
+                className="min-h-[120px] resize-none"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Describe what this role can do..."
               />
+            </div>
+          </form>
 
-              <DialogFooter className="pt-4">
-                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loading} className="bg-black hover:bg-gray-800">
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> {isEditing ? "Update Role" : "Create Role"}</>}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+          {/* Footer */}
+          <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3">
+            <Button variant="outline" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={loading}
+              className="bg-black hover:bg-gray-800 px-6"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isEditing ? "Update Role" : "Create Role"}
+                </>
+              )}
+            </Button>
+          </div>
+        </SheetContent>
 
+        {/* Shake Animation */}
+        <style jsx global>{`
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+          }
+          .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        `}</style>
+      </Sheet>
+
+      {/* Confirmation Dialog */}
       <ConfirmDialog
         isOpen={confirmOpen}
         title={isEditing ? "Update Role?" : "Create Role?"}
-        message={isEditing ? `Are you sure you want to update the role ${pendingValues?.name}?` : `Are you sure you want to create the role ${pendingValues?.name}?`}
+        message={isEditing 
+          ? `Are you sure you want to update the role <b>${pendingValues?.name}</b>?` 
+          : `Are you sure you want to create the role <b>${pendingValues?.name}</b>?`
+        }
         confirmText={isEditing ? "Yes, Update" : "Yes, Create"}
+        isDestructive={false}
         onConfirm={handleSave}
         onCancel={() => setConfirmOpen(false)}
       />

@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { 
-  Sheet, 
-  SheetContent, 
-  SheetHeader, 
-  SheetTitle, 
-  SheetFooter,
-  SheetDescription
+import React, { useState, useEffect } from 'react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +17,9 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { Shield, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Loader2, Shield } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const MODULES = [
@@ -54,68 +52,92 @@ const SUB_ACTIONS: Record<string, string[]> = {
 };
 
 interface PermissionFormDrawerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  isOpen: boolean;
+  onClose: () => void;
   permission?: any;
   onSuccess: () => void;
 }
 
-const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpenChange, permission, onSuccess }) => {
+const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ 
+  isOpen, 
+  onClose, 
+  permission, 
+  onSuccess 
+}) => {
   const [loading, setLoading] = useState(false);
-  const [parentModule, setParentModule] = useState("");
-  const [subModule, setSubModule] = useState("");
-  const [action, setAction] = useState("");
-  const [description, setDescription] = useState("");
+  const [shake, setShake] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const isEditing = !!permission;
 
-  useEffect(() => {
-    if (open && permission) {
-      const parts = permission.name.split(':');
-      if (parts.length === 3) {
-        setParentModule(parts[0]);
-        setSubModule(parts[1]);
-        setAction(parts[2]);
-      } else {
-        setParentModule(parts[0]);
-        setSubModule("");
-        setAction(parts[1]);
-      }
-      setDescription(permission.description || "");
-    } else if (open) {
-      setParentModule("");
-      setSubModule("");
-      setAction("");
-      setDescription("");
-    }
-  }, [open, permission]);
+  const [formData, setFormData] = useState({
+    parentModule: '',
+    subModule: '',
+    action: '',
+    description: '',
+  });
 
-  const selectedModule = MODULES.find(m => m.name === parentModule);
+  useEffect(() => {
+    if (isOpen) {
+      if (permission) {
+        const parts = permission.name.split(':');
+        setFormData({
+          parentModule: parts[0] || '',
+          subModule: parts.length === 3 ? parts[1] : '',
+          action: parts.length === 3 ? parts[2] : parts[1] || '',
+          description: permission.description || '',
+        });
+      } else {
+        setFormData({
+          parentModule: '',
+          subModule: '',
+          action: '',
+          description: '',
+        });
+      }
+    }
+  }, [isOpen, permission]);
+
+  const selectedModule = MODULES.find(m => m.name === formData.parentModule);
   const availableSubModules = selectedModule?.subModels || [];
-  const availableActions = subModule 
-    ? (SUB_ACTIONS[subModule] || selectedModule?.actions || [])
+  const availableActions = formData.subModule 
+    ? (SUB_ACTIONS[formData.subModule] || selectedModule?.actions || [])
     : (selectedModule?.actions || []);
 
-  const generatedName = parentModule && action 
-    ? (subModule ? `${parentModule}:${subModule}:${action}` : `${parentModule}:${action}`)
+  const generatedName = formData.parentModule && formData.action 
+    ? (formData.subModule 
+        ? `${formData.parentModule}:${formData.subModule}:${formData.action}` 
+        : `${formData.parentModule}:${formData.action}`)
     : "";
 
-  const handlePreSubmit = () => {
-    if (!parentModule || !action) {
+  const triggerShake = () => {
+    setShake(true);
+    setTimeout(() => setShake(false), 500);
+  };
+
+  const validate = () => {
+    if (!formData.parentModule || !formData.action) {
+      triggerShake();
       showError("Please select a module and action");
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
     setConfirmOpen(true);
   };
 
   const handleSave = async () => {
     setConfirmOpen(false);
     setLoading(true);
+
     try {
       const payload = {
         name: generatedName,
-        description: description || `Permission to ${action} on ${subModule || parentModule}`
+        description: formData.description || `Permission to ${formData.action} on ${formData.subModule || formData.parentModule}`
       };
 
       if (isEditing) {
@@ -134,7 +156,7 @@ const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpe
       }
 
       onSuccess();
-      onOpenChange(false);
+      onClose();
     } catch (err: any) {
       showError(err.message);
     } finally {
@@ -144,27 +166,35 @@ const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpe
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-[420px] flex flex-col">
-          <SheetHeader className="border-b pb-4">
-            <SheetTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              {isEditing ? "Edit Permission" : "Add Permission"}
-            </SheetTitle>
-            <SheetDescription>
-              Define granular access control keys for the system.
-            </SheetDescription>
-          </SheetHeader>
+      <Sheet open={isOpen} onOpenChange={onClose}>
+        <SheetContent className="sm:max-w-[460px] p-0 flex flex-col bg-white overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-4 border-b bg-slate-50/50">
+            <SheetHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 bg-black text-white rounded-md">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <SheetTitle className="text-lg font-bold">
+                  {isEditing ? "Edit Permission" : "Add New Permission"}
+                </SheetTitle>
+              </div>
+            </SheetHeader>
+          </div>
 
-          <div className="flex-1 overflow-y-auto py-6 space-y-6">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Parent Module</Label>
+          {/* Form Content */}
+          <form 
+            onSubmit={handleSubmit} 
+            className={`flex-1 px-8 py-6 space-y-6 overflow-y-auto transition-transform ${shake ? 'animate-shake' : ''}`}
+          >
+            <div className="space-y-1">
+              <Label>Parent Module *</Label>
               <Select 
-                value={parentModule} 
-                onValueChange={(val) => { setParentModule(val); setSubModule(""); setAction(""); }}
+                value={formData.parentModule} 
+                onValueChange={(val) => setFormData({ ...formData, parentModule: val, subModule: '', action: '' })}
                 disabled={isEditing}
               >
-                <SelectTrigger className="h-11 rounded-xl border-slate-200">
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Select module..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -176,14 +206,14 @@ const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpe
             </div>
 
             {availableSubModules.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sub-Module</Label>
+              <div className="space-y-1">
+                <Label>Sub-Module</Label>
                 <Select 
-                  value={subModule} 
-                  onValueChange={(val) => { setSubModule(val); setAction(""); }}
+                  value={formData.subModule} 
+                  onValueChange={(val) => setFormData({ ...formData, subModule: val, action: '' })}
                   disabled={isEditing}
                 >
-                  <SelectTrigger className="h-11 rounded-xl border-slate-200">
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="Select sub-module..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -195,14 +225,14 @@ const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpe
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Action</Label>
+            <div className="space-y-1">
+              <Label>Action *</Label>
               <Select 
-                value={action} 
-                onValueChange={setAction}
-                disabled={isEditing || !parentModule}
+                value={formData.action} 
+                onValueChange={(val) => setFormData({ ...formData, action: val })}
+                disabled={isEditing || !formData.parentModule}
               >
-                <SelectTrigger className="h-11 rounded-xl border-slate-200">
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Select action..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -213,45 +243,65 @@ const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpe
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Description</Label>
+            <div className="space-y-1">
+              <Label>Description</Label>
               <Input 
                 placeholder="Describe what this permission allows..." 
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="h-11 rounded-xl border-slate-200"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="h-10"
               />
             </div>
 
             {generatedName && (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Permission Key Preview</Label>
-                <div className="flex">
-                  <code className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono font-bold text-indigo-600">
-                    {generatedName}
-                  </code>
-                </div>
+              <div className="p-4 rounded-xl bg-slate-50 border">
+                <Label className="text-xs text-slate-500 mb-1 block">Generated Permission Key</Label>
+                <code className="text-sm font-mono text-indigo-600 bg-white px-3 py-1.5 rounded border">
+                  {generatedName}
+                </code>
               </div>
             )}
-          </div>
+          </form>
 
-          <SheetFooter className="border-t pt-4">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">Cancel</Button>
-            <Button 
-              onClick={handlePreSubmit} 
-              disabled={loading || !parentModule || !action}
-              className="bg-black hover:bg-gray-800 text-white rounded-xl px-8"
-            >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isEditing ? "Save Changes" : "Add Permission")}
+          {/* Footer */}
+          <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3">
+            <Button variant="outline" onClick={onClose} disabled={loading}>
+              Cancel
             </Button>
-          </SheetFooter>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={loading || !formData.parentModule || !formData.action}
+              className="bg-black hover:bg-gray-800 px-6"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isEditing ? "Update Permission" : "Create Permission"}
+                </>
+              )}
+            </Button>
+          </div>
         </SheetContent>
+
+        <style jsx global>{`
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+          }
+          .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        `}</style>
       </Sheet>
 
       <ConfirmDialog
         isOpen={confirmOpen}
         title={isEditing ? "Update Permission?" : "Create Permission?"}
-        message={isEditing ? `Are you sure you want to update the permission ${generatedName}?` : `Are you sure you want to create the permission ${generatedName}?`}
+        message={isEditing 
+          ? `Are you sure you want to update <b>${generatedName}</b>?` 
+          : `Are you sure you want to create <b>${generatedName}</b>?`
+        }
         confirmText={isEditing ? "Yes, Update" : "Yes, Create"}
         onConfirm={handleSave}
         onCancel={() => setConfirmOpen(false)}
