@@ -21,7 +21,7 @@ export const useSessionMonitor = () => {
     const startHeartbeat = (sessionId: string) => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
       
-      // Update last_seen every 2 minutes
+      // Update last_seen every 1 minute for more responsive tracking
       heartbeatIntervalRef.current = setInterval(async () => {
         try {
           await supabase
@@ -31,7 +31,7 @@ export const useSessionMonitor = () => {
         } catch (err) {
           console.error("Failed to update session heartbeat:", err);
         }
-      }, 2 * 60 * 1000);
+      }, 60 * 1000);
     };
 
     const stopHeartbeat = () => {
@@ -41,36 +41,66 @@ export const useSessionMonitor = () => {
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const ipAddress = await fetchIpAddress();
-        const userAgent = navigator.userAgent;
+    const registerSession = async (userId: string, accessToken: string) => {
+      // Check if we already have an active session logged for this token to prevent duplicates
+      if (currentSessionIdRef.current) {
+        return;
+      }
 
-        try {
-          const { data, error } = await supabase
-            .from('user_sessions')
-            .insert({
-              user_id: session.user.id,
-              session_token: session.access_token,
-              ip_address: ipAddress,
-              user_agent: userAgent,
-              is_active: true,
-              login_time: new Date().toISOString(),
-              last_seen: new Date().toISOString()
-            })
-            .select('id')
-            .single();
+      const ipAddress = await fetchIpAddress();
+      const userAgent = navigator.userAgent;
 
-          if (error) throw error;
+      try {
+        // Check if there's already an active session in the database with this token
+        const { data: existing } = await supabase
+          .from('user_sessions')
+          .select('id')
+          .eq('session_token', accessToken)
+          .eq('is_active', true)
+          .maybeSingle();
 
-          if (data) {
-            currentSessionIdRef.current = data.id;
-            localStorage.setItem("current_user_session_id", data.id);
-            startHeartbeat(data.id);
-          }
-        } catch (err) {
-          console.error("Failed to register user session:", err);
+        if (existing) {
+          currentSessionIdRef.current = existing.id;
+          localStorage.setItem("current_user_session_id", existing.id);
+          startHeartbeat(existing.id);
+          return;
         }
+
+        // Otherwise, insert a new session record
+        const { data, error } = await supabase
+          .from('user_sessions')
+          .insert({
+            user_id: userId,
+            session_token: accessToken,
+            ip_address: ipAddress,
+            user_agent: userAgent,
+            is_active: true,
+            login_time: new Date().toISOString(),
+            last_seen: new Date().toISOString()
+          })
+          .select('id')
+          .single();
+
+        if (error) {
+          console.error("Supabase error inserting session:", error);
+          throw error;
+        }
+
+        if (data) {
+          currentSessionIdRef.current = data.id;
+          localStorage.setItem("current_user_session_id", data.id);
+          startHeartbeat(data.id);
+        }
+      } catch (err) {
+        console.error("Failed to register user session in database:", err);
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed event:", event, "Session user:", session?.user?.email);
+
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+        await registerSession(session.user.id, session.access_token);
       }
 
       if (event === 'TOKEN_REFRESHED' && session?.user && currentSessionIdRef.current) {
