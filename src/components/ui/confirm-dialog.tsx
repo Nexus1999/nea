@@ -53,9 +53,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                       {title}
                     </h3>
                     <div className="mt-2">
-                      <p className="text-sm text-gray-500">
-                        {message}
-                      </p>
+                      <p 
+                        className="text-sm text-gray-500"
+                        dangerouslySetInnerHTML={{ __html: message }}
+                      />
                     </div>
                   </div>
                 </div>

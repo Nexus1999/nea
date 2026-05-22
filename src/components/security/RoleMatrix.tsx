@@ -70,7 +70,7 @@ const RoleMatrix: React.FC<RoleMatrixProps> = ({ isOpen, onClose }) => {
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent 
         side="right" 
-        className="w-[98vw] max-w-[1800px] p-0 flex flex-col overflow-hidden"
+        className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] xl:w-[75vw] max-w-[1600px] p-0 flex flex-col overflow-hidden bg-white"
       >
         {/* Header */}
         <div className="px-8 py-5 border-b bg-slate-50 flex items-center justify-between sticky top-0 z-20">
@@ -80,7 +80,7 @@ const RoleMatrix: React.FC<RoleMatrixProps> = ({ isOpen, onClose }) => {
                 <Check className="h-5 w-5" />
               </div>
               <div>
-                <SheetTitle className="text-2xl">Role Permission Matrix</SheetTitle>
+                <SheetTitle className="text-2xl font-bold">Role Permission Matrix</SheetTitle>
                 <p className="text-sm text-slate-500 mt-0.5">
                   Complete overview of all roles and their permissions
                 </p>
@@ -93,13 +93,13 @@ const RoleMatrix: React.FC<RoleMatrixProps> = ({ isOpen, onClose }) => {
               variant="outline" 
               onClick={fetchData} 
               disabled={loading}
-              className="gap-2"
+              className="gap-2 rounded-xl"
             >
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
               Refresh Matrix
             </Button>
             
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9">
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 rounded-xl">
               <X className="h-5 w-5" />
             </Button>
           </div>
