@@ -6,7 +6,7 @@ import {
   Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags,
   Shield, FileText, Settings, Menu, Bell, User, ChevronDown, LogOut, X,
   Users, LayoutDashboard, Globe, MapPin, BookOpen, GraduationCap, Navigation,
-  Lock, History
+  Lock, History, KeyRound
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../providers/AuthProvider';
@@ -64,6 +64,7 @@ export const navItems = [
       { path: '/dashboard/security/users', label: 'Users', icon: Users, key: 'SecurityUsers' },
       { path: '/dashboard/security/roles', label: 'Roles', icon: UserCog, key: 'SecurityRoles' },
       { path: '/dashboard/security/permissions', label: 'Permissions', icon: Lock, key: 'SecurityPermissions' },
+      { path: '/dashboard/security/sessions', label: 'Sessions', icon: KeyRound, key: 'SecuritySessions' },
       { path: '/dashboard/security/audit-logs', label: 'Audit Logs', icon: History, key: 'SecurityAuditLogs' },
     ]
   },
