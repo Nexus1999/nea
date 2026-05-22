@@ -4,21 +4,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { User, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
-import NectaLogo from '@/components/NectaLogo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { showError, showSuccess } from '@/utils/toast';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { User, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
+import NectaLogo from '@/components/NectaLogo';
 
 const Login = () => {
   const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
@@ -63,6 +61,7 @@ const Login = () => {
       showSuccess(`Welcome back, ${username}!`);
     } catch (error: any) {
       showError(error.message || "Invalid username or password");
+    } finally {
       setLoading(false);
     }
   };
@@ -70,62 +69,60 @@ const Login = () => {
   if (authLoading) return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] relative overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-100 rounded-full blur-[120px] opacity-50" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-100 rounded-full blur-[120px] opacity-50" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black flex items-center justify-center p-4 font-sans overflow-hidden">
       
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-[440px] px-4 z-10"
-      >
-        <AnimatePresence>
-          {sessionExpired && (
-            <motion.div
-              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-              animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
-              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-              className="overflow-hidden"
-            >
-              <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800 rounded-2xl shadow-lg shadow-red-100">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertTitle className="font-black uppercase text-[10px] tracking-widest">Session Expired</AlertTitle>
-                <AlertDescription className="text-xs font-medium">
-                  You have been logged out due to inactivity. Please log in again to continue.
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Background Grid */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293740_1px,transparent_1px),linear-gradient(to_bottom,#1f293740_1px,transparent_1px)] bg-[size:50px_50px]" />
 
-        <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden">
-          <CardHeader className="pt-10 pb-2 px-8 text-center">
-            <h1 className="text-lg font-bold tracking-tight text-gray-900">
+      <div className="w-full max-w-md relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="bg-gray-900/70 backdrop-blur-xl border border-gray-700 rounded-3xl shadow-2xl overflow-hidden"
+        >
+
+          {/* Header */}
+          <div className="pt-5 pb-4 px-8 text-center border-b border-gray-800">
+            <p className="text-white text-xl font-extrabold tracking-wide">
               EXAMINATIONS ADMINISTRATION
-            </h1>
-            <div className="flex justify-center mb-6 mt-4">
-              <motion.div 
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                className="p-6 bg-white rounded-3xl shadow-xl ring-1 ring-gray-100"
-              >
-                <NectaLogo className="w-24 h-24" />
-              </motion.div>
+            </p>
+
+            <div className="flex justify-center mt-4 mb-2">
+              <div className="p-4 bg-gray-800/50 rounded-2xl">
+                <NectaLogo className="w-32 h-32" />
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="px-8 pb-10">
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-sm font-semibold text-gray-700 ml-1">Username</Label>
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-red-500 transition-colors">
-                    <User size={18} />
-                  </div>
-                  <input 
-                    id="username"
+          </div>
+
+          {/* Form */}
+          <div className="p-8">
+            <AnimatePresence>
+              {sessionExpired && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="mb-6 flex gap-3 items-start bg-orange-500/10 border border-orange-500/30 text-orange-400 p-4 rounded-2xl text-sm"
+                >
+                  <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  <span>Your session has expired. Please sign in again.</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              {/* Username */}
+              <div>
+                <label className="text-xs font-medium text-gray-400 mb-2 block">
+                  USERNAME
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+                  <input
+                    type="text"
                     placeholder="Enter your username"
-                    className="flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-11 transition-all"
+                    className="w-full bg-gray-800 border border-gray-700 focus:border-orange-500 rounded-2xl py-3.5 pl-12 pr-5 text-white placeholder-gray-500 focus:outline-none transition-all"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
@@ -133,56 +130,75 @@ const Login = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center ml-1">
-                  <Label htmlFor="password" className="text-sm font-semibold text-gray-700">Password</Label>
-                  <Link to="/forgot-password" title="Reset your password" className="text-xs font-bold text-red-600 hover:text-red-700 transition-colors">
-                    Forgot Password?
-                  </Link>
-                </div>
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-red-500 transition-colors">
-                    <Lock size={18} />
-                  </div>
-                  <input 
-                    id="password"
-                    type="password"
+              {/* Password */}
+              <div>
+                <label className="text-xs font-medium text-gray-400 mb-2 block">
+                  PASSWORD
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className="flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-11 transition-all"
+                    className="w-full bg-gray-800 border border-gray-700 focus:border-orange-500 rounded-2xl py-3.5 pl-12 pr-12 text-white placeholder-gray-500 focus:outline-none transition-all"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-200 transition-all active:scale-[0.98]"
+              {/* Remember + Forgot */}
+              <div className="flex items-center justify-between text-sm">
+                <label className="flex items-center gap-2 text-gray-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-orange-500 bg-gray-800 border-gray-600"
+                  />
+                  Remember me
+                </label>
+
+                <Link
+                  to="/forgot-password"
+                  className="text-orange-400 hover:text-orange-300 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
                 disabled={loading}
+                className="w-full mt-2 bg-gradient-to-r from-red-500 via-orange-500 to-yellow-400 hover:brightness-110 transition-all text-black font-bold py-3.5 rounded-2xl text-base flex items-center justify-center gap-3 shadow-lg shadow-orange-500/30 disabled:opacity-70"
               >
                 {loading ? (
-                  <Loader2 className="animate-spin mr-2" size={20} />
+                  <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                 ) : (
                   <>
-                    Sign In <ArrowRight className="ml-2" size={18} />
+                    SIGN IN
+                    <ArrowRight className="w-5 h-5" />
                   </>
                 )}
-              </Button>
+              </button>
             </form>
-            <div className="mt-8 text-center">
-              <p className="text-sm text-gray-500">
-                Don't have an account? <button className="font-bold text-red-600 hover:underline">Contact Admin</button>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        <div className="mt-8 text-center">
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">
-            © NECTA • All Rights Reserved
-          </p>
-        </div>
-      </motion.div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-8 py-4 border-t border-gray-800 text-center">
+            <p className="text-gray-500 text-xs">
+              © {new Date().getFullYear()} NECTA • National Examinations Council
+            </p>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 };
