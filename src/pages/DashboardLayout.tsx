@@ -13,6 +13,7 @@ import { useAuth } from '../providers/AuthProvider';
 import { showSuccess, showError } from '../utils/toast';
 import NectaLogo from '../components/NectaLogo';
 import DynamicBreadcrumbs from '../components/DynamicBreadcrumbs';
+import { useSessionMonitor } from '../hooks/useSessionMonitor';
 
 // ── Nav Items ─────────────────────────────────────────────────
 export const navItems = [
@@ -157,6 +158,9 @@ const NavGroup = ({
 
 // ── Main DashboardLayout ──────────────────────────────────────────────────────
 const DashboardLayout = () => {
+  // Initialize session monitor
+  useSessionMonitor();
+
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isCollapsed, setCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
