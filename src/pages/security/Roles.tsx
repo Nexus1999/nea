@@ -5,14 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Shield, PlusCircle, Search, Edit, Trash2, 
-  Lock, Users, ChevronRight, AlertTriangle
+  Users, ChevronRight
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { showStyledSwal } from '@/utils/alerts';
 import Spinner from "@/components/Spinner";
 import RoleForm from "@/components/security/RoleForm";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const Roles = () => {
   const [roles, setRoles] = useState<any[]>([]);
@@ -20,6 +20,18 @@ const Roles = () => {
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<any>(null);
+
+  // Confirm Dialog State
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     fetchRoles();
@@ -52,27 +64,23 @@ const Roles = () => {
     setIsFormOpen(true);
   };
 
-  const handleDeleteRole = async (role: any) => {
-    const result = await showStyledSwal({
+  const handleDeleteRole = (role: any) => {
+    setConfirmConfig({
       title: 'Delete Role?',
-      html: `Are you sure you want to delete the role <b>${role.name}</b>? This may affect users assigned to this role.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, delete it!',
-      cancelButtonText: 'Cancel',
-      reverseButtons: true,
-    });
-
-    if (result.isConfirmed) {
-      try {
-        const { error } = await supabase.from('roles').delete().eq('id', role.id);
-        if (error) throw error;
-        showSuccess("Role deleted successfully");
-        fetchRoles();
-      } catch (err: any) {
-        showError(err.message);
+      message: `Are you sure you want to delete the role ${role.name}? This may affect users assigned to this role.`,
+      onConfirm: async () => {
+        setConfirmOpen(false);
+        try {
+          const { error } = await supabase.from('roles').delete().eq('id', role.id);
+          if (error) throw error;
+          showSuccess("Role deleted successfully");
+          fetchRoles();
+        } catch (err: any) {
+          showError(err.message);
+        }
       }
-    }
+    });
+    setConfirmOpen(true);
   };
 
   const filteredRoles = roles.filter(r => 
@@ -177,6 +185,16 @@ const Roles = () => {
         onOpenChange={setIsFormOpen} 
         role={selectedRole} 
         onSuccess={fetchRoles} 
+      />
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        isDestructive={true}
+        confirmText="Yes, delete it!"
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmOpen(false)}
       />
     </div>
   );

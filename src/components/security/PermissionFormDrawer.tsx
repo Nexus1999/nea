@@ -22,6 +22,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { Loader2, Shield } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const MODULES = [
   { name: 'Timetables', actions: ['view', 'add', 'edit', 'delete'] },
@@ -65,6 +66,7 @@ const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpe
   const [subModule, setSubModule] = useState("");
   const [action, setAction] = useState("");
   const [description, setDescription] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const isEditing = !!permission;
 
@@ -99,12 +101,16 @@ const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpe
     ? (subModule ? `${parentModule}:${subModule}:${action}` : `${parentModule}:${action}`)
     : "";
 
-  const handleSave = async () => {
+  const handlePreSubmit = () => {
     if (!parentModule || !action) {
       showError("Please select a module and action");
       return;
     }
+    setConfirmOpen(true);
+  };
 
+  const handleSave = async () => {
+    setConfirmOpen(false);
     setLoading(true);
     try {
       const payload = {
@@ -137,109 +143,120 @@ const PermissionFormDrawer: React.FC<PermissionFormDrawerProps> = ({ open, onOpe
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-[420px] flex flex-col">
-        <SheetHeader className="border-b pb-4">
-          <SheetTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
-            {isEditing ? "Edit Permission" : "Add Permission"}
-          </SheetTitle>
-          <SheetDescription>
-            Define granular access control keys for the system.
-          </SheetDescription>
-        </SheetHeader>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="sm:max-w-[420px] flex flex-col">
+          <SheetHeader className="border-b pb-4">
+            <SheetTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              {isEditing ? "Edit Permission" : "Add Permission"}
+            </SheetTitle>
+            <SheetDescription>
+              Define granular access control keys for the system.
+            </SheetDescription>
+          </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto py-6 space-y-6">
-          <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Parent Module</Label>
-            <Select 
-              value={parentModule} 
-              onValueChange={(val) => { setParentModule(val); setSubModule(""); setAction(""); }}
-              disabled={isEditing}
-            >
-              <SelectTrigger className="h-11 rounded-xl border-slate-200">
-                <SelectValue placeholder="Select module..." />
-              </SelectTrigger>
-              <SelectContent>
-                {MODULES.map(m => (
-                  <SelectItem key={m.name} value={m.name}>{m.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {availableSubModules.length > 0 && (
+          <div className="flex-1 overflow-y-auto py-6 space-y-6">
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sub-Module</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Parent Module</Label>
               <Select 
-                value={subModule} 
-                onValueChange={(val) => { setSubModule(val); setAction(""); }}
+                value={parentModule} 
+                onValueChange={(val) => { setParentModule(val); setSubModule(""); setAction(""); }}
                 disabled={isEditing}
               >
                 <SelectTrigger className="h-11 rounded-xl border-slate-200">
-                  <SelectValue placeholder="Select sub-module..." />
+                  <SelectValue placeholder="Select module..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableSubModules.map(s => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  {MODULES.map(m => (
+                    <SelectItem key={m.name} value={m.name}>{m.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Action</Label>
-            <Select 
-              value={action} 
-              onValueChange={setAction}
-              disabled={isEditing || !parentModule}
-            >
-              <SelectTrigger className="h-11 rounded-xl border-slate-200">
-                <SelectValue placeholder="Select action..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availableActions.map(a => (
-                  <SelectItem key={a} value={a}>{a}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Description</Label>
-            <Input 
-              placeholder="Describe what this permission allows..." 
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="h-11 rounded-xl border-slate-200"
-            />
-          </div>
-
-          {generatedName && (
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Permission Key Preview</Label>
-              <div className="flex">
-                <code className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono font-bold text-indigo-600">
-                  {generatedName}
-                </code>
+            {availableSubModules.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sub-Module</Label>
+                <Select 
+                  value={subModule} 
+                  onValueChange={(val) => { setSubModule(val); setAction(""); }}
+                  disabled={isEditing}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-slate-200">
+                    <SelectValue placeholder="Select sub-module..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSubModules.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        <SheetFooter className="border-t pt-4">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">Cancel</Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={loading || !parentModule || !action}
-            className="bg-black hover:bg-gray-800 text-white rounded-xl px-8"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isEditing ? "Save Changes" : "Add Permission")}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Action</Label>
+              <Select 
+                value={action} 
+                onValueChange={setAction}
+                disabled={isEditing || !parentModule}
+              >
+                <SelectTrigger className="h-11 rounded-xl border-slate-200">
+                  <SelectValue placeholder="Select action..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableActions.map(a => (
+                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Description</Label>
+              <Input 
+                placeholder="Describe what this permission allows..." 
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="h-11 rounded-xl border-slate-200"
+              />
+            </div>
+
+            {generatedName && (
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Permission Key Preview</Label>
+                <div className="flex">
+                  <code className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono font-bold text-indigo-600">
+                    {generatedName}
+                  </code>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <SheetFooter className="border-t pt-4">
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">Cancel</Button>
+            <Button 
+              onClick={handlePreSubmit} 
+              disabled={loading || !parentModule || !action}
+              className="bg-black hover:bg-gray-800 text-white rounded-xl px-8"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isEditing ? "Save Changes" : "Add Permission")}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title={isEditing ? "Update Permission?" : "Create Permission?"}
+        message={isEditing ? `Are you sure you want to update the permission ${generatedName}?` : `Are you sure you want to create the permission ${generatedName}?`}
+        confirmText={isEditing ? "Yes, Update" : "Yes, Create"}
+        onConfirm={handleSave}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   );
 };
 

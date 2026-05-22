@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { logDataChange } from "@/utils/auditLogger";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const roleSchema = z.object({
   id: z.string().optional(),
@@ -45,6 +46,8 @@ interface RoleFormProps {
 
 const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingValues, setPendingValues] = useState<RoleFormValues | null>(null);
   const isEditing = !!role?.id;
 
   const form = useForm<RoleFormValues>({
@@ -65,15 +68,22 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
     }
   }, [open, role, form]);
 
-  const onSubmit = async (values: RoleFormValues) => {
+  const onSubmit = (values: RoleFormValues) => {
+    setPendingValues(values);
+    setConfirmOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!pendingValues) return;
+    setConfirmOpen(false);
     setLoading(true);
     try {
       if (isEditing) {
         const { error } = await supabase
           .from("roles")
           .update({
-            name: values.name.toUpperCase(),
-            description: values.description,
+            name: pendingValues.name.toUpperCase(),
+            description: pendingValues.description,
           })
           .eq("id", role.id);
         if (error) throw error;
@@ -83,14 +93,14 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
           record_id: role.id!,
           action_type: 'UPDATE',
           old_data: role,
-          new_data: values
+          new_data: pendingValues
         });
 
         showSuccess("Role updated successfully");
       } else {
         const { data, error } = await supabase.from("roles").insert({
-          name: values.name.toUpperCase(),
-          description: values.description,
+          name: pendingValues.name.toUpperCase(),
+          description: pendingValues.description,
         }).select('id').single();
         
         if (error) throw error;
@@ -99,7 +109,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
           table_name: 'roles',
           record_id: data.id,
           action_type: 'INSERT',
-          new_data: values
+          new_data: pendingValues
         });
 
         showSuccess("Role created successfully");
@@ -114,64 +124,75 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onOpenChange, role, onSuccess
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
-            {isEditing ? "Edit Role" : "Create New Role"}
-          </DialogTitle>
-          <DialogDescription>
-            Define system access levels and permissions.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              {isEditing ? "Edit Role" : "Create New Role"}
+            </DialogTitle>
+            <DialogDescription>
+              Define system access levels and permissions.
+            </DialogDescription>
+          </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-bold uppercase">Role Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. ADMINISTRATOR" className="uppercase" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase">Role Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. ADMINISTRATOR" className="uppercase" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-bold uppercase">Description</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Describe what this role can do..." 
-                      className="resize-none" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase">Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Describe what this role can do..." 
+                        className="resize-none" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading} className="bg-black hover:bg-gray-800">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> {isEditing ? "Update Role" : "Create Role"}</>}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading} className="bg-black hover:bg-gray-800">
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> {isEditing ? "Update Role" : "Create Role"}</>}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title={isEditing ? "Update Role?" : "Create Role?"}
+        message={isEditing ? `Are you sure you want to update the role ${pendingValues?.name}?` : `Are you sure you want to create the role ${pendingValues?.name}?`}
+        confirmText={isEditing ? "Yes, Update" : "Yes, Create"}
+        onConfirm={handleSave}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   );
 };
 

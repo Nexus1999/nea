@@ -7,7 +7,7 @@ import {
   Lock, Search, PlusCircle, Filter, 
   Shield, Settings, Database, 
   RefreshCw, Edit, Trash2, ShieldCheck,
-  LayoutGrid, List, Package, FileText, Tags
+  LayoutGrid, List, Package
 } from "lucide-react";
 import {
   Table,
@@ -22,12 +22,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { showStyledSwal } from '@/utils/alerts';
 import Spinner from "@/components/Spinner";
 import PermissionFormDrawer from "@/components/security/PermissionFormDrawer";
 import AssignPermissionsDrawer from "@/components/security/AssignPermissionsDrawer";
 import RoleMatrix from "@/components/security/RoleMatrix";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const Permissions = () => {
   const [permissions, setPermissions] = useState<any[]>([]);
@@ -38,6 +38,18 @@ const Permissions = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState<any>(null);
+
+  // Confirm Dialog State
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     fetchPermissions();
@@ -60,30 +72,27 @@ const Permissions = () => {
     }
   };
 
-  const handleDelete = async (permission: any) => {
-    const result = await showStyledSwal({
+  const handleDelete = (permission: any) => {
+    setConfirmConfig({
       title: 'Delete Permission?',
-      html: `Are you sure you want to delete <b>${permission.name}</b>?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, delete it!',
-      confirmButtonColor: '#ef4444',
-    });
-
-    if (result.isConfirmed) {
-      try {
-        const { error } = await supabase
-          .from('permissions')
-          .delete()
-          .eq('id', permission.id);
-        
-        if (error) throw error;
-        showSuccess("Permission deleted");
-        fetchPermissions();
-      } catch (err: any) {
-        showError(err.message);
+      message: `Are you sure you want to delete ${permission.name}?`,
+      onConfirm: async () => {
+        setConfirmOpen(false);
+        try {
+          const { error } = await supabase
+            .from('permissions')
+            .delete()
+            .eq('id', permission.id);
+          
+          if (error) throw error;
+          showSuccess("Permission deleted");
+          fetchPermissions();
+        } catch (err: any) {
+          showError(err.message);
+        }
       }
-    }
+    });
+    setConfirmOpen(true);
   };
 
   const getModuleIcon = (name: string) => {
@@ -269,6 +278,16 @@ const Permissions = () => {
         open={isAssignOpen} 
         onOpenChange={setIsAssignOpen} 
         onSuccess={fetchPermissions} 
+      />
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        isDestructive={true}
+        confirmText="Yes, delete it!"
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmOpen(false)}
       />
     </div>
   );

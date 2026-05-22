@@ -19,7 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { showStyledSwal } from '@/utils/alerts';
 import { cn } from "@/lib/utils";
 
 import Spinner from "@/components/Spinner";
@@ -27,6 +26,7 @@ import UserForm from "@/components/security/UserForm";
 import ChangePasswordModal from "@/components/security/ChangePasswordModal";
 import { logChange } from "@/utils/audit";
 import PaginationControls from "@/components/ui/pagination-controls";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const Users = () => {
   const navigate = useNavigate();
@@ -42,6 +42,20 @@ const Users = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+
+  // Confirm Dialog State
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+    confirmText?: string;
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -67,78 +81,76 @@ const Users = () => {
     }
   };
 
-  const handleToggleStatus = async (user: any) => {
+  const handleToggleStatus = (user: any) => {
     const currentStatus = user.status || 'active';
     const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
     const actionText = newStatus === 'active' ? 'Activate' : 'Block';
 
-    const result = await showStyledSwal({
+    setConfirmConfig({
       title: `${actionText} User?`,
-      text: `Are you sure you want to ${actionText.toLowerCase()} ${user.username}?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: `Yes, ${actionText}!`,
-      confirmButtonColor: newStatus === 'active' ? '#10b981' : '#ef4444',
-    });
+      message: `Are you sure you want to ${actionText.toLowerCase()} ${user.username}?`,
+      isDestructive: newStatus === 'blocked',
+      confirmText: `Yes, ${actionText}`,
+      onConfirm: async () => {
+        setConfirmOpen(false);
+        try {
+          const { data, error } = await supabase.functions.invoke('manage-users', {
+            body: {
+              action: 'TOGGLE_USER_STATUS',
+              userData: { userId: user.id, status: newStatus }
+            }
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
 
-    if (result.isConfirmed) {
-      try {
-        const { data, error } = await supabase.functions.invoke('manage-users', {
-          body: {
-            action: 'TOGGLE_USER_STATUS',
-            userData: { userId: user.id, status: newStatus }
-          }
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+          await logChange({
+            tableName: 'profiles',
+            recordId: user.id,
+            actionType: 'UPDATE',
+            oldData: { status: currentStatus },
+            newData: { status: newStatus }
+          });
 
-        await logChange({
-          tableName: 'profiles',
-          recordId: user.id,
-          actionType: 'UPDATE',
-          oldData: { status: currentStatus },
-          newData: { status: newStatus }
-        });
-
-        showSuccess(`User ${newStatus === 'active' ? 'activated' : 'blocked'} successfully`);
-        fetchUsers();
-      } catch (err: any) {
-        showError(err.message);
+          showSuccess(`User ${newStatus === 'active' ? 'activated' : 'blocked'} successfully`);
+          fetchUsers();
+        } catch (err: any) {
+          showError(err.message);
+        }
       }
-    }
+    });
+    setConfirmOpen(true);
   };
 
-  const handleDeleteUser = async (user: any) => {
-    const result = await showStyledSwal({
+  const handleDeleteUser = (user: any) => {
+    setConfirmConfig({
       title: 'Delete User?',
-      html: `Are you sure you want to delete <b>${user.username}</b>? This will permanently remove their access.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, delete account',
-      confirmButtonColor: '#d32f2f',
-    });
+      message: `Are you sure you want to delete ${user.username}? This will permanently remove their access.`,
+      isDestructive: true,
+      confirmText: 'Yes, delete account',
+      onConfirm: async () => {
+        setConfirmOpen(false);
+        try {
+          const { data, error } = await supabase.functions.invoke('manage-users', {
+            body: { action: 'DELETE_USER', userData: { userId: user.id } }
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
 
-    if (result.isConfirmed) {
-      try {
-        const { data, error } = await supabase.functions.invoke('manage-users', {
-          body: { action: 'DELETE_USER', userData: { userId: user.id } }
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+          await logChange({
+            tableName: 'profiles',
+            recordId: user.id,
+            actionType: 'DELETE',
+            oldData: user
+          });
 
-        await logChange({
-          tableName: 'profiles',
-          recordId: user.id,
-          actionType: 'DELETE',
-          oldData: user
-        });
-
-        showSuccess("User account deleted");
-        fetchUsers();
-      } catch (err: any) {
-        showError(err.message);
+          showSuccess("User account deleted");
+          fetchUsers();
+        } catch (err: any) {
+          showError(err.message);
+        }
       }
-    }
+    });
+    setConfirmOpen(true);
   };
 
   const filteredUsers = useMemo(() => {
@@ -344,6 +356,16 @@ const Users = () => {
         open={isPasswordModalOpen}
         onOpenChange={setIsPasswordModalOpen}
         user={selectedUser}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        isDestructive={confirmConfig.isDestructive}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmOpen(false)}
       />
     </>
   );
