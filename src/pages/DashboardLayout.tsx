@@ -14,6 +14,12 @@ import { showSuccess, showError } from '../utils/toast';
 import NectaLogo from '../components/NectaLogo';
 import DynamicBreadcrumbs from '../components/DynamicBreadcrumbs';
 import { useSessionMonitor } from '../hooks/useSessionMonitor';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ── Nav Items ─────────────────────────────────────────────────
 export const navItems = [
@@ -97,26 +103,41 @@ const NavGroup = ({
   const location = useLocation();
   const isParentActive = location.pathname.startsWith(item.path);
 
+  const triggerButton = (
+    <button
+      onClick={onToggle}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left ${
+        isParentActive
+          ? 'bg-gradient-to-r from-red-500/80 via-orange-500/70 to-yellow-400/60 text-white shadow-sm'
+          : 'text-gray-300 hover:bg-white/10 hover:text-white'
+      } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <item.icon className="h-4 w-4 shrink-0" />
+        {!isCollapsed && <span className="font-semibold text-sm truncate">{item.label}</span>}
+      </div>
+      {!isCollapsed && (
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
+        />
+      )}
+    </button>
+  );
+
   return (
     <div className="space-y-0.5">
-      <button
-        onClick={onToggle}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left ${
-          isParentActive
-            ? 'bg-gradient-to-r from-red-500/80 via-orange-500/70 to-yellow-400/60 text-white shadow-sm'
-            : 'text-gray-300 hover:bg-white/10 hover:text-white'
-        } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <item.icon className="h-4 w-4 shrink-0" />
-          {!isCollapsed && <span className="font-semibold text-sm truncate">{item.label}</span>}
-        </div>
-        {!isCollapsed && (
-          <ChevronDown
-            className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
-          />
-        )}
-      </button>
+      {isCollapsed ? (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            {triggerButton}
+          </TooltipTrigger>
+          <TooltipContent side="right" className="font-semibold text-xs bg-slate-900 text-white border-none">
+            {item.label}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        triggerButton
+      )}
 
       <AnimatePresence initial={false}>
         {isOpen && !isCollapsed && (
@@ -257,41 +278,41 @@ const DashboardLayout = () => {
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className={`flex items-center gap-3 px-5 py-5 border-b border-white/10 ${isCollapsed ? 'justify-center' : ''}`}>
-        <div className="shrink-0 p-2 bg-gradient-to-br from-red-500 via-orange-500 to-yellow-400 rounded-xl shadow-lg ring-2 ring-white/20">
-          <NectaLogo className={`${isCollapsed ? 'w-6 h-6' : 'w-8 h-8'} text-white`} />
-        </div>
-        {!isCollapsed && (
-          <div className="min-w-0">
-            <h1 className="text-white font-black text-lg leading-none">NEAS</h1>
-            <p className="text-gray-400 text-xs font-medium mt-0.5">Admin System v2</p>
+    <TooltipProvider>
+      <div className="flex flex-col h-full">
+        {/* Logo */}
+        <div className={`flex items-center gap-3 px-5 py-5 border-b border-white/10 ${isCollapsed ? 'justify-center' : ''}`}>
+          <div className="shrink-0 p-2 bg-gradient-to-br from-red-500 via-orange-500 to-yellow-400 rounded-xl shadow-lg ring-2 ring-white/20">
+            <NectaLogo className={`${isCollapsed ? 'w-6 h-6' : 'w-8 h-8'} text-white`} />
           </div>
-        )}
-      </div>
+          {!isCollapsed && (
+            <div className="min-w-0">
+              <h1 className="text-white font-black text-lg leading-none">NEAS</h1>
+              <p className="text-gray-400 text-xs font-medium mt-0.5">Admin System v2</p>
+            </div>
+          )}
+        </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        <style>{`nav::-webkit-scrollbar { display: none; }`}</style>
-        {filteredNavItems.map((item) => {
-          if (item.subItems) {
-            const isOpen = openGroupKey === item.key;
-            return (
-              <NavGroup
-                key={item.key}
-                item={item}
-                isCollapsed={isCollapsed}
-                isOpen={isOpen}
-                onToggle={() => toggleGroup(item.key)}
-                onCloseMobile={() => setMobileSidebarOpen(false)}
-              />
-            );
-          }
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <style>{`nav::-webkit-scrollbar { display: none; }`}</style>
+          {filteredNavItems.map((item) => {
+            if (item.subItems) {
+              const isOpen = openGroupKey === item.key;
+              return (
+                <NavGroup
+                  key={item.key}
+                  item={item}
+                  isCollapsed={isCollapsed}
+                  isOpen={isOpen}
+                  onToggle={() => toggleGroup(item.key)}
+                  onCloseMobile={() => setMobileSidebarOpen(false)}
+                />
+              );
+            }
 
-          const isActive = (item as any).exact ? location.pathname === item.path : location.pathname === item.path;
-          return (
-            <Link key={item.key} to={item.path} onClick={() => setMobileSidebarOpen(false)}>
+            const isActive = (item as any).exact ? location.pathname === item.path : location.pathname === item.path;
+            const linkContent = (
               <motion.div
                 whileHover={{ x: isCollapsed ? 0 : 2 }}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
@@ -303,33 +324,50 @@ const DashboardLayout = () => {
                 <item.icon className="h-4 w-4 shrink-0" />
                 {!isCollapsed && <span className="font-semibold text-sm truncate">{item.label}</span>}
               </motion.div>
-            </Link>
-          );
-        })}
-      </nav>
+            );
 
-      {/* User Footer */}
-      <div className="p-3 border-t border-white/10">
-        <div className={`flex items-center gap-3 p-2.5 bg-white/5 rounded-xl mb-2 ${isCollapsed ? 'justify-center' : ''}`}>
-          <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center ring-2 ring-white/20 shrink-0">
-            <User className="w-4 h-4 text-white" />
-          </div>
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{user?.email || 'User'}</p>
-              <p className="text-xs text-gray-400 truncate">{userRole || 'Loading...'}</p>
+            return (
+              <Link key={item.key} to={item.path} onClick={() => setMobileSidebarOpen(false)}>
+                {isCollapsed ? (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      {linkContent}
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="font-semibold text-xs bg-slate-900 text-white border-none">
+                      {item.label}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  linkContent
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* User Footer */}
+        <div className="p-3 border-t border-white/10">
+          <div className={`flex items-center gap-3 p-2.5 bg-white/5 rounded-xl mb-2 ${isCollapsed ? 'justify-center' : ''}`}>
+            <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center ring-2 ring-white/20 shrink-0">
+              <User className="w-4 h-4 text-white" />
             </div>
-          )}
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{user?.email || 'User'}</p>
+                <p className="text-xs text-gray-400 truncate">{userRole || 'Loading...'}</p>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => handleLogout()}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-white/10 hover:text-white transition-colors ${isCollapsed ? 'justify-center' : ''}`}
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            {!isCollapsed && <span className="font-semibold text-sm">Logout</span>}
+          </button>
         </div>
-        <button
-          onClick={() => handleLogout()}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-white/10 hover:text-white transition-colors ${isCollapsed ? 'justify-center' : ''}`}
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          {!isCollapsed && <span className="font-semibold text-sm">Logout</span>}
-        </button>
       </div>
-    </div>
+    </TooltipProvider>
   );
 
   return (
