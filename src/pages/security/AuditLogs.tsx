@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
-import { AuditLogDetailsDrawer } from "@/components/audit/AuditLogDetailsDrawer";
+import { AuditLogDetailsDrawer } from "@/components/security/AuditLogDetailsDrawer";
 import PaginationControls from "@/components/ui/pagination-controls";
 
 const AuditLogs = () => {
@@ -217,8 +217,8 @@ const AuditLogs = () => {
       </Card>
 
       <AuditLogDetailsDrawer 
-        isOpen={isDrawerOpen} 
-        onClose={() => setIsDrawerOpen(false)} 
+        open={isDrawerOpen} 
+        onOpenChange={setIsDrawerOpen} 
         log={selectedLog} 
       />
     </>
