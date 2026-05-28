@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Shield, PlusCircle, Search, Edit, Trash2, 
-  ShieldCheck, RefreshCw 
+  ShieldCheck 
 } from "lucide-react";
 import {
   Table,
@@ -22,7 +22,6 @@ import { showError, showSuccess } from "@/utils/toast";
 import Spinner from "@/components/Spinner";
 import PermissionFormDrawer from "@/components/security/PermissionFormDrawer";
 import AssignPermissionsDrawer from "@/components/security/AssignPermissionsDrawer";
-import RoleMatrix from "@/components/security/RoleMatrix";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PaginationControls from "@/components/ui/pagination-controls";
@@ -35,7 +34,6 @@ const Permissions = () => {
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
-  const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState<any>(null);
 
   // Pagination
@@ -155,14 +153,6 @@ const Permissions = () => {
             >
               <ShieldCheck className="h-4 w-4 mr-2" />
               Assign to Role
-            </Button>
-            
-            <Button 
-              variant="outline"
-              onClick={() => setIsMatrixOpen(true)}
-            >
-              <Shield className="h-4 w-4 mr-2" />
-              Role Matrix
             </Button>
 
             <Button 
@@ -301,12 +291,6 @@ const Permissions = () => {
         isOpen={isAssignOpen} 
         onClose={() => setIsAssignOpen(false)} 
         onSuccess={fetchPermissions} 
-      />
-
-      {/* Role Matrix - Side Drawer */}
-      <RoleMatrix 
-        isOpen={isMatrixOpen} 
-        onClose={() => setIsMatrixOpen(false)} 
       />
 
       <ConfirmDialog
