@@ -183,7 +183,7 @@ const DashboardLayout = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showLogoutCountdown, setShowLogoutCountdown] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60);
-  const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const idleTimerRef = useRef<any>(null);
@@ -193,13 +193,13 @@ const DashboardLayout = () => {
   const navigate = useNavigate();
   const { user, userRole, logout, hasPermission } = useAuth();
 
-  // Auto-open correct group when route changes
+  // Auto-open correct group when route changes and keep it open
   useEffect(() => {
     const activeGroup = navItems.find(
       (item) => item.subItems && location.pathname.startsWith(item.path)
     );
     if (activeGroup) {
-      setOpenGroupKey(activeGroup.key);
+      setOpenGroups(prev => ({ ...prev, [activeGroup.key]: true }));
     }
   }, [location.pathname]);
 
@@ -268,9 +268,9 @@ const DashboardLayout = () => {
     return hasPermission(item.permission);
   });
 
-  // Toggle with single open enforcement
+  // Toggle group state independently so other open groups stay open
   const toggleGroup = (key: string) => {
-    setOpenGroupKey(prev => (prev === key ? null : key));
+    setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const SidebarContent = () => (
@@ -294,7 +294,7 @@ const DashboardLayout = () => {
           <style>{`nav::-webkit-scrollbar { display: none; }`}</style>
           {filteredNavItems.map((item) => {
             if (item.subItems) {
-              const isOpen = openGroupKey === item.key;
+              const isOpen = !!openGroups[item.key];
               return (
                 <NavGroup
                   key={item.key}
@@ -309,8 +309,7 @@ const DashboardLayout = () => {
 
             const isActive = (item as any).exact ? location.pathname === item.path : location.pathname === item.path;
             const linkContent = (
-              <motion.div
-                whileHover={{ x: isCollapsed ? 0 : 2 }}
+              <div
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
                   isActive
                     ? 'bg-gradient-to-r from-red-500/80 via-orange-500/70 to-yellow-400/60 text-white shadow-sm'
@@ -319,7 +318,7 @@ const DashboardLayout = () => {
               >
                 <item.icon className="h-4 w-4 shrink-0" />
                 {!isCollapsed && <span className="font-semibold text-sm truncate">{item.label}</span>}
-              </motion.div>
+              </div>
             );
 
             return (
