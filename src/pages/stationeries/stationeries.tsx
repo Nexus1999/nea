@@ -34,7 +34,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
@@ -139,17 +138,6 @@ const StationeriesPage = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Draft':
-        return <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 font-medium px-2 py-0 h-5">DRAFT</Badge>;
-      case 'Finalized':
-        return <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 font-medium px-2 py-0 h-5">FINALIZED</Badge>;
-      default:
-        return <Badge variant="outline" className="font-medium px-2 py-0 h-5">{status}</Badge>;
-    }
-  };
-
   return (
     <Card className="relative min-h-[600px]">
       {loading && (
@@ -194,7 +182,6 @@ const StationeriesPage = () => {
                     <ArrowUpDown className={cn("ml-2 h-4 w-4", orderBy === 'examination_year' ? 'opacity-100' : 'opacity-50')} />
                   </Button>
                 </TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Created At</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -202,7 +189,7 @@ const StationeriesPage = () => {
             <TableBody>
               {currentItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     No stationery records found.
                   </TableCell>
                 </TableRow>
@@ -214,7 +201,6 @@ const StationeriesPage = () => {
                     </TableCell>
                     <TableCell className="font-medium">{s.examination_name}</TableCell>
                     <TableCell>{s.examination_year}</TableCell>
-                    <TableCell>{getStatusBadge(s.status)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {format(new Date(s.created_at), 'PPP')}
                     </TableCell>
