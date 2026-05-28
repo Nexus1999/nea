@@ -42,7 +42,6 @@ import UserProfile from "./pages/security/UserProfile";
 import Roles from "./pages/security/Roles";
 import Permissions from "./pages/security/Permissions";
 import AuditLogs from "./pages/security/AuditLogs";
-import Sessions from "./pages/security/Sessions";
 
 // Budget Module Pages
 import BudgetsPage from "./pages/budgets/BudgetsPage";
@@ -129,7 +128,6 @@ const App = () => (
               <Route path="security/roles" element={<Roles />} />
               <Route path="security/permissions" element={<Permissions />} />
               <Route path="security/audit-logs" element={<AuditLogs />} />
-              <Route path="security/sessions" element={<Sessions />} />
 
                {/* Settings Routes */}
               <Route path="settings/subjects" element={<Subjects />} />

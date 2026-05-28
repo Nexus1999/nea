@@ -6,14 +6,13 @@ import {
   Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags,
   Shield, FileText, Settings, Menu, Bell, User, ChevronDown, LogOut, X,
   Users, LayoutDashboard, Globe, MapPin, BookOpen, GraduationCap, Navigation,
-  Lock, History, Activity
+  Lock, History
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../providers/AuthProvider';
 import { showSuccess, showError } from '../utils/toast';
 import NectaLogo from '../components/NectaLogo';
 import DynamicBreadcrumbs from '../components/DynamicBreadcrumbs';
-import { useSessionMonitor } from '../hooks/useSessionMonitor';
 import {
   Tooltip,
   TooltipContent,
@@ -64,7 +63,6 @@ export const navItems = [
       { path: '/dashboard/security/users', label: 'Users', icon: Users, key: 'SecurityUsers' },
       { path: '/dashboard/security/roles', label: 'Roles', icon: UserCog, key: 'SecurityRoles' },
       { path: '/dashboard/security/permissions', label: 'Permissions', icon: Lock, key: 'SecurityPermissions' },
-      { path: '/dashboard/security/sessions', label: 'Sessions', icon: Activity, key: 'SecuritySessions' },
       { path: '/dashboard/security/audit-logs', label: 'Audit Logs', icon: History, key: 'SecurityAuditLogs' },
     ]
   },
@@ -180,9 +178,6 @@ const NavGroup = ({
 
 // ── Main DashboardLayout ──────────────────────────────────────────────────────
 const DashboardLayout = () => {
-  // Initialize session monitor
-  useSessionMonitor();
-
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isCollapsed, setCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
