@@ -194,7 +194,8 @@ const DashboardLayout = () => {
 
           <nav className="flex-1 p-4 space-y-2">
             {filteredNavItems.map((item) => {
-              const isActive = location.pathname === item.path || (item.subItems && location.pathname.startsWith(item.path));
+              const isExactActive = location.pathname === item.path;
+              const isParentOfActive = item.subItems && location.pathname.startsWith(item.path) && !isExactActive;
               
               if (item.subItems) {
                 const isSubMenuOpen =
@@ -215,7 +216,11 @@ const DashboardLayout = () => {
                       <motion.div
                         whileHover={{ x: 2 }}
                         className={`flex items-center justify-between gap-3 p-3 rounded-lg transition-colors cursor-pointer ${
-                          isActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
+                          isExactActive 
+                            ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" 
+                            : isParentOfActive
+                            ? "bg-white/10 text-white font-semibold"
+                            : "text-gray-300 hover:bg-white/10 hover:text-white"
                         } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
                       >
                         <div className="flex items-center gap-3">
@@ -254,7 +259,7 @@ const DashboardLayout = () => {
                   <motion.div
                     whileHover={{ x: 2 }}
                     className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                      isActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
+                      isExactActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
                     } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
                   >
                     <item.icon className="h-5 w-5" />
