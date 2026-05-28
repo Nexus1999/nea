@@ -1,37 +1,33 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate, Link, Outlet } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate, Link, Outlet } from "react-router-dom";
 import {
-  Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags,
-  Shield, FileText, Settings, Menu, Bell, User, ChevronDown, LogOut, X,
-  Users, LayoutDashboard, Globe, MapPin, BookOpen, GraduationCap, Navigation,
-  Lock, History
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '../providers/AuthProvider';
-import { showSuccess, showError } from '../utils/toast';
-import NectaLogo from '../components/NectaLogo';
-import DynamicBreadcrumbs from '../components/DynamicBreadcrumbs';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Home, Clock, DollarSign, Database, PenLine, UserCog, Building, Tags, Shield, FileText, Settings,
+  Menu, Bell, User, ChevronDown, LogOut, X, Users, LayoutDashboard,
+  Globe, MapPin, BookOpen, GraduationCap,
+  Navigation
+} from "lucide-react";
+ 
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { showStyledSwal } from '../utils/alerts';
+import { useAuth } from "@/providers/AuthProvider";
+import { motion, AnimatePresence } from "framer-motion";
+import NectaLogo from "@/components/NectaLogo";
+import Spinner from "@/components/Spinner";
+import DynamicBreadcrumbs from "@/components/DynamicBreadcrumbs";
 
-// ── Nav Items ─────────────────────────────────────────────────
-export const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: Home, key: 'Dashboard', exact: true },
+const navItems = [
+  { path: '/dashboard', label: 'Dashboard', icon: Home, key: 'Dashboard' },
   { path: '/dashboard/timetables', label: 'Timetables', icon: Clock, key: 'Timetables', permission: 'Timetables:view' },
   { path: '/dashboard/budgets', label: 'Budgets', icon: DollarSign, key: 'Budgets', permission: 'Budgets:view' },
-  { path: '/dashboard/mastersummaries', label: 'Master Summaries', icon: Database, key: 'MasterSummaries', permission: 'Master Summaries:view' },
+  { path: '/dashboard/mastersummaries', label: 'Master Summaries', icon: Database, key:'Master Summaries', permission: 'Master Summaries:view' },
   { path: '/dashboard/stationeries', label: 'Stationeries', icon: PenLine, key: 'Stationeries', permission: 'Stationeries:view' },
   { path: '/dashboard/supervisors', label: 'Supervisions', icon: UserCog, key: 'Supervisions', permission: 'Supervisors:view' },
-  {
-    path: '/dashboard/institutions',
-    label: 'Institutions',
-    icon: Building,
+  { 
+    path: '/dashboard/institutions', 
+    label: 'Institutions', 
+    icon: Building, 
     key: 'Institutions',
     permission: 'Institutions:view',
     subItems: [
@@ -41,15 +37,15 @@ export const navItems = [
       { path: '/dashboard/institutions/colleges', label: 'Teachers Colleges', icon: Building, key: 'TeachersColleges' },
     ]
   },
-  {
+ {
     path: '/dashboard/miscellaneous',
     label: 'Miscellaneous',
     icon: Tags,
     key: 'Miscellaneous',
     permission: 'Miscellaneous:view',
     subItems: [
-      { path: '/dashboard/miscellaneous/overview', label: 'Overview', icon: LayoutDashboard, key: 'MiscOverview' },
-      { path: '/dashboard/miscellaneous/jobs', label: 'Teachers Inventory', icon: Users, key: 'MiscTeachers' },
+      { path: '/dashboard/miscellaneous/overview', label: 'OverView', icon: LayoutDashboard, key: 'MiscellaneousOverview' },
+      { path: '/dashboard/miscellaneous/jobs', label: 'Teachers Inventory', icon: Users, key: 'MiscellaneousTeachers' },
     ],
   },
   {
@@ -59,11 +55,11 @@ export const navItems = [
     key: 'Security',
     permission: 'Security:view',
     subItems: [
-      { path: '/dashboard/security', label: 'Overview', icon: Shield, key: 'SecurityOverview', exact: true },
+      { path: '/dashboard/security', label: 'Overview', icon: Shield, key: 'SecurityOverview' },
       { path: '/dashboard/security/users', label: 'Users', icon: Users, key: 'SecurityUsers' },
       { path: '/dashboard/security/roles', label: 'Roles', icon: UserCog, key: 'SecurityRoles' },
-      { path: '/dashboard/security/permissions', label: 'Permissions', icon: Lock, key: 'SecurityPermissions' },
-      { path: '/dashboard/security/audit-logs', label: 'Audit Logs', icon: History, key: 'SecurityAuditLogs' },
+      { path: '/dashboard/security/permissions', label: 'Permissions', icon: Shield, key: 'SecurityPermissions' },
+      { path: '/dashboard/security/audit-logs', label: 'Audit Logs', icon: FileText, key: 'SecurityAuditLogs' },
     ]
   },
   { path: '/dashboard/reports', label: 'Reports', icon: FileText, key: 'Reports', permission: 'Reports:view' },
@@ -79,383 +75,274 @@ export const navItems = [
       { path: '/dashboard/settings/examinations', label: 'Examinations', icon: BookOpen, key: 'SettingsExaminations' },
       { path: '/dashboard/settings/subjects', label: 'Subjects', icon: GraduationCap, key: 'SettingsSubjects' },
       { path: '/dashboard/settings/regional-distances', label: 'Regional Distances', icon: Navigation, key: 'SettingsDistances' },
-      { path: '/dashboard/settings/transport-guidelines', label: 'Transport Guidelines', icon: Settings, key: 'SettingsTransport' },
+      { path: '/dashboard/settings/transport-guidelines', label: 'Transport Guidelines', icon: Shield, key: 'SettingsTransportGuidelines' },
     ]
   },
   { path: '/dashboard/profile', label: 'Profile', icon: User, key: 'Profile' },
 ];
 
-// ── NavGroup Component ─────────────────────────────────
-const NavGroup = ({
-  item,
-  isCollapsed,
-  isOpen,
-  onToggle,
-  onCloseMobile,
-}: {
-  item: typeof navItems[0] & { subItems?: any[] };
-  isCollapsed: boolean;
-  isOpen: boolean;
-  onToggle: () => void;
-  onCloseMobile: () => void;
-}) => {
-  const location = useLocation();
-  const isParentActive = location.pathname.startsWith(item.path);
-
-  const triggerButton = (
-    <button
-      onClick={onToggle}
-      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left ${
-        isParentActive
-          ? 'bg-gradient-to-r from-red-500/80 via-orange-500/70 to-yellow-400/60 text-white shadow-sm'
-          : 'text-gray-300 hover:bg-white/10 hover:text-white'
-      } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
-    >
-      <div className="flex items-center gap-3 min-w-0">
-        <item.icon className="h-4 w-4 shrink-0" />
-        {!isCollapsed && <span className="font-semibold text-sm truncate">{item.label}</span>}
-      </div>
-      {!isCollapsed && (
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
-        />
-      )}
-    </button>
-  );
-
-  return (
-    <div className="space-y-0.5">
-      {isCollapsed ? (
-        <Tooltip delayDuration={0}>
-          <TooltipTrigger asChild>
-            {triggerButton}
-          </TooltipTrigger>
-          <TooltipContent side="right" className="font-semibold text-xs bg-slate-900 text-white border-none">
-            {item.label}
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        triggerButton
-      )}
-
-      <AnimatePresence initial={false}>
-        {isOpen && !isCollapsed && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="overflow-hidden"
-          >
-            <div className="ml-4 pl-3 border-l border-white/10 space-y-0.5 py-1">
-              {item.subItems!.map((sub) => {
-                const isActive = (sub as any).exact
-                  ? location.pathname === sub.path
-                  : location.pathname === sub.path || location.pathname.startsWith(sub.path + '/');
-                return (
-                  <Link
-                    key={sub.key}
-                    to={sub.path}
-                    onClick={onCloseMobile}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
-                      isActive
-                        ? 'bg-white/15 text-white font-semibold'
-                        : 'text-gray-400 hover:bg-white/8 hover:text-gray-200'
-                    }`}
-                  >
-                    <sub.icon className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{sub.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-// ── Main DashboardLayout ──────────────────────────────────────────────────────
 const DashboardLayout = () => {
-  const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [isCollapsed, setCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [showLogoutCountdown, setShowLogoutCountdown] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [isSecuritySubMenuOpen, setIsSecuritySubMenuOpen] = useState(false);
+  const [isSettingsSubMenuOpen, setIsSettingsSubMenuOpen] = useState(false);
+  const [isInstitutionsSubMenuOpen, setIsInstitutionsSubMenuOpen] = useState(false);
+  const [isMiscellaneousSubMenuOpen, setIsMiscellaneousSubMenuOpen] = useState(false);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const idleTimerRef = useRef<any>(null);
-  const countdownIntervalRef = useRef<any>(null);
-
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, userRole, logout, hasPermission } = useAuth();
+  const { session, user, loading, userRole, logout, hasPermission } = useAuth();
 
-  // Auto-open correct group when route changes and keep it open
   useEffect(() => {
-    const activeGroup = navItems.find(
-      (item) => item.subItems && location.pathname.startsWith(item.path)
-    );
-    if (activeGroup) {
-      setOpenGroups(prev => ({ ...prev, [activeGroup.key]: true }));
-    }
+    setIsSecuritySubMenuOpen(location.pathname.startsWith('/dashboard/security'));
+    setIsSettingsSubMenuOpen(location.pathname.startsWith('/dashboard/settings'));
+    setIsInstitutionsSubMenuOpen(location.pathname.startsWith('/dashboard/institutions'));
+    setIsMiscellaneousSubMenuOpen(location.pathname.startsWith('/dashboard/miscellaneous'));
   }, [location.pathname]);
 
-  // Click outside handler
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+    if (!loading && !session && location.pathname !== '/login') {
+      navigate("/login", { replace: true });
+    }
+  }, [session, loading, navigate, location.pathname]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout failed:", error);
+      showStyledSwal({
+        icon: "error",
+        title: "Logout Failed",
+        text: "An error occurred while trying to log out. Please try again."
+      });
+    }
+  };
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setUserMenuOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = async (reason?: string) => {
-    try {
-      await logout();
-      if (!reason) showSuccess('Logged out successfully');
-      navigate(reason ? `/login?reason=${reason}` : '/login');
-    } catch {
-      showError('Failed to log out');
-    }
-  };
-
-  // Auto-logout logic
-  const IDLE_TIMEOUT = 14 * 60 * 1000;
-  const COUNTDOWN_START = 60;
-
-  const startCountdown = () => {
-    setShowLogoutCountdown(true);
-    setTimeLeft(COUNTDOWN_START);
-    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    countdownIntervalRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownIntervalRef.current);
-          handleLogout('expired');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const resetIdleTimer = () => {
-    setShowLogoutCountdown(false);
-    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(startCountdown, IDLE_TIMEOUT);
-  };
-
-  useEffect(() => {
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    events.forEach(event => document.addEventListener(event, resetIdleTimer));
-    resetIdleTimer();
-
-    return () => {
-      events.forEach(event => document.removeEventListener(event, resetIdleTimer));
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    };
-  }, []);
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-white/70 flex items-center justify-center z-[9999]">
+        <Spinner label="Loading dashboard..." size="lg" />
+      </div>
+    );
+  }
 
   const filteredNavItems = navItems.filter(item => {
     if (!item.permission) return true;
     return hasPermission(item.permission);
   });
 
-  // Toggle group state independently so other open groups stay open
-  const toggleGroup = (key: string) => {
-    setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const SidebarContent = () => (
-    <TooltipProvider>
-      <div className="flex flex-col h-full">
-        {/* Logo */}
-        <div className={`flex items-center gap-3 px-5 py-5 border-b border-white/10 ${isCollapsed ? 'justify-center' : ''}`}>
-          <div className="shrink-0 p-2 bg-gradient-to-br from-red-500 via-orange-500 to-yellow-400 rounded-xl shadow-lg ring-2 ring-white/20">
-            <NectaLogo className={`${isCollapsed ? 'w-6 h-6' : 'w-8 h-8'} text-white`} />
-          </div>
-          {!isCollapsed && (
-            <div className="min-w-0">
-              <h1 className="text-white font-black text-lg leading-none">NEAS</h1>
-              <p className="text-gray-400 text-xs font-medium mt-0.5">Admin System v2</p>
-            </div>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-          <style>{`nav::-webkit-scrollbar { display: none; }`}</style>
-          {filteredNavItems.map((item) => {
-            if (item.subItems) {
-              const isOpen = !!openGroups[item.key];
-              return (
-                <NavGroup
-                  key={item.key}
-                  item={item}
-                  isCollapsed={isCollapsed}
-                  isOpen={isOpen}
-                  onToggle={() => toggleGroup(item.key)}
-                  onCloseMobile={() => setMobileSidebarOpen(false)}
-                />
-              );
-            }
-
-            const isActive = (item as any).exact ? location.pathname === item.path : location.pathname === item.path;
-            const linkContent = (
-              <div
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                  isActive
-                    ? 'bg-gradient-to-r from-red-500/80 via-orange-500/70 to-yellow-400/60 text-white shadow-sm'
-                    : 'text-gray-300 hover:bg-white/10 hover:text-white'
-                } ${isCollapsed ? 'justify-center' : ''}`}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {!isCollapsed && <span className="font-semibold text-sm truncate">{item.label}</span>}
-              </div>
-            );
-
-            return (
-              <Link key={item.key} to={item.path} onClick={() => setMobileSidebarOpen(false)}>
-                {isCollapsed ? (
-                  <Tooltip delayDuration={0}>
-                    <TooltipTrigger asChild>
-                      {linkContent}
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="font-semibold text-xs bg-slate-900 text-white border-none">
-                      {item.label}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  linkContent
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* User Footer */}
-        <div className="p-3 border-t border-white/10">
-          <div className={`flex items-center gap-3 p-2.5 bg-white/5 rounded-xl mb-2 ${isCollapsed ? 'justify-center' : ''}`}>
-            <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center ring-2 ring-white/20 shrink-0">
-              <User className="w-4 h-4 text-white" />
-            </div>
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{user?.email || 'User'}</p>
-                <p className="text-xs text-gray-400 truncate">{userRole || 'Loading...'}</p>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => handleLogout()}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-white/10 hover:text-white transition-colors ${isCollapsed ? 'justify-center' : ''}`}
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            {!isCollapsed && <span className="font-semibold text-sm">Logout</span>}
-          </button>
-        </div>
-      </div>
-    </TooltipProvider>
-  );
-
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
-      {/* Mobile Overlay */}
+    <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
       <AnimatePresence>
         {isMobileSidebarOpen && (
           <motion.div
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setMobileSidebarOpen(false)}
+            onClick={() => setIsMobileSidebarOpen(false)}
             className="fixed inset-0 bg-black/60 z-40 lg:hidden"
           />
         )}
       </AnimatePresence>
 
-      {/* Mobile Sidebar */}
-      <motion.div
-        initial={{ x: '-100%' }}
-        animate={{ x: isMobileSidebarOpen ? 0 : '-100%' }}
-        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-gray-900 to-gray-800 shadow-2xl lg:hidden"
-      >
-        <button onClick={() => setMobileSidebarOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
-          <X className="h-5 w-5" />
-        </button>
-        <SidebarContent />
-      </motion.div>
-
-      {/* Desktop Sidebar */}
       <motion.aside
-        animate={{ width: isCollapsed ? 72 : 272 }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className="hidden lg:flex flex-col h-full bg-gradient-to-b from-gray-900 to-gray-800 shadow-2xl z-30 shrink-0 overflow-hidden"
+        initial={false}
+        animate={{ width: isDesktopSidebarCollapsed ? "90px" : "288px" }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className={`
+          flex-shrink-0 h-full bg-gradient-to-b from-gray-900 to-gray-800 shadow-2xl z-50
+          ${isMobileSidebarOpen ? "fixed translate-x-0" : "fixed -translate-x-full"}
+          lg:relative lg:translate-x-0
+          flex flex-col overflow-y-auto scrollbar-none
+        `}
+        style={{ 
+          width: isMobileSidebarOpen ? "288px" : (isDesktopSidebarCollapsed ? "90px" : "288px"),
+          msOverflowStyle: 'none',
+          scrollbarWidth: 'none'
+        }}
       >
-        <SidebarContent />
-      </motion.aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Topbar */}
-        <header className="h-16 flex items-center justify-between px-6 bg-white shadow-sm z-20 shrink-0">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setMobileSidebarOpen(true)} className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100">
-              <Menu className="h-5 w-5" />
-            </button>
-            <button onClick={() => setCollapsed(prev => !prev)} className="hidden lg:flex p-2 rounded-lg text-gray-500 hover:bg-gray-100">
-              <Menu className="h-5 w-5" />
+        <div className="flex flex-col h-full">
+          <div className="p-6 border-b border-white/10 flex justify-between items-center h-20">
+            <div className={`flex items-center gap-3 ${isDesktopSidebarCollapsed ? 'justify-center w-full' : ''}`}>
+              <div className="p-2.5 bg-gradient-to-br from-red-500 via-orange-500 to-yellow-400 rounded-xl shadow-lg ring-2 ring-white/20">
+                <NectaLogo className="w-6 h-6" />
+              </div>
+              {!isDesktopSidebarCollapsed && (
+                <div>
+                  <h1 className="text-white font-black text-lg">NEAS</h1>
+                  <p className="text-xs text-gray-400 font-medium">Admin System</p>
+                </div>
+              )}
+            </div>
+            <button onClick={() => setIsMobileSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white">
+              <X size={24} />
             </button>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative cursor-pointer">
-              <Bell className="h-5 w-5 text-gray-500 hover:text-gray-800" />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center">3</span>
+          <nav className="flex-1 p-4 space-y-2">
+            {filteredNavItems.map((item) => {
+              const isActive = location.pathname === item.path || (item.subItems && location.pathname.startsWith(item.path));
+              
+              if (item.subItems) {
+                const isSubMenuOpen =
+                  item.key === 'Security' ? isSecuritySubMenuOpen :
+                  item.key === 'Settings' ? isSettingsSubMenuOpen :
+                  item.key === 'Institutions' ? isInstitutionsSubMenuOpen :
+                  item.key === 'Miscellaneous' ? isMiscellaneousSubMenuOpen : false;
+
+                const setIsSubMenuOpen =
+                  item.key === 'Security' ? setIsSecuritySubMenuOpen :
+                  item.key === 'Settings' ? setIsSettingsSubMenuOpen :
+                  item.key === 'Institutions' ? setIsInstitutionsSubMenuOpen :
+                  item.key === 'Miscellaneous' ? setIsMiscellaneousSubMenuOpen : () => {};
+
+                return (
+                  <Collapsible key={item.key} open={isSubMenuOpen} onOpenChange={setIsSubMenuOpen} className="space-y-2">
+                    <CollapsibleTrigger asChild>
+                      <motion.div
+                        whileHover={{ x: 2 }}
+                        className={`flex items-center justify-between gap-3 p-3 rounded-lg transition-colors cursor-pointer ${
+                          isActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
+                        } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <item.icon className="h-5 w-5" />
+                          {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">{item.label}</span>}
+                        </div>
+                        {!isDesktopSidebarCollapsed && (
+                          <ChevronDown className={`h-4 w-4 transition-transform ${isSubMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
+                        )}
+                      </motion.div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="ml-4 space-y-1">
+                      {item.subItems.map((subItem) => {
+                        const isSubItemActive = location.pathname === subItem.path;
+                        return (
+                          <Link key={subItem.key} to={subItem.path} onClick={() => setIsMobileSidebarOpen(false)}>
+                            <motion.div
+                              whileHover={{ x: 2 }}
+                              className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                                isSubItemActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
+                              } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
+                            >
+                              <subItem.icon className="h-5 w-5" />
+                              {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">{subItem.label}</span>}
+                            </motion.div>
+                          </Link>
+                        );
+                      })}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              }
+
+              return (
+                <Link key={item.key} to={item.path} onClick={() => setIsMobileSidebarOpen(false)}>
+                  <motion.div
+                    whileHover={{ x: 2 }}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                      isActive ? "bg-gradient-to-r from-red-500/80 via-orange-500/80 to-yellow-400/80 text-white shadow-md" : "text-gray-300 hover:bg-white/10 hover:text-white"
+                    } ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">{item.label}</span>}
+                  </motion.div>
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="p-4 border-t border-white/10 space-y-2">
+            <div className={`flex items-center gap-3 p-2 bg-white/5 rounded-lg ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}>
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center ring-2 ring-white/20">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              {!isDesktopSidebarCollapsed && (
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-white truncate">{user?.email || "User"}</p>
+                  <p className="text-xs text-gray-400">{userRole || "Loading Role..."}</p>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleLogout}
+              className={`w-full flex items-center justify-start text-gray-300 hover:bg-white/10 hover:text-white p-3 rounded-lg transition-colors ${isDesktopSidebarCollapsed ? 'justify-center' : ''}`}
+            >
+              <LogOut className={`h-5 w-5 ${!isDesktopSidebarCollapsed ? 'mr-3' : ''}`} />
+              {!isDesktopSidebarCollapsed && <span className="font-semibold text-sm">Logout</span>}
+            </button>
+          </div>
+        </div>
+      </motion.aside>
+
+      <div className="flex-1 flex flex-col">
+        <header className="flex items-center justify-between h-20 bg-white shadow-sm px-6 z-30 flex-shrink-0">
+          <button onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} className="text-gray-600 hover:text-primary transition-colors lg:hidden">
+            <Menu size={24} />
+          </button>
+          <div className="hidden lg:block">
+            <button onClick={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)} className="text-gray-600 hover:text-primary transition-colors p-2 rounded-full hover:bg-gray-100">
+              <Menu size={24} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-4 ml-auto">
+            <div className="relative">
+              <Bell size={24} className="text-gray-600 cursor-pointer hover:text-primary" />
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
             </div>
 
             <div ref={userMenuRef} className="relative">
-              <button onClick={() => setUserMenuOpen(prev => !prev)} className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-gray-100">
-                <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+              <div className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-100 transition-colors" onClick={() => setUserMenuOpen(!userMenuOpen)}>
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-semibold">
                   {user?.email ? user.email.charAt(0).toUpperCase() : "U"}
                 </div>
-                <div className="hidden md:flex flex-col text-left">
-                  <p className="text-sm font-semibold text-gray-800">{user?.email || 'User'}</p>
-                  <p className="text-xs text-gray-500">{userRole}</p>
+                <div className="hidden md:flex flex-col">
+                  <p className="text-sm font-semibold text-gray-800">{user?.email || "User"}</p>
+                  <p className="text-xs text-gray-600">{userRole || "Loading Role..."}</p>
                 </div>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              </button>
+                <ChevronDown size={16} className="text-gray-600" />
+              </div>
 
               <AnimatePresence>
                 {userMenuOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                    className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-1.5 z-50"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-2 w-60 bg-white rounded-lg shadow-lg py-2 z-50 origin-top-right"
                   >
-                    <div className="px-4 py-2.5 border-b border-gray-100">
-                      <p className="font-semibold text-sm text-gray-900">{user?.email || 'User'}</p>
-                      <p className="text-xs text-gray-500">{userRole}</p>
+                    <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
+                      <p className="font-semibold">{user?.email || "User"}</p>
+                      <p className="text-xs text-gray-500">{userRole || "Loading Role..."}</p>
                     </div>
-                    <Link to="/dashboard/profile" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
-                      <User className="h-4 w-4 text-gray-400" /> Profile
+                    <Link to="/dashboard/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={() => setUserMenuOpen(false)}>
+                      <User size={16} /> Profile
                     </Link>
-                    <Link to="/dashboard/settings" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
-                      <Settings className="h-4 w-4 text-gray-400" /> Settings
+                    <Link to="/dashboard/settings/regions" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={() => setUserMenuOpen(false)}>
+                      <Settings size={16} /> Settings
                     </Link>
-                    <button 
-                      onClick={() => { setUserMenuOpen(false); handleLogout(); }} 
-                      className="flex items-center gap-2.5 w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
-                      <LogOut className="h-4 w-4" /> Logout
+                      <LogOut size={16} /> Logout
                     </button>
                   </motion.div>
                 )}
@@ -464,48 +351,15 @@ const DashboardLayout = () => {
           </div>
         </header>
 
-        {/* Main Scrollable Area */}
-        <div className="flex-1 overflow-auto p-6 md:p-10 bg-gray-50/50">
-          <div className="flex justify-end mb-6">
-            <div className="max-w-[85%] md:max-w-none">
+        <div className="flex-1 p-6 overflow-auto">
+          <div className="flex justify-end mb-4 px-2">
+            <div className="max-w-[75%] md:max-w-none">
               <DynamicBreadcrumbs />
             </div>
           </div>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+          <Outlet />
         </div>
       </div>
-
-      {/* Logout Countdown Overlay */}
-      <AnimatePresence>
-        {showLogoutCountdown && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-md p-4"
-          >
-            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center space-y-4">
-              <h3 className="text-lg font-bold text-gray-900">Session Expiring</h3>
-              <p className="text-sm text-gray-500">You have been idle for a while. You will be logged out in <span className="font-bold text-red-600">{timeLeft}</span> seconds.</p>
-              <div className="flex gap-3">
-                <Button onClick={() => handleLogout('expired')} variant="outline" className="flex-1 rounded-xl">Logout</Button>
-                <Button onClick={resetIdleTimer} className="flex-1 bg-black hover:bg-gray-800 text-white rounded-xl">Stay Logged In</Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
