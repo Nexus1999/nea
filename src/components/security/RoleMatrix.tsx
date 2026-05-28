@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -16,8 +16,15 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Check, Minus, Loader2, RefreshCw, X } from "lucide-react";
+import { Check, Minus, Loader2, RefreshCw, X, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface RoleMatrixProps {
@@ -30,6 +37,7 @@ const RoleMatrix: React.FC<RoleMatrixProps> = ({ isOpen, onClose }) => {
   const [roles, setRoles] = useState<any[]>([]);
   const [permissions, setPermissions] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Record<string, Set<string>>>({});
+  const [moduleFilter, setModuleFilter] = useState<string>("all");
 
   useEffect(() => {
     if (isOpen) {
@@ -66,11 +74,25 @@ const RoleMatrix: React.FC<RoleMatrixProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  // Extract unique modules from permissions
+  const modules = useMemo(() => {
+    const extracted = permissions.map(p => p.name.split(':')[0]);
+    return ["all", ...new Set(extracted)];
+  }, [permissions]);
+
+  // Filter permissions based on selected module
+  const filteredPermissions = useMemo(() => {
+    return permissions.filter(p => {
+      if (moduleFilter === "all") return true;
+      return p.name.startsWith(`${moduleFilter}:`);
+    });
+  }, [permissions, moduleFilter]);
+
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent 
         side="right" 
-        className="!w-[96vw] !max-w-[96vw] p-0 flex flex-col overflow-hidden bg-white border-l shadow-2xl"
+        className="!w-[70vw] !max-w-[70vw] p-0 flex flex-col overflow-hidden bg-white border-l shadow-2xl"
       >
         {/* Header */}
         <div className="px-8 py-5 border-b bg-slate-50 flex items-center justify-between sticky top-0 z-20">
@@ -89,20 +111,40 @@ const RoleMatrix: React.FC<RoleMatrixProps> = ({ isOpen, onClose }) => {
           </SheetHeader>
 
           <div className="flex items-center gap-3">
-            <Button 
-              variant="outline" 
-              onClick={fetchData} 
-              disabled={loading}
-              className="gap-2 rounded-xl"
-            >
-              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-              Refresh Matrix
-            </Button>
-            
             <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 rounded-xl">
               <X className="h-5 w-5" />
             </Button>
           </div>
+        </div>
+
+        {/* Filters & Actions Bar */}
+        <div className="px-8 py-4 border-b bg-white flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-slate-400" />
+            <span className="text-sm font-medium text-slate-600">Filter Module:</span>
+            <Select value={moduleFilter} onValueChange={setModuleFilter}>
+              <SelectTrigger className="w-[200px] h-9">
+                <SelectValue placeholder="Select Module" />
+              </SelectTrigger>
+              <SelectContent>
+                {modules.map(m => (
+                  <SelectItem key={m} value={m}>
+                    {m === "all" ? "All Modules" : m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button 
+            variant="outline" 
+            onClick={fetchData} 
+            disabled={loading}
+            className="gap-2 rounded-xl h-9"
+          >
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            Refresh Matrix
+          </Button>
         </div>
 
         {/* Content */}
@@ -132,34 +174,42 @@ const RoleMatrix: React.FC<RoleMatrixProps> = ({ isOpen, onClose }) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {permissions.map(perm => (
-                      <TableRow key={perm.id} className="hover:bg-slate-50 transition-colors">
-                        <TableCell className="pl-8 border-r font-medium">
-                          <code className="px-4 py-2 bg-slate-100 rounded-lg text-sm font-mono text-indigo-700 border border-indigo-100">
-                            {perm.name}
-                          </code>
+                    {filteredPermissions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={roles.length + 1} className="text-center py-10 text-slate-400">
+                          No permissions found for the selected module.
                         </TableCell>
-                        {roles.map(role => {
-                          const isAssigned = assignments[role.id]?.has(perm.id);
-                          return (
-                            <TableCell 
-                              key={`${role.id}-${perm.id}`} 
-                              className="text-center border-r last:border-r-0 py-4"
-                            >
-                              <div className="flex justify-center">
-                                {isAssigned ? (
-                                  <div className="h-9 w-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 border border-emerald-200">
-                                    <Check className="h-5 w-5" />
-                                  </div>
-                                ) : (
-                                  <Minus className="h-6 w-6 text-slate-200" />
-                                )}
-                              </div>
-                            </TableCell>
-                          );
-                        })}
                       </TableRow>
-                    ))}
+                    ) : (
+                      filteredPermissions.map(perm => (
+                        <TableRow key={perm.id} className="hover:bg-slate-50 transition-colors">
+                          <TableCell className="pl-8 border-r font-medium">
+                            <code className="px-4 py-2 bg-slate-100 rounded-lg text-sm font-mono text-indigo-700 border border-indigo-100">
+                              {perm.name}
+                            </code>
+                          </TableCell>
+                          {roles.map(role => {
+                            const isAssigned = assignments[role.id]?.has(perm.id);
+                            return (
+                              <TableCell 
+                                key={`${role.id}-${perm.id}`} 
+                                className="text-center border-r last:border-r-0 py-4"
+                              >
+                                <div className="flex justify-center">
+                                  {isAssigned ? (
+                                    <div className="h-9 w-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 border border-emerald-200">
+                                      <Check className="h-5 w-5" />
+                                    </div>
+                                  ) : (
+                                    <Minus className="h-6 w-6 text-slate-200" />
+                                  )}
+                                </div>
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
