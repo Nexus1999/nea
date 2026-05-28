@@ -177,6 +177,12 @@ const StationeriesPage = () => {
                   </Button>
                 </TableHead>
                 <TableHead>
+                  <Button variant="ghost" onClick={() => handleSort('examination_code')} className="px-0 hover:bg-transparent">
+                    Code
+                    <ArrowUpDown className={cn("ml-2 h-4 w-4", orderBy === 'examination_code' ? 'opacity-100' : 'opacity-50')} />
+                  </Button>
+                </TableHead>
+                <TableHead>
                   <Button variant="ghost" onClick={() => handleSort('examination_year')} className="px-0 hover:bg-transparent">
                     Year
                     <ArrowUpDown className={cn("ml-2 h-4 w-4", orderBy === 'examination_year' ? 'opacity-100' : 'opacity-50')} />
@@ -189,7 +195,7 @@ const StationeriesPage = () => {
             <TableBody>
               {currentItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No stationery records found.
                   </TableCell>
                 </TableRow>
@@ -200,6 +206,7 @@ const StationeriesPage = () => {
                       {(currentPage - 1) * itemsPerPage + index + 1}
                     </TableCell>
                     <TableCell className="font-medium">{s.examination_name}</TableCell>
+                    <TableCell className="font-semibold text-slate-700">{s.examination_code}</TableCell>
                     <TableCell>{s.examination_year}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {format(new Date(s.created_at), 'PPP')}
