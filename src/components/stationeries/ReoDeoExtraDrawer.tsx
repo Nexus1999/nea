@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -42,10 +42,15 @@ interface ReoDeoExtraDrawerProps {
 
 const ReoDeoExtraDrawer: React.FC<ReoDeoExtraDrawerProps> = ({ open, onOpenChange, stationery, onSuccess }) => {
   const [settings, setSettings] = useState<Record<string, number>>({});
+  const [existingId, setExistingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const examCode = stationery?.examination_code;
+
+  const isDeo = useMemo(() => {
+    return ['PSLE', 'SSNA', 'SFNA'].includes(examCode || '');
+  }, [examCode]);
 
   const filteredItems = useMemo(() => {
     if (!examCode) return ALL_EXTRA_ITEMS;
@@ -72,7 +77,15 @@ const ReoDeoExtraDrawer: React.FC<ReoDeoExtraDrawerProps> = ({ open, onOpenChang
         .select('*')
         .eq('stationery_id', stationery.id)
         .maybeSingle()
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Error fetching extra settings:", error);
+          }
+          if (data) {
+            setExistingId(data.id);
+          } else {
+            setExistingId(null);
+          }
           const newSettings: Record<string, number> = {};
           filteredItems.forEach(item => {
             newSettings[item.key] = data ? Number(data[item.key] || 0) : 0;
@@ -88,8 +101,24 @@ const ReoDeoExtraDrawer: React.FC<ReoDeoExtraDrawerProps> = ({ open, onOpenChang
     setSaving(true);
     try {
       const payload = { stationery_id: stationery.id, ...settings };
-      await supabase.from('stationery_reo_deo_extra').upsert(payload, { onConflict: 'stationery_id' });
-      showSuccess("REO/DEO Extra settings saved successfully.");
+      
+      let error;
+      if (existingId) {
+        const { error: err } = await supabase
+          .from('stationery_reo_deo_extra')
+          .update(payload)
+          .eq('id', existingId);
+        error = err;
+      } else {
+        const { error: err } = await supabase
+          .from('stationery_reo_deo_extra')
+          .insert(payload);
+        error = err;
+      }
+
+      if (error) throw error;
+
+      showSuccess(`${isDeo ? 'DEO' : 'REO'} Extra settings saved successfully.`);
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
@@ -108,7 +137,9 @@ const ReoDeoExtraDrawer: React.FC<ReoDeoExtraDrawerProps> = ({ open, onOpenChang
               <div className="p-1.5 bg-black text-white rounded-md">
                 <Users className="h-4 w-4" />
               </div>
-              <SheetTitle className="text-lg font-bold">REO/DEO Extra Settings</SheetTitle>
+              <SheetTitle className="text-lg font-bold">
+                {isDeo ? "DEO Extra Settings" : "REO Extra Settings"}
+              </SheetTitle>
             </div>
             <SheetDescription className="text-xs">
               Configure extra percentages for {stationery?.title}
