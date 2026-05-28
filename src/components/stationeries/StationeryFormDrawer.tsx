@@ -10,7 +10,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +20,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -40,9 +38,7 @@ const stationeryFormSchema = z.object({
     (val) => Number(val),
     z.number().int().positive({ message: "Master Summary is required." })
   ),
-  status: z.enum(["Draft", "Finalized"], {
-    required_error: "Status is required.",
-  }),
+  status: z.enum(["Draft", "Finalized"]).default("Draft"),
 });
 
 export type StationeryFormValues = z.infer<typeof stationeryFormSchema>;
@@ -121,13 +117,13 @@ const StationeryFormDrawer: React.FC<StationeryFormDrawerProps> = ({ open, onOpe
         mid: values.mid,
         user_id: user.id,
         title: generatedTitle,
-        status: values.status,
+        status: values.status || "Draft",
       };
 
       if (isEditing) {
         const { error } = await supabase
           .from('stationeries')
-          .update({ mid: values.mid, status: values.status })
+          .update({ mid: values.mid, status: values.status || "Draft" })
           .eq('id', values.id);
         if (error) throw error;
         showSuccess("Stationery entry updated successfully!");
@@ -187,32 +183,10 @@ const StationeryFormDrawer: React.FC<StationeryFormDrawerProps> = ({ open, onOpe
                       ) : (
                         masterSummaries.map((summary) => (
                           <SelectItem key={summary.id} value={String(summary.id)}>
-                            {summary.Examination} ({summary.Code}) - {summary.Year}
+                            {summary.Code} - {summary.Year}
                           </SelectItem>
                         ))
                       )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage className="text-[9px] font-bold uppercase" />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem className="space-y-1.5">
-                  <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-400">Status *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
-                    <FormControl>
-                      <SelectTrigger className="h-9 rounded-xl">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Draft">Draft</SelectItem>
-                      <SelectItem value="Finalized">Finalized</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage className="text-[9px] font-bold uppercase" />

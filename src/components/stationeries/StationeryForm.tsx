@@ -23,7 +23,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -42,10 +41,7 @@ const stationeryFormSchema = z.object({
     (val) => Number(val),
     z.number().int().positive({ message: "Master Summary is required." })
   ),
-  // Removed title field
-  status: z.enum(["Draft", "Finalized"], {
-    required_error: "Status is required.",
-  }),
+  status: z.enum(["Draft", "Finalized"]).default("Draft"),
 });
 
 export type StationeryFormValues = z.infer<typeof stationeryFormSchema>;
@@ -68,7 +64,6 @@ const StationeryForm: React.FC<StationeryFormProps> = ({ open, onOpenChange, sta
     resolver: zodResolver(stationeryFormSchema),
     defaultValues: {
       mid: undefined,
-      // title: "", // Removed
       status: "Draft",
       ...stationery,
     },
@@ -104,7 +99,6 @@ const StationeryForm: React.FC<StationeryFormProps> = ({ open, onOpenChange, sta
     } else {
       form.reset({
         mid: undefined,
-        // title: "", // Removed
         status: "Draft",
       });
     }
@@ -130,22 +124,18 @@ const StationeryForm: React.FC<StationeryFormProps> = ({ open, onOpenChange, sta
         mid: values.mid,
         user_id: user.id,
         title: generatedTitle, // Automatically generate title based on MID
-        status: values.status,
+        status: values.status || "Draft",
       };
 
       if (isEditing) {
         if (!values.id) {
           throw new Error("Stationery ID is missing for update operation.");
         }
-        // When editing, we only update status and mid (if allowed, but mid is disabled)
-        // We keep the title update logic simple here, assuming title is derived from MID
         const { error } = await supabase
           .from('stationeries')
           .update({
             mid: values.mid,
-            status: values.status,
-            // Note: We don't update title here unless we fetch the summary again, 
-            // but since MID is disabled for editing, the title should remain consistent.
+            status: values.status || "Draft",
           })
           .eq('id', values.id);
 
@@ -170,7 +160,7 @@ const StationeryForm: React.FC<StationeryFormProps> = ({ open, onOpenChange, sta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Stationery Entry" : "Add New Stationery Entry"}</DialogTitle>
           <DialogDescription>
@@ -179,69 +169,46 @@ const StationeryForm: React.FC<StationeryFormProps> = ({ open, onOpenChange, sta
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="mid"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Master Summary</FormLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange(Number(value))}
-                      value={field.value ? String(field.value) : ""}
-                      disabled={loading || summariesLoading || isEditing} // Cannot change MID after creation
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          {field.value ? (
-                            <SelectValue placeholder="Select a master summary" />
-                          ) : (
-                            <span className="text-muted-foreground">Select a master summary</span>
-                          )}
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {summariesLoading ? (
-                          <div className="flex items-center justify-center p-4">
-                            <Loader2 className="h-5 w-5 animate-spin text-neas-green" />
-                          </div>
-                        ) : masterSummaries.length === 0 ? (
-                          <div className="p-4 text-center text-gray-500">No active master summaries found.</div>
+            <FormField
+              control={form.control}
+              name="mid"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Master Summary</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(Number(value))}
+                    value={field.value ? String(field.value) : ""}
+                    disabled={loading || summariesLoading || isEditing} // Cannot change MID after creation
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        {field.value ? (
+                          <SelectValue placeholder="Select a master summary" />
                         ) : (
-                          masterSummaries.map((summary) => (
-                            <SelectItem key={summary.id} value={String(summary.id)}>
-                              {summary.Examination} ({summary.Code}) - {summary.Year}
-                            </SelectItem>
-                          ))
+                          <span className="text-muted-foreground">Select a master summary</span>
                         )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Draft">Draft</SelectItem>
-                        <SelectItem value="Finalized">Finalized</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {summariesLoading ? (
+                        <div className="flex items-center justify-center p-4">
+                          <Loader2 className="h-5 w-5 animate-spin text-neas-green" />
+                        </div>
+                      ) : masterSummaries.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500">No active master summaries found.</div>
+                      ) : (
+                        masterSummaries.map((summary) => (
+                          <SelectItem key={summary.id} value={String(summary.id)}>
+                            {summary.Code} - {summary.Year}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <DialogFooter>
               <Button type="submit" disabled={loading || summariesLoading}>
                 {loading ? (
