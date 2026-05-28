@@ -70,7 +70,7 @@ const RoleMatrix: React.FC<RoleMatrixProps> = ({ isOpen, onClose }) => {
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent 
         side="right" 
-        className="w-[98vw] sm:w-[98vw] md:w-[98vw] lg:w-[98vw] xl:w-[98vw] max-w-none p-0 flex flex-col overflow-hidden bg-white border-l shadow-2xl"
+        className="!w-[96vw] !max-w-[96vw] p-0 flex flex-col overflow-hidden bg-white border-l shadow-2xl"
       >
         {/* Header */}
         <div className="px-8 py-5 border-b bg-slate-50 flex items-center justify-between sticky top-0 z-20">
