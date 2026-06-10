@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -416,7 +416,25 @@ const LabelsManagementPage: React.FC = () => {
             {masterSummary.Code} - {masterSummary.Year}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Category Dropdown Selector */}
+          <Select value={selectedCategoryId || ""} onValueChange={setSelectedCategoryId}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  <div className="flex items-center gap-2">
+                    <cat.icon className="h-4 w-4 text-slate-500" />
+                    <span>{cat.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Region Dropdown Selector */}
           <Select value={selectedRegion} onValueChange={setSelectedRegion}>
             <SelectTrigger className="w-52">
               <SelectValue placeholder="Select region" />
@@ -430,165 +448,134 @@ const LabelsManagementPage: React.FC = () => {
               ))}
             </SelectContent>
           </Select>
+
           <Button variant="outline" onClick={() => navigate("/dashboard/stationeries")}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
         </div>
       </div>
 
-      {/* Sidebar + Main Content */}
-      <div className="flex flex-col md:flex-row gap-6">
-        {/* Sidebar */}
-        <aside className="w-full md:w-64 shrink-0">
-          <Card className="border shadow-sm">
-            <CardContent className="p-2">
-              <nav className="flex flex-col space-y-1">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategoryId(cat.id)}
-                    className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-left
-                      ${
-                        selectedCategoryId === cat.id
-                          ? "bg-blue-50 text-blue-700 border-l-4 border-blue-600"
-                          : "text-gray-700 hover:bg-gray-100"
-                      }
-                    `}
-                  >
-                    <cat.icon className="h-4 w-4" />
-                    <span className="truncate">{cat.name}</span>
-                  </button>
-                ))}
-              </nav>
-            </CardContent>
-          </Card>
-        </aside>
+      {/* Main Content */}
+      <Card className="border-t-4 border-blue-600 shadow-xl rounded-xl">
+        <CardHeader className="flex flex-row items-center justify-between bg-slate-50/50 flex-wrap gap-3">
+          <div>
+            <CardTitle className="text-2xl font-bold flex items-center gap-2">
+              {currentCategory && (
+                <>
+                  <currentCategory.icon className="h-6 w-6 text-blue-600" />
+                  {currentCategory.name} Labels
+                </>
+              )}
+            </CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            {selectedCategoryId === "stationeries" && stationery && (
+              <Button
+                variant="outline"
+                onClick={() => setIsBoxLimitsDrawerOpen(true)}
+                className="bg-blue-50 text-blue-600"
+              >
+                <Settings className="h-4 w-4 mr-2" /> Box Limits
+              </Button>
+            )}
+            {selectedCategoryId === "kitbags" && stationery && (
+              <Button
+                variant="outline"
+                onClick={() => setIsKitbagLimitsDrawerOpen(true)}
+                className="bg-green-50 text-green-600"
+              >
+                <Settings className="h-4 w-4 mr-2" /> Kitbag Limits
+              </Button>
+            )}
+            <Button onClick={handleCreateLabels} disabled={isGeneratingLabels || !selectedCategoryId}>
+              {isGeneratingLabels ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <PlusCircle className="h-4 w-4 mr-2" />
+              )}
+              Create Labels
+            </Button>
+            <Button variant="destructive" onClick={handleResetLabels} disabled={isGeneratingLabels || !selectedCategoryId}>
+              <RotateCcw className="h-4 w-4 mr-2" /> Reset
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Search bar */}
+          <div className="flex items-center gap-2 mb-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by center name, number or district..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
 
-        {/* Main Content */}
-        <main className="flex-1">
-          <Card className="border-t-4 border-blue-600 shadow-xl rounded-xl">
-            <CardHeader className="flex flex-row items-center justify-between bg-slate-50/50 flex-wrap gap-3">
-              <div>
-                <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                  {currentCategory && (
-                    <>
-                      <currentCategory.icon className="h-6 w-6 text-blue-600" />
-                      {currentCategory.name} Labels
-                    </>
-                  )}
-                </CardTitle>
-              </div>
-              <div className="flex items-center gap-2">
-                {selectedCategoryId === "stationeries" && stationery && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsBoxLimitsDrawerOpen(true)}
-                    className="bg-blue-50 text-blue-600"
-                  >
-                    <Settings className="h-4 w-4 mr-2" /> Box Limits
-                  </Button>
-                )}
-                {selectedCategoryId === "kitbags" && stationery && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsKitbagLimitsDrawerOpen(true)}
-                    className="bg-green-50 text-green-600"
-                  >
-                    <Settings className="h-4 w-4 mr-2" /> Kitbag Limits
-                  </Button>
-                )}
-                <Button onClick={handleCreateLabels} disabled={isGeneratingLabels || !selectedCategoryId}>
-                  {isGeneratingLabels ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Create Labels
-                </Button>
-                <Button variant="destructive" onClick={handleResetLabels} disabled={isGeneratingLabels || !selectedCategoryId}>
-                  <RotateCcw className="h-4 w-4 mr-2" /> Reset
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Search bar */}
-              <div className="flex items-center gap-2 mb-4">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search by center name, number or district..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-
-              {/* Table with skeleton loading */}
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-gray-50">
-                    <TableRow>
-                      {getTableColumns.map((col, idx) => (
-                        <TableHead key={idx} className={col.width}>
-                          {col.header}
-                        </TableHead>
-                      ))}
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {labelsLoading && allLabels.length === 0 ? (
-                      // Show skeleton rows for initial load
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}>
-                          {getTableColumns.map((_, j) => (
-                            <TableCell key={j}>
-                              <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
-                            </TableCell>
-                          ))}
-                          <TableCell>
-                            <div className="h-4 w-8 bg-gray-200 rounded animate-pulse" />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : currentLabels.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={getTableColumns.length + 1} className="text-center text-muted-foreground">
-                          No labels found. Click "Create Labels" to generate.
+          {/* Table with skeleton loading */}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-gray-50">
+                <TableRow>
+                  {getTableColumns.map((col, idx) => (
+                    <TableHead key={idx} className={col.width}>
+                      {col.header}
+                    </TableHead>
+                  ))}
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {labelsLoading && allLabels.length === 0 ? (
+                  // Show skeleton rows for initial load
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {getTableColumns.map((_, j) => (
+                        <TableCell key={j}>
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
                         </TableCell>
-                      </TableRow>
-                    ) : (
-                      currentLabels.map((label, idx) => (
-                        <TableRow key={idx}>
-                          {getTableColumns.map((col, j) => (
-                            <TableCell key={j}>
-                              {col.render ? col.render(label) : (label as any)[col.accessor]}
-                            </TableCell>
-                          ))}
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon">
-                              <Printer className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              {/* Update indicator (background fetch) */}
-              {labelsFetching && !labelsLoading && allLabels.length > 0 && (
-                <div className="text-xs text-muted-foreground text-right mt-1">Updating labels…</div>
-              )}
-              {totalPages > 1 && (
-                <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
-              )}
-            </CardContent>
-          </Card>
-        </main>
-      </div>
+                      ))}
+                      <TableCell>
+                        <div className="h-4 w-8 bg-gray-200 rounded animate-pulse" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : currentLabels.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={getTableColumns.length + 1} className="text-center text-muted-foreground">
+                      No labels found. Click "Create Labels" to generate.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  currentLabels.map((label, idx) => (
+                    <TableRow key={idx}>
+                      {getTableColumns.map((col, j) => (
+                        <TableCell key={j}>
+                          {col.render ? col.render(label) : (label as any)[col.accessor]}
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon">
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          {/* Update indicator (background fetch) */}
+          {labelsFetching && !labelsLoading && allLabels.length > 0 && (
+            <div className="text-xs text-muted-foreground text-right mt-1">Updating labels…</div>
+          )}
+          {totalPages > 1 && (
+            <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Drawers */}
       {stationery && masterSummary.Code && (
