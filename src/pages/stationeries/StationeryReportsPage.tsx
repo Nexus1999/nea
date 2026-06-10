@@ -10,7 +10,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { showStyledSwal } from '@/utils/alerts';
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
@@ -59,7 +58,7 @@ const DISTRICT_ALLOWED_CATEGORIES: Record<string, string[]> = {
 const CATEGORIES_REQUIRING_DISTRICTS = ['Bkm Description', 'Stationeries Description'];
 
 // Categories that MUST be generated per region (single region only)
-const SINGLE_REGION_CATEGORIES = ['Stationeries Description', 'Bkm Description']; // ADDED Bkm Description
+const SINGLE_REGION_CATEGORIES = ['Stationeries Description', 'Bkm Description'];
 
 // Categories that require subject registration filtering for regions
 const SUBJECT_AWARE_REGION_CATEGORIES = ['ICT Covers', 'Arabic Booklets', 'Fine Arts Booklets', 'Braille Stationeries'];
@@ -76,18 +75,16 @@ const getSubjectCodeForCategory = (code: string, category: string): string | nul
     return code === 'ACSEE' ? '125' : '025';
   }
   if (category === "Fine Arts Booklets") {
-    // Ensure a valid subject code is always returned for these exam types
     if (code === 'ACSEE') return '116';
     if (code === 'CSEE' || code === 'FTNA') return '016';
-    return null; // Return null if no matching code
+    return null;
   }
   return null;
 };
 
-
 // --- Dynamic Header Mapping ---
 const getReportHeader = (code: string, year: string, category: string): { title: string, subtitle: string | null } => {
-  const yearStr = year; // Already a string
+  const yearStr = year;
   
   const baseTitles: Record<string, string> = {
     'PSLE': `SHAJARA ZA MTIHANI WA DARASA LA SABA ${yearStr}`,
@@ -102,13 +99,12 @@ const getReportHeader = (code: string, year: string, category: string): { title:
 
   switch (category) {
     case 'Stationeries':
-      // This case now handles primary exams AND FTNA (Supervisor Report)
       return { title: baseTitle, subtitle: null };
     case 'Bkm Description':
       return { title: `MGAWANYO WA BKM ZA ${baseTitle.replace('SHAJARA ZA ', '')}`, subtitle: null };
     case 'Stationeries Description':
       return { title: baseTitle, subtitle: null };
-    case 'Supervisors Forms': // Still needed for ACSEE/CSEE
+    case 'Supervisors Forms':
       return { title: baseTitle, subtitle: null };
     case 'Braille Stationeries':
       return { title: baseTitle, subtitle: 'MAHITAJI MAALUMU (BRAILLE)' };
@@ -126,9 +122,6 @@ const getReportHeader = (code: string, year: string, category: string): { title:
   }
 };
 
-
-// --- Component ---
-
 const StationeryReportsPage = () => {
   const navigate = useNavigate();
   const { masterSummaryId } = useParams<{ masterSummaryId: string }>();
@@ -138,7 +131,7 @@ const StationeryReportsPage = () => {
   const [districts, setDistricts] = useState<District[]>([]);
   
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedRegions, setSelectedRegions] = useState<string[]>([]); // Changed to array for multi-select
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
   
   const [regionSearch, setRegionSearch] = useState('');
@@ -151,7 +144,6 @@ const StationeryReportsPage = () => {
   const [regionsLoading, setRegionsLoading] = useState(true);
   const [districtsLoading, setDistrictsLoading] = useState(true);
 
-  // Popover states for manual control
   const [isCategoryPopoverOpen, setIsCategoryPopoverOpen] = useState(false);
   const [isRegionPopoverOpen, setIsRegionPopoverOpen] = useState(false);
   const [isDistrictPopoverOpen, setIsDistrictPopoverOpen] = useState(false);
@@ -160,7 +152,6 @@ const StationeryReportsPage = () => {
   const year = masterSummary?.Year?.toString() || '';
 
   const availableCategories = useMemo(() => {
-    // Filter out any potential empty strings or nulls if the map definition was messy
     return (CATEGORY_MAP[code] || []).filter(c => c && c.trim() !== '');
   }, [code]);
 
@@ -177,7 +168,6 @@ const StationeryReportsPage = () => {
     return HIDE_REGION_SELECTOR_CATEGORIES.includes(selectedCategory);
   }, [selectedCategory]);
 
-  // Filter districts based on currently selected regions
   const filteredDistricts = useMemo(() => {
     if (selectedRegions.length === 0) {
       return districts;
@@ -204,25 +194,21 @@ const StationeryReportsPage = () => {
   const isAllRegionsSelected = useMemo(() => regions.length > 0 && regions.every(r => selectedRegions.includes(r.region_name)), [regions, selectedRegions]);
   const isAllDistrictsSelected = useMemo(() => filteredDistricts.length > 0 && filteredDistricts.every(d => selectedDistricts.includes(d.district_name)), [filteredDistricts, selectedDistricts]);
   
-  // Calculate dynamic height for popovers
-  // Category height: N * 36px (h-9 button height) + 8px (p-1 padding top/bottom)
   const categoryPopoverHeight = useMemo(() => availableCategories.length * 36 + 8, [availableCategories]); 
-  const regionPopoverHeight = useMemo(() => Math.min(regions.length * 40 + 60, 256), [regions]); // 60 for search/select all
-  const districtPopoverHeight = useMemo(() => Math.min(filteredDistricts.length * 40 + 60, 256), [filteredDistricts]); // 60 for search/select all
+  const regionPopoverHeight = useMemo(() => Math.min(regions.length * 40 + 60, 256), [regions]);
+  const districtPopoverHeight = useMemo(() => Math.min(filteredDistricts.length * 40 + 60, 256), [filteredDistricts]);
 
-  // Calculate the height for the main content area to fit screen
-  const mainContentHeightClass = "h-[calc(100vh-160px)]"; 
+  const mainContentHeightClass = "h-[calc(100vh-180px)]"; 
   
   const regionStatusText = useMemo(() => {
     if (selectedRegions.length === 0) return 'No Region Selected';
     if (isSingleRegionRequired) {
-      return selectedRegions[0]; // Show the name of the single selected region
+      return selectedRegions[0];
     }
     if (selectedRegions.length === regions.length) return 'All Regions Selected';
     return `${selectedRegions.length} Regions Selected`;
   }, [selectedRegions, regions.length, isSingleRegionRequired]);
       
-  // Check if the current selection violates the single-region rule
   const isRegionSelectionInvalid = useMemo(() => isSingleRegionRequired && selectedRegions.length > 1, [isSingleRegionRequired, selectedRegions]);
 
   const fetchMasterSummary = async () => {
@@ -243,23 +229,19 @@ const StationeryReportsPage = () => {
     }
   };
 
-  // RPC to fetch regions based on master summary data
   const fetchRegions = useCallback(async (mid: number, code: string, subjectCodeFilter: string | null = null) => {
     setRegionsLoading(true);
-    
     try {
       let distinctRegionNames: string[] = [];
 
       if (subjectCodeFilter && ["FTNA", "CSEE", "ACSEE"].includes(code)) {
-          // For secondary subject-aware reports, use a custom query to find regions with > 0 registration for the subject
           const detailedTableName = 'secondarymastersummaries';
-          
           const { data: subjectRegions, error: subjectRegionError } = await supabase
               .from(detailedTableName)
               .select('region')
               .eq('mid', mid)
               .eq('is_latest', true)
-              .gt(subjectCodeFilter, 0); // Filter where subject count > 0
+              .gt(subjectCodeFilter, 0);
 
           if (subjectRegionError) {
               showError(subjectRegionError.message || "Failed to fetch subject-aware regions.");
@@ -267,16 +249,13 @@ const StationeryReportsPage = () => {
               return;
           }
           distinctRegionNames = Array.from(new Set(subjectRegions.map(d => d.region))).filter(name => name);
-          
       } else {
-          // For all other reports (primary, supervisor, general secondary), use the RPC to get all regions in the summary
           const { data: rpcData, error: rpcError } = await supabase.rpc('get_distinct_regions_for_mastersummary', {
               p_mid: mid,
               p_code: code,
           });
 
-          if (rpcError || !rpcData || rpcData.length === 0) { // Added check for empty rpcData
-              // Fallback: If RPC fails or returns no data, try to fetch all regions from the regions table
+          if (rpcError || !rpcData || rpcData.length === 0) {
               const { data: allRegionsData, error: allRegionsError } = await supabase
                   .from('regions')
                   .select('region_name')
@@ -294,7 +273,6 @@ const StationeryReportsPage = () => {
           }
       }
       
-      // 2. Fetch full region details (code, name) from the regions table, filtering by the names found
       const { data: regionDetails, error: detailsError } = await supabase
         .from('regions')
         .select('region_code, region_name')
@@ -318,9 +296,7 @@ const StationeryReportsPage = () => {
 
   const fetchDistricts = React.useCallback(async (mid: number, code: string) => {
     setDistrictsLoading(true);
-
     try {
-      // Determine detailed table
       let detailedTableName: string | null = null;
       if (["SFNA", "SSNA", "PSLE"].includes(code)) {
         detailedTableName = "primarymastersummary";
@@ -331,7 +307,6 @@ const StationeryReportsPage = () => {
         return;
       }
 
-      // 1) Fetch distinct districts from the detailed master summary table for this mid
       const { data: distinctDistrictRows, error: distinctErr } = await supabase
         .from(detailedTableName)
         .select("district")
@@ -352,7 +327,6 @@ const StationeryReportsPage = () => {
         return;
       }
 
-      // 2) Load full district records (with region_number) from 'districts' table limited to those names
       const { data: districtDetails, error: detailsErr } = await supabase
         .from("districts")
         .select("district_number, district_name, region_number")
@@ -378,7 +352,6 @@ const StationeryReportsPage = () => {
     fetchMasterSummary();
   }, [masterSummaryId]);
   
-  // Effect to fetch regions and districts when master summary is loaded or category changes
   useEffect(() => {
     if (masterSummary) {
       const subjectCodeFilter = SUBJECT_AWARE_REGION_CATEGORIES.includes(selectedCategory)
@@ -389,9 +362,6 @@ const StationeryReportsPage = () => {
       fetchDistricts(masterSummary.id, masterSummary.Code);
     }
   }, [masterSummary, fetchRegions, fetchDistricts, selectedCategory]);
-
-
-  // --- Filtering Logic ---
 
   const toggleDistrictSelection = (districtName: string) => {
     setSelectedDistricts(prev => 
@@ -419,10 +389,8 @@ const StationeryReportsPage = () => {
       let newRegions: string[];
       
       if (isSingleRegionRequired) {
-        // If single region is required, selecting a region deselects all others
         newRegions = prev.includes(regionName) ? [] : [regionName];
       } else {
-        // Standard multi-select logic
         newRegions = prev.includes(regionName)
           ? prev.filter(name => name !== regionName)
           : [...prev, regionName];
@@ -430,7 +398,6 @@ const StationeryReportsPage = () => {
       
       clearPreview();
       
-      // Auto-close popover if single region is selected
       if (isSingleRegionRequired && newRegions.length === 1) {
         setIsRegionPopoverOpen(false);
       }
@@ -456,8 +423,6 @@ const StationeryReportsPage = () => {
     clearPreview();
   };
 
-
-  // Effect to handle automatic district selection when region selection changes
   useEffect(() => {
     if (selectedRegions.length > 0 && showDistrictSelector) {
       const selectedRegionCodes = regions
@@ -469,11 +434,8 @@ const StationeryReportsPage = () => {
         .map(d => d.district_name);
 
       if (selectedCategory === 'Stationeries Description' || selectedCategory === 'Bkm Description') {
-        // Auto-select all districts for the selected (single) region when region changes,
-        // but allow manual deselection afterwards.
         setSelectedDistricts(districtsInSelectedRegions);
       } else {
-        // Preserve previous selection but within the selected regions; if none, select all
         setSelectedDistricts(prev => prev.filter(d => districtsInSelectedRegions.includes(d)));
         if (selectedDistricts.length === 0) {
           setSelectedDistricts(districtsInSelectedRegions);
@@ -484,17 +446,12 @@ const StationeryReportsPage = () => {
     }
   }, [selectedRegions, showDistrictSelector, regions, districts, selectedCategory]);
 
-
   const handleCategorySelect = (category: string) => {
     setSelectedCategory(category);
-    // Reset districts when category changes, as scope might change
     setSelectedDistricts([]); 
-    
     clearPreview();
-    setIsCategoryPopoverOpen(false); // Close popover
+    setIsCategoryPopoverOpen(false);
   };
-
-  // --- Report Generation ---
 
   const validateForm = () => {
     if (!masterSummary) {
@@ -506,19 +463,16 @@ const StationeryReportsPage = () => {
         return false;
     }
 
-    // Only require user-selected regions if the selector is visible
     if (!hideRegionSelector && selectedRegions.length === 0) {
       showError('Please select at least one region.');
       return false;
     }
 
-    // Validation for single-region reports
     if (!hideRegionSelector && isSingleRegionRequired && selectedRegions.length > 1) {
         showError(`The '${selectedCategory}' report can only be generated for one region at a time.`);
         return false;
     }
 
-    // New validation for subject-aware categories
     if (SUBJECT_AWARE_REGION_CATEGORIES.includes(selectedCategory)) {
         const subjectCode = getSubjectCodeForCategory(code, selectedCategory);
         if (!subjectCode && selectedCategory !== 'Braille Stationeries') {
@@ -527,7 +481,6 @@ const StationeryReportsPage = () => {
         }
     }
     
-    // Only validate districts if the selector is visible AND no districts are selected
     if (showDistrictSelector && selectedDistricts.length === 0) {
       showError('Please select at least one district.');
       return false;
@@ -551,10 +504,8 @@ const StationeryReportsPage = () => {
 
     try {
       const { title, subtitle } = getReportHeader(code, year, selectedCategory);
-
       let generatedReports: { region: string, url: string, fileName: string }[] = [];
 
-      // Define report types
       const isSupervisorReport = selectedCategory === 'Supervisors Forms';
       const isSubjectPercentageReport = SUBJECT_AWARE_REGION_CATEGORIES.includes(selectedCategory) && selectedCategory !== 'Braille Stationeries';
       const isSpecialNeedsReport = selectedCategory === 'Braille Stationeries';
@@ -564,8 +515,6 @@ const StationeryReportsPage = () => {
       
       if (isBkmDescriptionReport) {
           const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-bkm-description-report`;
-          
-          // Since SINGLE_REGION_CATEGORIES includes 'Bkm Description', selectedRegions.length must be 1
           const regionName = selectedRegions[0];
 
           const payload = {
@@ -573,7 +522,7 @@ const StationeryReportsPage = () => {
               code,
               year,
               region: regionName,
-              districts: selectedDistricts, // Pass selected districts
+              districts: selectedDistricts,
               reportTitle: title,
               reportSubtitle: subtitle,
           };
@@ -633,7 +582,6 @@ const StationeryReportsPage = () => {
           reportTitle: title,
           reportSubtitle: subtitle,
           specialNeedType: 'BR',
-          // No regions passed; edge function will auto-pick eligible regions
         };
 
         const response = await fetch(endpoint, {
@@ -653,7 +601,6 @@ const StationeryReportsPage = () => {
         generatedReports.push({ region: 'All Eligible Regions', url, fileName: downloadedFileName });
 
       } else if (isStationeriesReport) {
-        // NEW: Stationeries category (all exams) -> single function
         const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-stationeries-report`;
         const payload = {
           mid: masterSummaryId,
@@ -680,7 +627,6 @@ const StationeryReportsPage = () => {
         const downloadedFileName = `Stationeries ${code} ${year} ${selectedRegions.length > 1 ? 'MultiRegion' : (selectedRegions[0] || 'Region')}.pdf`;
         generatedReports.push({ region: selectedRegions.join(', '), url, fileName: downloadedFileName });
       } else if (isSupervisorReport) {
-          // Supervisors Forms (multi-region) - now handles FTNA under 'Stationeries' name
           const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-multi-region-supervisor-report`;
           const payload = {
             mid: masterSummaryId,
@@ -707,18 +653,14 @@ const StationeryReportsPage = () => {
           const downloadedFileName = `Supervisors Forms ${code}-${year} ${selectedRegions.length > 1 ? 'MultiRegion' : (selectedRegions[0] || 'Region')}.pdf`;
           generatedReports.push({ region: selectedRegions.join(', '), url, fileName: downloadedFileName });
       } else if (isStationeryDescriptionReport) {
-          // Generate one PDF per selected region using the existing edge function
           for (const regionName of selectedRegions) {
             const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-stationery-description-report`;
-
-            // Derive districts for this region
             const regionObj = regions.find(r => r.region_name === regionName);
             const regionCode = regionObj?.region_code;
             const regionDistrictNames = districts
               .filter(d => d.region_number === regionCode)
               .map(d => d.district_name);
 
-            // Use only the selected districts that belong to this region; if none, select all
             const selectedForRegion = selectedDistricts.filter(name => regionDistrictNames.includes(name));
 
             const payload: any = {
@@ -750,11 +692,9 @@ const StationeryReportsPage = () => {
             generatedReports.push({ region: regionName, url, fileName: downloadedFileName });
           }
       } else {
-          // This handles 'Bkm Description' and any other unhandled categories
-          throw new Error('Unsupported category selected.'); // Safety net
+          throw new Error('Unsupported category selected.');
       }
 
-      // Handle results: Show the last generated PDF in the preview
       if (generatedReports.length > 0) {
           const lastReport = generatedReports[generatedReports.length - 1];
           setFileName(lastReport.fileName);
@@ -792,26 +732,24 @@ const StationeryReportsPage = () => {
     clearPreview();
   };
 
-  // Check if masterSummaryId is present and we are still loading the summary
   if (!masterSummaryId || (regionsLoading && districtsLoading && !masterSummary)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-10 w-10 animate-spin text-neas-green" />
+        <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
       </div>
     );
   }
 
-  // If masterSummaryId is present but fetching failed (masterSummary is null)
   if (!masterSummary) {
     return (
-      <Card className="w-full max-w-4xl mx-auto mt-8">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-gray-800">Stationery Reports</CardTitle>
+      <Card className="w-full max-w-4xl mx-auto mt-8 border-slate-200 shadow-xl rounded-2xl">
+        <CardHeader className="border-b bg-slate-50/50">
+          <CardTitle className="text-2xl font-bold text-slate-800">Stationery Reports</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-center text-gray-500">Master Summary details could not be loaded for ID: {masterSummaryId}.</p>
-          <div className="text-center mt-4">
-            <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')}>
+        <CardContent className="p-6">
+          <p className="text-center text-slate-500">Master Summary details could not be loaded for ID: {masterSummaryId}.</p>
+          <div className="text-center mt-6">
+            <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')} className="rounded-xl">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Stationeries
             </Button>
           </div>
@@ -821,65 +759,68 @@ const StationeryReportsPage = () => {
   }
 
   return (
-    <div className="container mx-auto py-3 px-4 h-full">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <FolderOpenDot className="h-6 w-6 text-neas-green" /> Stationery Reports
-        </h1>
-        <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/stationeries')}>
+    <div className="container mx-auto py-4 px-4 h-full">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
+            <div className="p-1.5 bg-black text-white rounded-md">
+              <FolderOpenDot className="h-5 w-5" />
+            </div>
+            Stationery Reports
+          </h1>
+          <p className="text-gray-600 mt-1 font-extrabold">{code}-{year}</p>
+        </div>
+        <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')} className="rounded-xl">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Stationeries
         </Button>
       </div>
 
-      {/* Main Content Area: Fixed height to fit screen */}
-      <div className={cn("flex gap-4", mainContentHeightClass)}> 
+      <div className={cn("flex flex-col lg:flex-row gap-6", mainContentHeightClass)}> 
         {/* Left Panel - Controls */}
-        <Card className="w-full lg:w-1/3 flex flex-col flex-shrink-0 shadow-lg">
-          <CardHeader className="border-b p-3">
-            <CardTitle className="text-xl font-bold text-gray-800 flex items-center justify-between">
-              Report Filters
-              <Button variant="ghost" size="sm" onClick={handleClearFilters} title="Clear Filters">
-                <RefreshCw className="h-4 w-4 text-gray-800" />
+        <Card className="w-full lg:w-[380px] flex flex-col flex-shrink-0 shadow-xl border-slate-200 rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="border-b bg-slate-50/50 p-5">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-bold text-slate-900">Report Filters</CardTitle>
+              <Button variant="ghost" size="icon" onClick={handleClearFilters} title="Clear Filters" className="h-8 w-8 rounded-lg hover:bg-slate-100">
+                <RefreshCw className="h-4 w-4 text-slate-600" />
               </Button>
-            </CardTitle>
-            <CardDescription className="text-sm font-semibold text-gray-700">
-              Report for: <span className="text-gray-800">{code}-{year}</span>
+            </div>
+            <CardDescription className="text-xs font-semibold text-slate-500 mt-1">
+              Configure parameters for {code} ({year})
             </CardDescription>
           </CardHeader>
           
-          {/* Filter Fields Container - Now handles scrolling if needed */}
-          <CardContent className="flex-1 p-4 space-y-3 overflow-y-auto scrollbar-hidden"> 
-            
+          <CardContent className="flex-1 p-6 space-y-5 overflow-y-auto scrollbar-none"> 
             {/* Category Selection */}
-            <div className="space-y-1">
-              <Label htmlFor="category-select" className="flex items-center gap-1 font-semibold text-gray-700 text-sm">
-                <ListChecks className="h-4 w-4 text-neas-green" /> Select Category
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                <ListChecks className="h-3.5 w-3.5" /> Select Category
               </Label>
               <Popover open={isCategoryPopoverOpen} onOpenChange={setIsCategoryPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-full justify-between text-left font-normal h-9" // Standard height
+                    className="w-full justify-between text-left font-medium h-10 rounded-xl border-slate-200 hover:bg-slate-50"
                     disabled={regionsLoading || isGenerating || availableCategories.length === 0}
                   >
-                    {selectedCategory || "Select a category..."}
+                    <span className="truncate">{selectedCategory || "Select a category..."}</span>
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0">
+                <PopoverContent className="w-[330px] p-0 rounded-xl shadow-xl border-slate-200">
                   <ScrollArea style={{ height: `${categoryPopoverHeight}px` }}>
-                    <div className="p-1">
+                    <div className="p-1.5 space-y-0.5">
                       {availableCategories.length === 0 ? (
-                        <p className="text-center text-sm text-gray-500 py-2">No categories defined for {code}.</p>
+                        <p className="text-center text-sm text-slate-500 py-3">No categories defined for {code}.</p>
                       ) : (
                         availableCategories.map((category) => (
                           <Button
                             key={category}
                             variant="ghost"
                             className={cn(
-                              "w-full justify-start h-9",
-                              selectedCategory === category && "bg-gray-100 text-neas-green hover:bg-gray-200"
+                              "w-full justify-start h-9 rounded-lg text-sm font-medium",
+                              selectedCategory === category ? "bg-slate-900 text-white hover:bg-slate-800" : "text-slate-700 hover:bg-slate-100"
                             )}
                             onClick={() => handleCategorySelect(category)}
                           >
@@ -895,11 +836,11 @@ const StationeryReportsPage = () => {
 
             {/* Conditional Region Selection */}
             {!hideRegionSelector && (
-              <div className="space-y-1">
-                <Label htmlFor="region-select" className="flex items-center gap-1 font-semibold text-gray-700 text-sm">
-                  <Globe className="h-4 w-4 text-neas-green" /> Select Region(s)
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                  <Globe className="h-3.5 w-3.5" /> Select Region(s)
                   {isSingleRegionRequired && selectedCategory && (
-                      <span className="text-red-500 text-xs ml-2">(Single Region Required)</span>
+                      <span className="text-red-500 text-[9px] font-bold uppercase tracking-normal ml-auto">(Single Region)</span>
                   )}
                 </Label>
                 <Popover open={isRegionPopoverOpen} onOpenChange={setIsRegionPopoverOpen}>
@@ -908,41 +849,42 @@ const StationeryReportsPage = () => {
                       variant="outline"
                       role="combobox"
                       className={cn(
-                          "w-full justify-between text-left font-normal h-9",
+                          "w-full justify-between text-left font-medium h-10 rounded-xl border-slate-200 hover:bg-slate-50",
                           isRegionSelectionInvalid && "border-red-500 ring-1 ring-red-500"
                       )}
                       disabled={regionsLoading || isGenerating || !selectedCategory}
                     >
-                      {selectedRegions.length > 0 ? (
-                        <span className="truncate">{regionStatusText}</span>
-                      ) : (
-                        "Select regions..."
-                      )}
+                      <span className="truncate">{selectedRegions.length > 0 ? regionStatusText : "Select regions..."}</span>
                       <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0">
-                    <Input
-                      placeholder="Search regions..."
-                      className="h-9"
-                      value={regionSearch}
-                      onChange={(e) => setRegionSearch(e.target.value)}
-                    />
-                    <ScrollArea style={{ height: `${regionPopoverHeight}px` }} className="mt-2">
-                      <div className="p-1">
+                  <PopoverContent className="w-[330px] p-0 rounded-xl shadow-xl border-slate-200 overflow-hidden">
+                    <div className="p-2 border-b bg-slate-50">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                        <Input
+                          placeholder="Search regions..."
+                          className="h-9 pl-9 rounded-lg border-slate-200"
+                          value={regionSearch}
+                          onChange={(e) => setRegionSearch(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <ScrollArea style={{ height: `${regionPopoverHeight}px` }}>
+                      <div className="p-1.5 space-y-0.5">
                         {regionsLoading ? (
-                          <div className="flex items-center justify-center p-4">
-                            <Loader2 className="h-5 w-5 animate-spin text-neas-green" />
+                          <div className="flex items-center justify-center p-6">
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
                           </div>
                         ) : searchableRegions.length === 0 ? (
-                          <p className="text-center text-sm text-gray-500 py-2">No regions found.</p>
+                          <p className="text-center text-sm text-slate-500 py-3">No regions found.</p>
                         ) : (
                           <>
                             {/* Select All */}
                             <div 
                               className={cn(
-                                  "flex items-center space-x-2 p-2 rounded-md h-9",
-                                  isSingleRegionRequired ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100'
+                                  "flex items-center space-x-2.5 p-2.5 rounded-lg h-9 cursor-pointer hover:bg-slate-100",
+                                  isSingleRegionRequired && 'opacity-50 cursor-not-allowed hover:bg-transparent'
                               )}
                               onClick={handleSelectAllRegions}
                             >
@@ -951,8 +893,9 @@ const StationeryReportsPage = () => {
                                 onCheckedChange={handleSelectAllRegions}
                                 id="select-all-regions"
                                 disabled={isSingleRegionRequired}
+                                className="rounded"
                               />
-                              <Label htmlFor="select-all-regions" className={cn("font-semibold", isSingleRegionRequired && 'text-gray-400')}>
+                              <Label htmlFor="select-all-regions" className={cn("font-bold text-xs text-slate-700 cursor-pointer", isSingleRegionRequired && 'cursor-not-allowed')}>
                                 Select All ({regions.length})
                               </Label>
                             </div>
@@ -964,19 +907,22 @@ const StationeryReportsPage = () => {
                               return (
                                 <div 
                                   key={region.region_code}
-                                  className="flex items-center space-x-2 p-2 cursor-pointer hover:bg-gray-100 rounded-md h-9"
-                                  onClick={() => {
-                                    toggleRegionSelection(region.region_name);
-                                  }}
+                                  className="flex items-center space-x-2.5 p-2.5 cursor-pointer hover:bg-slate-100 rounded-lg h-9"
+                                  onClick={() => toggleRegionSelection(region.region_name)}
                                 >
-                                  {!isSingleRegionRequired && (
+                                  {!isSingleRegionRequired ? (
                                     <Checkbox
                                       checked={isSelected}
                                       onCheckedChange={() => toggleRegionSelection(region.region_name)}
                                       id={`region-${region.region_code}`}
+                                      className="rounded"
                                     />
+                                  ) : (
+                                    <div className={cn("w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center", isSelected && "border-black bg-black")}>
+                                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                    </div>
                                   )}
-                                  <Label htmlFor={`region-${region.region_code}`} className="font-normal">
+                                  <Label htmlFor={`region-${region.region_code}`} className="font-medium text-xs text-slate-700 cursor-pointer flex-1">
                                     {region.region_name}
                                   </Label>
                                 </div>
@@ -993,58 +939,58 @@ const StationeryReportsPage = () => {
 
             {/* District Selection (Conditional) */}
             {showDistrictSelector && (
-              <div className="space-y-1">
-                <Label htmlFor="district-select" className="flex items-center gap-1 font-semibold text-gray-700 text-sm">
-                  <MapPin className="h-4 w-4 text-neas-green" /> Select Districts
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5" /> Select Districts
                 </Label>
                 <Popover open={isDistrictPopoverOpen} onOpenChange={setIsDistrictPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
-                      className="w-full justify-between text-left font-normal h-9"
-                      disabled={
-                        selectedRegions.length === 0 ||
-                        districtsLoading ||
-                        isGenerating
-                      }
+                      className="w-full justify-between text-left font-medium h-10 rounded-xl border-slate-200 hover:bg-slate-50"
+                      disabled={selectedRegions.length === 0 || districtsLoading || isGenerating}
                     >
-                      {selectedDistricts.length > 0 ? (
-                        <span className="truncate">{selectedDistricts.length} district(s) selected</span>
-                      ) : (
-                        "Select districts..."
-                      )}
+                      <span className="truncate">
+                        {selectedDistricts.length > 0 ? `${selectedDistricts.length} district(s) selected` : "Select districts..."}
+                      </span>
                       <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0">
-                    <Input
-                      placeholder="Search districts..."
-                      className="h-9"
-                      value={districtSearch}
-                      onChange={(e) => setDistrictSearch(e.target.value)}
-                    />
-                    <ScrollArea style={{ height: `${districtPopoverHeight}px` }} className="mt-2">
-                      <div className="p-1">
+                  <PopoverContent className="w-[330px] p-0 rounded-xl shadow-xl border-slate-200 overflow-hidden">
+                    <div className="p-2 border-b bg-slate-50">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                        <Input
+                          placeholder="Search districts..."
+                          className="h-9 pl-9 rounded-lg border-slate-200"
+                          value={districtSearch}
+                          onChange={(e) => setDistrictSearch(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <ScrollArea style={{ height: `${districtPopoverHeight}px` }}>
+                      <div className="p-1.5 space-y-0.5">
                         {districtsLoading ? (
-                          <div className="flex items-center justify-center p-4">
-                            <Loader2 className="h-5 w-5 animate-spin text-neas-green" />
+                          <div className="flex items-center justify-center p-6">
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
                           </div>
                         ) : filteredDistricts.length === 0 ? (
-                          <p className="text-center text-sm text-gray-500 py-2">No districts found for selected regions.</p>
+                          <p className="text-center text-sm text-slate-500 py-3">No districts found for selected regions.</p>
                         ) : (
                           <>
                             {/* Select All */}
                             <div 
-                              className="flex items-center space-x-2 p-2 cursor-pointer hover:bg-gray-100 rounded-md h-9"
+                              className="flex items-center space-x-2.5 p-2.5 cursor-pointer hover:bg-slate-100 rounded-lg h-9"
                               onClick={handleSelectAllDistricts}
                             >
                               <Checkbox
                                 checked={isAllDistrictsSelected}
                                 onCheckedChange={handleSelectAllDistricts}
                                 id="select-all-districts"
+                                className="rounded"
                               />
-                              <Label htmlFor="select-all-districts" className="font-semibold">
+                              <Label htmlFor="select-all-districts" className="font-bold text-xs text-slate-700 cursor-pointer">
                                 Select All ({filteredDistricts.length})
                               </Label>
                             </div>
@@ -1056,15 +1002,16 @@ const StationeryReportsPage = () => {
                               return (
                                 <div 
                                   key={district.district_number}
-                                  className="flex items-center space-x-2 p-2 cursor-pointer hover:bg-gray-100 rounded-md h-9"
+                                  className="flex items-center space-x-2.5 p-2.5 cursor-pointer hover:bg-slate-100 rounded-lg h-9"
                                   onClick={() => toggleDistrictSelection(district.district_name)}
                                 >
                                   <Checkbox
                                     checked={isSelected}
                                     onCheckedChange={() => toggleDistrictSelection(district.district_name)}
                                     id={`district-${district.district_number}`}
+                                    className="rounded"
                                   />
-                                  <Label htmlFor={`district-${district.district_number}`} className="font-normal">
+                                  <Label htmlFor={`district-${district.district_number}`} className="font-medium text-xs text-slate-700 cursor-pointer flex-1">
                                     {district.district_name}
                                   </Label>
                                 </div>
@@ -1079,24 +1026,19 @@ const StationeryReportsPage = () => {
               </div>
             )}
             
-            {/* Generate Report Button and Progress Bar (Moved here) */}
-            <div className="pt-4 flex flex-col gap-3">
-              {/* Progress Bar */}
+            {/* Generate Report Button and Progress Bar */}
+            <div className="pt-4 flex flex-col gap-4">
               {isGenerating && (
-                <div className="w-full">
-                  <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-neas-green transition-all duration-500"
-                      style={{ width: '100%' }} // Simplified progress bar animation
-                    />
-                    </div>
-                  <p className="text-xs text-neas-green mt-1 text-center">
+                <div className="w-full space-y-1.5">
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-black animate-pulse rounded-full" style={{ width: '100%' }} />
+                  </div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">
                     Generating document(s), please wait...
                   </p>
                 </div>
               )}
 
-              {/* Export Button */}
               <Button
                 onClick={handleGenerateReport}
                 disabled={
@@ -1106,8 +1048,7 @@ const StationeryReportsPage = () => {
                   || (showDistrictSelector && selectedDistricts.length === 0)
                   || (!hideRegionSelector && isRegionSelectionInvalid)
                 }
-                className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold text-base transition-all duration-300"
-                size="lg"
+                className="w-full bg-black text-white hover:bg-slate-800 font-bold text-sm h-11 rounded-xl transition-all duration-300 shadow-md"
               >
                 {isGenerating ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1117,33 +1058,33 @@ const StationeryReportsPage = () => {
                 {isGenerating ? 'Generating Report(s)...' : 'Generate Report(s)'}
               </Button>
             </div>
-            
-            {/* Spacer to push content up if needed, though overflow-y-auto handles it */}
-            <div className="flex-1" /> 
-
           </CardContent>
-          
         </Card>
 
         {/* Right Panel - Preview */}
-        <Card className="w-full lg:w-2/3 flex flex-col shadow-lg">
-          <CardHeader className="border-b p-3 flex-row items-center justify-between">
-            <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-neas-green" /> Document Preview
-            </CardTitle>
+        <Card className="flex-1 flex flex-col shadow-xl border-slate-200 rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="border-b bg-slate-50/50 p-5 flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-slate-700" /> Document Preview
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500 mt-1">
+                {fileName ? `Viewing: ${fileName}` : "Generate a report to preview it here"}
+              </CardDescription>
+            </div>
             {previewUrl && (
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={downloadDocument} title="Download Document">
+                <Button variant="outline" size="sm" onClick={downloadDocument} className="rounded-xl h-9 border-slate-200 hover:bg-slate-50">
                   <Download className="h-4 w-4 mr-2" /> Download
                 </Button>
-                <Button variant="destructive" size="sm" onClick={clearPreview} title="Close Preview">
+                <Button variant="ghost" size="icon" onClick={clearPreview} className="h-9 w-9 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100">
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             )}
           </CardHeader>
-          <CardContent className="flex-1 p-3 flex items-center justify-center bg-gray-50">
-            <div className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+          <CardContent className="flex-1 p-6 flex items-center justify-center bg-slate-50/50">
+            <div className="w-full h-full border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-inner flex items-center justify-center">
               {previewUrl ? (
                 <iframe 
                   src={previewUrl} 
@@ -1154,11 +1095,13 @@ const StationeryReportsPage = () => {
                   className="border-none"
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                  <FileText className="h-12 w-12 text-gray-300 mb-4" />
-                  <p className="text-lg font-semibold text-gray-600 mb-2">Preview Area</p>
-                  <p className="text-sm text-gray-500">
-                    Select filters and click 'Generate Report(s)' to view the PDF here.
+                <div className="flex flex-col items-center justify-center text-center p-8 max-w-md">
+                  <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-100">
+                    <FileText className="h-8 w-8 text-slate-400" />
+                  </div>
+                  <p className="text-base font-bold text-slate-800 mb-1">No Document Generated</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Select your desired category, region, and district filters on the left panel, then click "Generate Report(s)" to view the PDF document.
                   </p>
                 </div>
               )}
@@ -1166,21 +1109,21 @@ const StationeryReportsPage = () => {
           </CardContent>
           
           {/* Status Bar */}
-          <div className="p-3 border-t bg-gray-100 flex justify-between items-center text-sm">
+          <div className="p-4 border-t bg-slate-50 flex justify-between items-center text-xs">
             <div className="flex items-center gap-2">
               {hideRegionSelector ? (
                 <>
-                  <CheckCircle className="h-4 w-4 text-neas-green" />
-                  <span className="text-neas-green font-medium">Auto-generating for eligible regions.</span>
+                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                  <span className="text-emerald-700 font-bold uppercase tracking-wider text-[10px]">Auto-generating for eligible regions</span>
                 </>
               ) : (
                 <>
                   {(selectedRegions.length > 0 && !isSingleRegionRequired) || (isSingleRegionRequired && selectedRegions.length === 1) ? (
-                    <CheckCircle className="h-4 w-4 text-neas-green" />
+                    <CheckCircle className="h-4 w-4 text-emerald-600" />
                   ) : (
                     <Ban className="h-4 w-4 text-red-500" />
                   )}
-                  <span className={(selectedRegions.length > 0 ? 'text-neas-green font-medium' : 'text-red-500')}>
+                  <span className={cn("font-bold uppercase tracking-wider text-[10px]", selectedRegions.length > 0 ? 'text-emerald-700' : 'text-red-500')}>
                     {selectedRegions.length === 0 
                       ? 'No Region Selected' 
                       : selectedRegions.length === regions.length
@@ -1195,9 +1138,9 @@ const StationeryReportsPage = () => {
                 variant="ghost" 
                 size="sm" 
                 onClick={() => setSelectedDistricts([])}
-                className="text-red-500 hover:bg-red-50"
+                className="text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg h-8 px-3 font-semibold"
               >
-                Clear District Selection ({selectedDistricts.length})
+                Clear Districts ({selectedDistricts.length})
               </Button>
             )}
           </div>
