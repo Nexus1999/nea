@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -104,13 +105,14 @@ const categoryQueryMap: Record<string, string> = {
 const LabelsManagementPage: React.FC = () => {
   const { masterSummaryId } = useParams<{ masterSummaryId: string }>();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const [masterSummary, setMasterSummary] = useState<MasterSummaryOption | null>(null);
   const [stationery, setStationery] = useState<Stationery | null>(null);
   const [activeTab, setActiveTab] = useState<string>('stationeries');
   const [isBoxLimitsDrawerOpen, setIsBoxLimitsDrawerOpen] = useState(false);
   const [isKitbagLimitsDrawerOpen, setIsKitbagLimitsDrawerOpen] = useState(false);
-  const [allLabels, setAllLabels] = useState<LabelItem[]>([]);
   const [isGeneratingLabels, setIsGeneratingLabels] = useState(false);
   const [regions, setRegions] = useState<string[]>([]);
   const [selectedRegion, setSelectedRegion] = useState<string>('All');
@@ -129,10 +131,10 @@ const LabelsManagementPage: React.FC = () => {
 
   const loadMasterSummaryAndStationery = useCallback(async () => {
     if (!masterSummaryId) {
-      setLoading(false);
+      setSummaryLoading(false);
       return;
     }
-    setLoading(true);
+    setSummaryLoading(true);
     try {
       const id = parseInt(masterSummaryId);
       const summary = await fetchMasterSummaryById(id);
@@ -164,14 +166,15 @@ const LabelsManagementPage: React.FC = () => {
     } catch (error: any) {
       showError(error.message || "Failed to load details.");
     } finally {
-      setLoading(false);
+      setSummaryLoading(false);
     }
   }, [masterSummaryId, activeTab]);
 
-  const loadAllLabels = useCallback(async () => {
-    if (!masterSummary) return;
-    setLoading(true);
-    try {
+  // React Query for labels
+  const { data: allLabels = [], isLoading: isLabelsLoading, isFetching: isLabelsFetching } = useQuery({
+    queryKey: ['labels', masterSummary?.id, activeTab],
+    queryFn: async () => {
+      if (!masterSummary?.id) return [];
       const dbCategory = categoryQueryMap[activeTab] || activeTab;
       const { data, error } = await supabase
         .from('labels')
@@ -182,13 +185,12 @@ const LabelsManagementPage: React.FC = () => {
         .order('district', { ascending: true })
         .order('center_number', { ascending: true });
       if (error) throw error;
-      setAllLabels(data as LabelItem[]);
-    } catch (err: any) {
-      showError("Failed to load labels");
-    } finally {
-      setLoading(false);
-    }
-  }, [masterSummary, activeTab]);
+      return data as LabelItem[];
+    },
+    enabled: !!masterSummary?.id,
+    placeholderData: (previousData) => previousData,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   const filteredLabels = useMemo(() => {
     let filtered = [...allLabels];
@@ -209,10 +211,6 @@ const LabelsManagementPage: React.FC = () => {
   useEffect(() => {
     loadMasterSummaryAndStationery();
   }, [loadMasterSummaryAndStationery]);
-
-  useEffect(() => {
-    loadAllLabels();
-  }, [loadAllLabels]);
 
   const handleCreateLabels = async () => {
     if (!masterSummary || !stationery?.id) return;
@@ -250,7 +248,7 @@ const LabelsManagementPage: React.FC = () => {
 
       if (error) throw error;
       showSuccess("Labels generated successfully!");
-      loadAllLabels();
+      queryClient.invalidateQueries({ queryKey: ['labels', masterSummary.id, activeTab] });
     } catch (error: any) {
       showError(error.message || "Failed to generate labels.");
     } finally {
@@ -266,8 +264,8 @@ const LabelsManagementPage: React.FC = () => {
       const query = supabase.from('labels').delete().eq('mid', masterSummary.id).eq('category', dbCategory);
       if (selectedRegion !== 'All') query.eq('region', selectedRegion);
       await query;
-      setAllLabels([]);
       showSuccess("Labels reset successfully!");
+      queryClient.invalidateQueries({ queryKey: ['labels', masterSummary.id, activeTab] });
     } catch (error: any) {
       showError("Failed to reset labels.");
     } finally {
@@ -301,7 +299,7 @@ const LabelsManagementPage: React.FC = () => {
     return baseColumns;
   }, [activeTab]);
 
-  if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Spinner label="Loading labels..." /></div>;
+  if (summaryLoading) return <div className="flex items-center justify-center min-h-[400px]"><Spinner label="Loading labels..." /></div>;
 
   return (
     <div className="container mx-auto py-4 px-4">
@@ -350,8 +348,14 @@ const LabelsManagementPage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center justify-between mb-4">
                   <Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-md" />
+                  {isLabelsFetching && !isLabelsLoading && (
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
+                      <span>Updating labels...</span>
+                    </div>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <Table>
@@ -362,12 +366,33 @@ const LabelsManagementPage: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {currentLabels.map((label, i) => (
-                        <TableRow key={i}>
-                          {getTableColumns.map((col, j) => <TableCell key={j}>{col.render ? col.render(label) : (label as any)[col.accessor]}</TableCell>)}
-                          <TableCell className="text-right"><Button variant="ghost" size="icon"><Printer className="h-4 w-4" /></Button></TableCell>
+                      {isLabelsLoading && !allLabels.length ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <TableRow key={i}>
+                            {getTableColumns.map((_, j) => (
+                              <TableCell key={j}>
+                                <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
+                              </TableCell>
+                            ))}
+                            <TableCell className="text-right">
+                              <div className="h-8 w-8 bg-gray-200 rounded animate-pulse ml-auto" />
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : currentLabels.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={getTableColumns.length + 1} className="text-center py-8 text-muted-foreground">
+                            No labels found. Click "Create Labels" to generate them.
+                          </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        currentLabels.map((label, i) => (
+                          <TableRow key={i}>
+                            {getTableColumns.map((col, j) => <TableCell key={j}>{col.render ? col.render(label) : (label as any)[col.accessor]}</TableCell>)}
+                            <TableCell className="text-right"><Button variant="ghost" size="icon"><Printer className="h-4 w-4" /></Button></TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
