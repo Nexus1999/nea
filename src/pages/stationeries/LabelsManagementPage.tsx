@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   Package,
   BookOpen,
   Cpu,
@@ -47,6 +48,7 @@ import BoxLimitsDrawer from "@/components/stationeries/BoxLimitsDrawer";
 import KitbagLimitsDrawer from "@/components/stationeries/KitbagLimitsDrawer";
 import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
+import { cn } from "@/lib/utils";
 
 // ---------- Helper Functions ----------
 function abbreviateSchoolName(name: string): string {
@@ -534,15 +536,39 @@ const LabelsManagementPage: React.FC = () => {
         <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-sm bg-white">
           <Table>
             <TableHeader className="bg-slate-50/75">
-              <TableRow className="border-b border-slate-100">
-                <TableHead className="w-[60px] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 pl-6">S/N</TableHead>
-                {getTableColumns.map((col, idx) => (
-                  <TableHead key={idx} className={`${col.width} text-xs font-bold uppercase tracking-wider text-slate-400 py-4`}>
-                    {col.header}
-                  </TableHead>
-                ))}
-                <TableHead className="text-right text-xs font-bold uppercase tracking-wider text-slate-400 py-4 pr-6">Actions</TableHead>
-              </TableRow>
+              {selectedCategoryId === "stationeries" ? (
+                <>
+                  <TableRow className="border-b border-slate-100">
+                    <TableHead rowSpan={2} className="w-[60px] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 pl-6 align-middle">S/N</TableHead>
+                    <TableHead rowSpan={2} className="w-[10%] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 align-middle">Region</TableHead>
+                    <TableHead rowSpan={2} className="w-[10%] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 align-middle">District</TableHead>
+                    <TableHead rowSpan={2} className="w-[10%] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 align-middle">Center No.</TableHead>
+                    <TableHead rowSpan={2} className="w-[15%] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 align-middle">Center Name</TableHead>
+                    <TableHead colSpan={2} className="text-center text-xs font-bold uppercase tracking-wider text-slate-400 py-2 border-b border-slate-100">Booklets</TableHead>
+                    <TableHead colSpan={2} className="text-center text-xs font-bold uppercase tracking-wider text-slate-400 py-2 border-b border-slate-100">Loose Sheets</TableHead>
+                    <TableHead rowSpan={2} className="w-[5%] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 align-middle">BKM</TableHead>
+                    <TableHead rowSpan={2} className="w-[5%] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 align-middle">Box</TableHead>
+                    <TableHead rowSpan={2} className="w-[5%] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 align-middle">Boxes</TableHead>
+                    <TableHead rowSpan={2} className="text-right text-xs font-bold uppercase tracking-wider text-slate-400 py-4 pr-6 align-middle">Actions</TableHead>
+                  </TableRow>
+                  <TableRow className="border-b border-slate-100">
+                    <TableHead className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 py-2">Normal</TableHead>
+                    <TableHead className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 py-2">Graph</TableHead>
+                    <TableHead className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 py-2">Normal</TableHead>
+                    <TableHead className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 py-2">Graph</TableHead>
+                  </TableRow>
+                </>
+              ) : (
+                <TableRow className="border-b border-slate-100">
+                  <TableHead className="w-[60px] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 pl-6">S/N</TableHead>
+                  {getTableColumns.map((col, idx) => (
+                    <TableHead key={idx} className={`${col.width} text-xs font-bold uppercase tracking-wider text-slate-400 py-4`}>
+                      {col.header}
+                    </TableHead>
+                  ))}
+                  <TableHead className="text-right text-xs font-bold uppercase tracking-wider text-slate-400 py-4 pr-6">Actions</TableHead>
+                </TableRow>
+              )}
             </TableHeader>
             <TableBody>
               {labelsLoading && allLabels.length === 0 ? (
@@ -563,7 +589,7 @@ const LabelsManagementPage: React.FC = () => {
                 ))
               ) : currentLabels.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={getTableColumns.length + 2} className="text-center py-12 text-slate-400 font-medium">
+                  <TableCell colSpan={selectedCategoryId === "stationeries" ? 13 : getTableColumns.length + 2} className="text-center py-12 text-slate-400 font-medium">
                     No labels found. Click "Create Labels" to generate.
                   </TableCell>
                 </TableRow>
@@ -574,7 +600,15 @@ const LabelsManagementPage: React.FC = () => {
                       {(currentPage - 1) * itemsPerPage + idx + 1}
                     </TableCell>
                     {getTableColumns.map((col, j) => (
-                      <TableCell key={j} className="py-4 text-sm text-slate-600 font-medium">
+                      <TableCell
+                        key={j}
+                        className={cn(
+                          "py-4 text-sm text-slate-600 font-medium",
+                          selectedCategoryId === "stationeries" &&
+                            ["normal_booklets", "graph_booklets", "normal_loosesheets", "graph_loosesheets", "bkm", "container_number", "total_containers"].includes(col.accessor) &&
+                            "text-center"
+                        )}
+                      >
                         {col.render ? (
                           col.render(label)
                         ) : col.accessor === "center_number" ? (
