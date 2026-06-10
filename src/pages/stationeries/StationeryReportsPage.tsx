@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
 import {
-  Download, RefreshCw, MapPin, Globe, FolderOpenDot, Search, Check, X, ChevronDown, FileText, Loader2, CheckCircle, Ban, ArrowLeft, ListChecks, Printer
+  Download, RefreshCw, MapPin, Globe, FolderOpenDot, Search, Check, X, ChevronDown, FileText, Loader2, CheckCircle, Ban, ArrowLeft, ListChecks, Printer, Maximize2, Minimize2, Lock, AlertCircle, HelpCircle, Eye, ChevronRight, Sparkles
 } from "lucide-react";
 
 // --- Types ---
@@ -76,7 +75,7 @@ const getSubjectCodeForCategory = (code: string, category: string): string | nul
   }
   if (category === "Fine Arts Booklets") {
     if (code === 'ACSEE') return '116';
-    if (code === 'CSEE' || code === 'FTNA') return '016';
+    if (code === 'CSEE' || code === 'FTNA' ? '016' : null) return '016';
     return null;
   }
   return null;
@@ -125,6 +124,7 @@ const getReportHeader = (code: string, year: string, category: string): { title:
 const StationeryReportsPage = () => {
   const navigate = useNavigate();
   const { masterSummaryId } = useParams<{ masterSummaryId: string }>();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [masterSummary, setMasterSummary] = useState<MasterSummary | null>(null);
   const [regions, setRegions] = useState<Region[]>([]);
@@ -140,13 +140,15 @@ const StationeryReportsPage = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
+  const [previewKey, setPreviewKey] = useState(0);
   
   const [regionsLoading, setRegionsLoading] = useState(true);
   const [districtsLoading, setDistrictsLoading] = useState(true);
 
-  const [isCategoryPopoverOpen, setIsCategoryPopoverOpen] = useState(false);
-  const [isRegionPopoverOpen, setIsRegionPopoverOpen] = useState(false);
-  const [isDistrictPopoverOpen, setIsDistrictPopoverOpen] = useState(false);
+  // New UI States
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [activeStep, setActiveStep] = useState<number>(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const code = masterSummary?.Code || '';
   const year = masterSummary?.Year?.toString() || '';
@@ -194,12 +196,6 @@ const StationeryReportsPage = () => {
   const isAllRegionsSelected = useMemo(() => regions.length > 0 && regions.every(r => selectedRegions.includes(r.region_name)), [regions, selectedRegions]);
   const isAllDistrictsSelected = useMemo(() => filteredDistricts.length > 0 && filteredDistricts.every(d => selectedDistricts.includes(d.district_name)), [filteredDistricts, selectedDistricts]);
   
-  const categoryPopoverHeight = useMemo(() => availableCategories.length * 36 + 8, [availableCategories]); 
-  const regionPopoverHeight = useMemo(() => Math.min(regions.length * 40 + 60, 256), [regions]);
-  const districtPopoverHeight = useMemo(() => Math.min(filteredDistricts.length * 40 + 60, 256), [filteredDistricts]);
-
-  const mainContentHeightClass = "h-[calc(100vh-180px)]"; 
-  
   const regionStatusText = useMemo(() => {
     if (selectedRegions.length === 0) return 'No Region Selected';
     if (isSingleRegionRequired) {
@@ -208,8 +204,17 @@ const StationeryReportsPage = () => {
     if (selectedRegions.length === regions.length) return 'All Regions Selected';
     return `${selectedRegions.length} Regions Selected`;
   }, [selectedRegions, regions.length, isSingleRegionRequired]);
-      
-  const isRegionSelectionInvalid = useMemo(() => isSingleRegionRequired && selectedRegions.length > 1, [isSingleRegionRequired, selectedRegions]);
+
+  // Validation logic
+  const validationError = useMemo(() => {
+    if (!selectedCategory) return "Please select a category to begin.";
+    if (!hideRegionSelector && selectedRegions.length === 0) return "Please select at least one region.";
+    if (!hideRegionSelector && isSingleRegionRequired && selectedRegions.length > 1) {
+      return `The '${selectedCategory}' report requires exactly one region.`;
+    }
+    if (showDistrictSelector && selectedDistricts.length === 0) return "Please select at least one district.";
+    return null;
+  }, [selectedCategory, selectedRegions, selectedDistricts, hideRegionSelector, isSingleRegionRequired, showDistrictSelector]);
 
   const fetchMasterSummary = async () => {
     if (!masterSummaryId) return;
@@ -363,6 +368,21 @@ const StationeryReportsPage = () => {
     }
   }, [masterSummary, fetchRegions, fetchDistricts, selectedCategory]);
 
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setActiveStep(1);
+      }
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
   const toggleDistrictSelection = (districtName: string) => {
     setSelectedDistricts(prev => 
       prev.includes(districtName)
@@ -390,6 +410,14 @@ const StationeryReportsPage = () => {
       
       if (isSingleRegionRequired) {
         newRegions = prev.includes(regionName) ? [] : [regionName];
+        // Auto-advance to Step 3 if single region is selected
+        if (newRegions.length === 1) {
+          setTimeout(() => {
+            if (showDistrictSelector) {
+              setActiveStep(3);
+            }
+          }, 300);
+        }
       } else {
         newRegions = prev.includes(regionName)
           ? prev.filter(name => name !== regionName)
@@ -397,11 +425,6 @@ const StationeryReportsPage = () => {
       }
       
       clearPreview();
-      
-      if (isSingleRegionRequired && newRegions.length === 1) {
-        setIsRegionPopoverOpen(false);
-      }
-
       return newRegions;
     });
   };
@@ -449,43 +472,22 @@ const StationeryReportsPage = () => {
   const handleCategorySelect = (category: string) => {
     setSelectedCategory(category);
     setSelectedDistricts([]); 
+    setSelectedRegions([]);
     clearPreview();
-    setIsCategoryPopoverOpen(false);
-  };
-
-  const validateForm = () => {
-    if (!masterSummary) {
-      showError('Master Summary details are missing.');
-      return false;
-    }
-    if (!selectedCategory) {
-        showError('Please select a category.');
-        return false;
-    }
-
-    if (!hideRegionSelector && selectedRegions.length === 0) {
-      showError('Please select at least one region.');
-      return false;
-    }
-
-    if (!hideRegionSelector && isSingleRegionRequired && selectedRegions.length > 1) {
-        showError(`The '${selectedCategory}' report can only be generated for one region at a time.`);
-        return false;
-    }
-
-    if (SUBJECT_AWARE_REGION_CATEGORIES.includes(selectedCategory)) {
-        const subjectCode = getSubjectCodeForCategory(code, selectedCategory);
-        if (!subjectCode && selectedCategory !== 'Braille Stationeries') {
-            showError(`Cannot generate '${selectedCategory}' report for exam code '${code}'. No corresponding subject code found.`);
-            return false;
-        }
-    }
     
-    if (showDistrictSelector && selectedDistricts.length === 0) {
-      showError('Please select at least one district.');
-      return false;
-    }
-    return true;
+    // Auto-advance to Step 2
+    setTimeout(() => {
+      if (HIDE_REGION_SELECTOR_CATEGORIES.includes(category)) {
+        // If region selector is hidden, skip to Step 3 or complete
+        if (CATEGORIES_REQUIRING_DISTRICTS.includes(category)) {
+          setActiveStep(3);
+        } else {
+          setActiveStep(1); // Keep on 1 or close
+        }
+      } else {
+        setActiveStep(2);
+      }
+    }, 300);
   };
 
   const clearPreview = () => {
@@ -497,7 +499,10 @@ const StationeryReportsPage = () => {
   };
 
   const handleGenerateReport = async () => {
-    if (!validateForm()) return;
+    if (validationError) {
+      showError(validationError);
+      return;
+    }
 
     setIsGenerating(true);
     clearPreview();
@@ -706,7 +711,7 @@ const StationeryReportsPage = () => {
       
     } catch (error: any) {
       console.error('Error generating document:', error);
-      showError(error.message || 'Failed to generate document. Please ensure the required Edge Function is deployed.');
+      showError(error.message || 'Failed to generate document.');
     } finally {
       setIsGenerating(false);
     }
@@ -714,7 +719,6 @@ const StationeryReportsPage = () => {
 
   const downloadDocument = () => {
     if (!previewUrl) return;
-    
     const link = document.createElement('a');
     link.href = previewUrl;
     link.setAttribute('download', fileName || `report_${new Date().getTime()}.pdf`);
@@ -723,12 +727,27 @@ const StationeryReportsPage = () => {
     link.remove();
   };
 
+  const handlePrint = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.focus();
+      iframeRef.current.contentWindow.print();
+    } else {
+      showError("Unable to print. Please download the PDF to print.");
+    }
+  };
+
+  const handleRefreshPreview = () => {
+    setPreviewKey(prev => prev + 1);
+    showSuccess("Preview refreshed");
+  };
+
   const handleClearFilters = () => {
     setSelectedRegions([]);
     setSelectedDistricts([]);
     setSelectedCategory('');
     setRegionSearch('');
     setDistrictSearch('');
+    setActiveStep(1);
     clearPreview();
   };
 
@@ -759,393 +778,455 @@ const StationeryReportsPage = () => {
   }
 
   return (
-    <div className="container mx-auto py-4 px-4 h-full">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-            <div className="p-1.5 bg-black text-white rounded-md">
-              <FolderOpenDot className="h-5 w-5" />
-            </div>
-            Stationery Reports
-          </h1>
-          <p className="text-gray-600 mt-1 font-extrabold">{code}-{year}</p>
+    <div className="container mx-auto py-4 px-4 h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => navigate('/dashboard/stationeries')} className="rounded-xl h-10 w-10 border-slate-200">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              <FolderOpenDot className="h-6 w-6 text-slate-700" />
+              Stationery Reports
+            </h1>
+            <p className="text-xs text-gray-500 font-semibold">{code} — {year}</p>
+          </div>
         </div>
-        <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')} className="rounded-xl">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Stationeries
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="rounded-xl h-9 border-slate-200 hidden lg:flex items-center gap-2"
+          >
+            <ChevronRight className={cn("h-4 w-4 transition-transform", isSidebarCollapsed ? "rotate-180" : "rotate-0")} />
+            {isSidebarCollapsed ? "Show Filters" : "Hide Filters"}
+          </Button>
+        </div>
       </div>
 
-      <div className={cn("flex flex-col lg:flex-row gap-6", mainContentHeightClass)}> 
-        {/* Left Panel - Controls */}
-        <Card className="w-full lg:w-[380px] flex flex-col flex-shrink-0 shadow-xl border-slate-200 rounded-2xl overflow-hidden bg-white">
-          <CardHeader className="border-b bg-slate-50/50 p-5">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-bold text-slate-900">Report Filters</CardTitle>
-              <Button variant="ghost" size="icon" onClick={handleClearFilters} title="Clear Filters" className="h-8 w-8 rounded-lg hover:bg-slate-100">
-                <RefreshCw className="h-4 w-4 text-slate-600" />
-              </Button>
-            </div>
-            <CardDescription className="text-xs font-semibold text-slate-500 mt-1">
-              Configure parameters for {code} ({year})
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="flex-1 p-6 space-y-5 overflow-y-auto scrollbar-none"> 
-            {/* Category Selection */}
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                <ListChecks className="h-3.5 w-3.5" /> Select Category
-              </Label>
-              <Popover open={isCategoryPopoverOpen} onOpenChange={setIsCategoryPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between text-left font-medium h-10 rounded-xl border-slate-200 hover:bg-slate-50"
-                    disabled={regionsLoading || isGenerating || availableCategories.length === 0}
-                  >
-                    <span className="truncate">{selectedCategory || "Select a category..."}</span>
-                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[330px] p-0 rounded-xl shadow-xl border-slate-200">
-                  <ScrollArea style={{ height: `${categoryPopoverHeight}px` }}>
-                    <div className="p-1.5 space-y-0.5">
-                      {availableCategories.length === 0 ? (
-                        <p className="text-center text-sm text-slate-500 py-3">No categories defined for {code}.</p>
-                      ) : (
-                        availableCategories.map((category) => (
-                          <Button
-                            key={category}
-                            variant="ghost"
-                            className={cn(
-                              "w-full justify-start h-9 rounded-lg text-sm font-medium",
-                              selectedCategory === category ? "bg-slate-900 text-white hover:bg-slate-800" : "text-slate-700 hover:bg-slate-100"
-                            )}
-                            onClick={() => handleCategorySelect(category)}
-                          >
-                            {category}
-                          </Button>
-                        ))
-                      )}
-                    </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-            </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 overflow-hidden relative">
+        {/* Left Panel - Collapsible Filters Sidebar */}
+        <div
+          className={cn(
+            "flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out",
+            isSidebarCollapsed ? "w-0 opacity-0 pointer-events-none lg:mr-0" : "w-full lg:w-[380px] opacity-100"
+          )}
+        >
+          <Card className="h-full flex flex-col shadow-lg border-slate-200 rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="border-b bg-slate-50/50 p-4 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  <CardTitle className="text-base font-bold text-slate-900">Filter Wizard</CardTitle>
+                </div>
+                <Button variant="ghost" size="icon" onClick={handleClearFilters} title="Reset Filters" className="h-8 w-8 rounded-lg hover:bg-slate-100">
+                  <RefreshCw className="h-3.5 w-3.5 text-slate-600" />
+                </Button>
+              </div>
+            </CardHeader>
 
-            {/* Conditional Region Selection */}
-            {!hideRegionSelector && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5" /> Select Region(s)
-                  {isSingleRegionRequired && selectedCategory && (
-                      <span className="text-red-500 text-[9px] font-bold uppercase tracking-normal ml-auto">(Single Region)</span>
-                  )}
-                </Label>
-                <Popover open={isRegionPopoverOpen} onOpenChange={setIsRegionPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className={cn(
-                          "w-full justify-between text-left font-medium h-10 rounded-xl border-slate-200 hover:bg-slate-50",
-                          isRegionSelectionInvalid && "border-red-500 ring-1 ring-red-500"
-                      )}
-                      disabled={regionsLoading || isGenerating || !selectedCategory}
-                    >
-                      <span className="truncate">{selectedRegions.length > 0 ? regionStatusText : "Select regions..."}</span>
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[330px] p-0 rounded-xl shadow-xl border-slate-200 overflow-hidden">
-                    <div className="p-2 border-b bg-slate-50">
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                        <Input
-                          placeholder="Search regions..."
-                          className="h-9 pl-9 rounded-lg border-slate-200"
-                          value={regionSearch}
-                          onChange={(e) => setRegionSearch(e.target.value)}
-                        />
-                      </div>
+            {/* Step-by-Step Wizard Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-none">
+              {/* Step 1: Category */}
+              <div className={cn("border rounded-xl overflow-hidden transition-all", activeStep === 1 ? "border-slate-900 ring-1 ring-slate-900" : "border-slate-200")}>
+                <button
+                  onClick={() => setActiveStep(1)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50/50 hover:bg-slate-50 text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn("w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold", selectedCategory ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-700")}>
+                      {selectedCategory ? <Check className="h-3 w-3" /> : "1"}
                     </div>
-                    <ScrollArea style={{ height: `${regionPopoverHeight}px` }}>
-                      <div className="p-1.5 space-y-0.5">
-                        {regionsLoading ? (
-                          <div className="flex items-center justify-center p-6">
-                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                          </div>
-                        ) : searchableRegions.length === 0 ? (
-                          <p className="text-center text-sm text-slate-500 py-3">No regions found.</p>
-                        ) : (
-                          <>
-                            {/* Select All */}
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Category Selection</span>
+                  </div>
+                  <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", activeStep === 1 ? "rotate-180" : "")} />
+                </button>
+                
+                {activeStep === 1 && (
+                  <div className="p-3 bg-white border-t space-y-1">
+                    {availableCategories.map((category) => {
+                      const isSelected = selectedCategory === category;
+                      return (
+                        <button
+                          key={category}
+                          onClick={() => handleCategorySelect(category)}
+                          className={cn(
+                            "w-full flex items-center justify-between p-2.5 rounded-lg text-left text-xs font-semibold transition-all",
+                            isSelected ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
+                          )}
+                        >
+                          <span>{category}</span>
+                          {isSelected && <Check className="h-4 w-4 text-white" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Step 2: Region(s) */}
+              <div className={cn(
+                "border rounded-xl overflow-hidden transition-all",
+                !selectedCategory && "opacity-50 pointer-events-none",
+                activeStep === 2 ? "border-slate-900 ring-1 ring-slate-900" : "border-slate-200"
+              )}>
+                <button
+                  onClick={() => selectedCategory && setActiveStep(2)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50/50 hover:bg-slate-50 text-left"
+                  disabled={!selectedCategory}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn(
+                      "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
+                      hideRegionSelector ? "bg-blue-500 text-white" : selectedRegions.length > 0 ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-700"
+                    )}>
+                      {hideRegionSelector ? <Lock className="h-3 w-3" /> : selectedRegions.length > 0 ? <Check className="h-3 w-3" /> : "2"}
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Region Selection</span>
+                  </div>
+                  <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", activeStep === 2 ? "rotate-180" : "")} />
+                </button>
+
+                {activeStep === 2 && (
+                  <div className="p-3 bg-white border-t space-y-3">
+                    {hideRegionSelector ? (
+                      <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-2">
+                        <Lock className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-blue-700 font-medium leading-relaxed">
+                          This category automatically generates reports for all eligible regions. Region selection is locked.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                          <Input
+                            placeholder="Search regions..."
+                            className="h-8 pl-8 text-xs rounded-lg border-slate-200"
+                            value={regionSearch}
+                            onChange={(e) => setRegionSearch(e.target.value)}
+                          />
+                        </div>
+
+                        <ScrollArea className="h-48 border rounded-lg p-1">
+                          {!isSingleRegionRequired && (
                             <div 
-                              className={cn(
-                                  "flex items-center space-x-2.5 p-2.5 rounded-lg h-9 cursor-pointer hover:bg-slate-100",
-                                  isSingleRegionRequired && 'opacity-50 cursor-not-allowed hover:bg-transparent'
-                              )}
+                              className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 cursor-pointer"
                               onClick={handleSelectAllRegions}
                             >
                               <Checkbox
                                 checked={isAllRegionsSelected}
                                 onCheckedChange={handleSelectAllRegions}
-                                id="select-all-regions"
-                                disabled={isSingleRegionRequired}
                                 className="rounded"
                               />
-                              <Label htmlFor="select-all-regions" className={cn("font-bold text-xs text-slate-700 cursor-pointer", isSingleRegionRequired && 'cursor-not-allowed')}>
-                                Select All ({regions.length})
-                              </Label>
+                              <span className="text-xs font-bold text-slate-700">Select All ({regions.length})</span>
                             </div>
-                            <Separator className="my-1" />
-                            
-                            {/* Individual Regions */}
-                            {searchableRegions.map((region) => {
-                              const isSelected = selectedRegions.includes(region.region_name);
-                              return (
-                                <div 
-                                  key={region.region_code}
-                                  className="flex items-center space-x-2.5 p-2.5 cursor-pointer hover:bg-slate-100 rounded-lg h-9"
-                                  onClick={() => toggleRegionSelection(region.region_name)}
-                                >
-                                  {!isSingleRegionRequired ? (
-                                    <Checkbox
-                                      checked={isSelected}
-                                      onCheckedChange={() => toggleRegionSelection(region.region_name)}
-                                      id={`region-${region.region_code}`}
-                                      className="rounded"
-                                    />
-                                  ) : (
-                                    <div className={cn("w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center", isSelected && "border-black bg-black")}>
-                                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                    </div>
-                                  )}
-                                  <Label htmlFor={`region-${region.region_code}`} className="font-medium text-xs text-slate-700 cursor-pointer flex-1">
-                                    {region.region_name}
-                                  </Label>
-                                </div>
-                              );
-                            })}
-                          </>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
+                          )}
 
-            {/* District Selection (Conditional) */}
-            {showDistrictSelector && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5" /> Select Districts
-                </Label>
-                <Popover open={isDistrictPopoverOpen} onOpenChange={setIsDistrictPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between text-left font-medium h-10 rounded-xl border-slate-200 hover:bg-slate-50"
-                      disabled={selectedRegions.length === 0 || districtsLoading || isGenerating}
-                    >
-                      <span className="truncate">
-                        {selectedDistricts.length > 0 ? `${selectedDistricts.length} district(s) selected` : "Select districts..."}
-                      </span>
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[330px] p-0 rounded-xl shadow-xl border-slate-200 overflow-hidden">
-                    <div className="p-2 border-b bg-slate-50">
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                        <Input
-                          placeholder="Search districts..."
-                          className="h-9 pl-9 rounded-lg border-slate-200"
-                          value={districtSearch}
-                          onChange={(e) => setDistrictSearch(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <ScrollArea style={{ height: `${districtPopoverHeight}px` }}>
-                      <div className="p-1.5 space-y-0.5">
-                        {districtsLoading ? (
-                          <div className="flex items-center justify-center p-6">
-                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                          </div>
-                        ) : filteredDistricts.length === 0 ? (
-                          <p className="text-center text-sm text-slate-500 py-3">No districts found for selected regions.</p>
-                        ) : (
-                          <>
-                            {/* Select All */}
-                            <div 
-                              className="flex items-center space-x-2.5 p-2.5 cursor-pointer hover:bg-slate-100 rounded-lg h-9"
-                              onClick={handleSelectAllDistricts}
-                            >
-                              <Checkbox
-                                checked={isAllDistrictsSelected}
-                                onCheckedChange={handleSelectAllDistricts}
-                                id="select-all-districts"
-                                className="rounded"
-                              />
-                              <Label htmlFor="select-all-districts" className="font-bold text-xs text-slate-700 cursor-pointer">
-                                Select All ({filteredDistricts.length})
-                              </Label>
-                            </div>
-                            <Separator className="my-1" />
-                            
-                            {/* Individual Districts */}
-                            {searchableDistricts.map((district) => {
-                              const isSelected = selectedDistricts.includes(district.district_name);
-                              return (
-                                <div 
-                                  key={district.district_number}
-                                  className="flex items-center space-x-2.5 p-2.5 cursor-pointer hover:bg-slate-100 rounded-lg h-9"
-                                  onClick={() => toggleDistrictSelection(district.district_name)}
-                                >
+                          {searchableRegions.map((region) => {
+                            const isSelected = selectedRegions.includes(region.region_name);
+                            return (
+                              <div
+                                key={region.region_code}
+                                className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 cursor-pointer"
+                                onClick={() => toggleRegionSelection(region.region_name)}
+                              >
+                                {!isSingleRegionRequired ? (
                                   <Checkbox
                                     checked={isSelected}
-                                    onCheckedChange={() => toggleDistrictSelection(district.district_name)}
-                                    id={`district-${district.district_number}`}
+                                    onCheckedChange={() => toggleRegionSelection(region.region_name)}
                                     className="rounded"
                                   />
-                                  <Label htmlFor={`district-${district.district_number}`} className="font-medium text-xs text-slate-700 cursor-pointer flex-1">
-                                    {district.district_name}
-                                  </Label>
-                                </div>
-                              );
-                            })}
-                          </>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
-            
-            {/* Generate Report Button and Progress Bar */}
-            <div className="pt-4 flex flex-col gap-4">
-              {isGenerating && (
-                <div className="w-full space-y-1.5">
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-black animate-pulse rounded-full" style={{ width: '100%' }} />
+                                ) : (
+                                  <div className={cn("w-3.5 h-3.5 rounded-full border flex items-center justify-center", isSelected ? "border-slate-900 bg-slate-900" : "border-slate-300")}>
+                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </div>
+                                )}
+                                <span className="text-xs font-medium text-slate-700">{region.region_name}</span>
+                              </div>
+                            );
+                          })}
+                        </ScrollArea>
+                      </>
+                    )}
                   </div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">
-                    Generating document(s), please wait...
+                )}
+              </div>
+
+              {/* Step 3: District(s) */}
+              <div className={cn(
+                "border rounded-xl overflow-hidden transition-all",
+                (!selectedCategory || (!hideRegionSelector && selectedRegions.length === 0)) && "opacity-50 pointer-events-none",
+                activeStep === 3 ? "border-slate-900 ring-1 ring-slate-900" : "border-slate-200"
+              )}>
+                <button
+                  onClick={() => selectedCategory && (hideRegionSelector || selectedRegions.length > 0) && setActiveStep(3)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50/50 hover:bg-slate-50 text-left"
+                  disabled={!selectedCategory || (!hideRegionSelector && selectedRegions.length === 0)}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn(
+                      "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
+                      !showDistrictSelector ? "bg-slate-100 text-slate-400" : selectedDistricts.length > 0 ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-700"
+                    )}>
+                      {!showDistrictSelector ? <Lock className="h-3 w-3" /> : selectedDistricts.length > 0 ? <Check className="h-3 w-3" /> : "3"}
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">District Selection</span>
+                  </div>
+                  <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", activeStep === 3 ? "rotate-180" : "")} />
+                </button>
+
+                {activeStep === 3 && (
+                  <div className="p-3 bg-white border-t space-y-3">
+                    {!showDistrictSelector ? (
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-2">
+                        <Lock className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                          District selection is not required for the '{selectedCategory}' category.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                          <Input
+                            placeholder="Search districts..."
+                            className="h-8 pl-8 text-xs rounded-lg border-slate-200"
+                            value={districtSearch}
+                            onChange={(e) => setDistrictSearch(e.target.value)}
+                          />
+                        </div>
+
+                        <ScrollArea className="h-48 border rounded-lg p-1">
+                          <div 
+                            className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 cursor-pointer"
+                            onClick={handleSelectAllDistricts}
+                          >
+                            <Checkbox
+                              checked={isAllDistrictsSelected}
+                              onCheckedChange={handleSelectAllDistricts}
+                              className="rounded"
+                            />
+                            <span className="text-xs font-bold text-slate-700">Select All ({filteredDistricts.length})</span>
+                          </div>
+
+                          {searchableDistricts.map((district) => {
+                            const isSelected = selectedDistricts.includes(district.district_name);
+                            return (
+                              <div
+                                key={district.district_number}
+                                className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 cursor-pointer"
+                                onClick={() => toggleDistrictSelection(district.district_name)}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleDistrictSelection(district.district_name)}
+                                  className="rounded"
+                                />
+                                <span className="text-xs font-medium text-slate-700">{district.district_name}</span>
+                              </div>
+                            );
+                          })}
+                        </ScrollArea>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Real-time Filter Summary & Validation */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Live Summary</span>
+                <div className="space-y-1.5 text-xs font-medium text-slate-600">
+                  <div className="flex justify-between">
+                    <span>Category:</span>
+                    <span className="text-slate-900 font-bold truncate max-w-[180px]">{selectedCategory || "None"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Regions:</span>
+                    <span className="text-slate-900 font-bold">
+                      {hideRegionSelector ? "Auto-all" : selectedRegions.length > 0 ? `${selectedRegions.length} selected` : "None"}
+                    </span>
+                  </div>
+                  {showDistrictSelector && (
+                    <div className="flex justify-between">
+                      <span>Districts:</span>
+                      <span className="text-slate-900 font-bold">
+                        {selectedDistricts.length > 0 ? `${selectedDistricts.length} selected` : "None"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {validationError && (
+                  <div className="pt-2 border-t border-slate-200/60 flex items-start gap-1.5 text-[10px] font-bold text-amber-600 uppercase tracking-wide">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                    <span>{validationError}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Unified Action Bar */}
+            <div className="p-4 border-t bg-slate-50 flex-shrink-0 space-y-3">
+              {isGenerating && (
+                <div className="w-full space-y-1">
+                  <div className="h-1 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <div className="h-full bg-slate-900 animate-pulse rounded-full" style={{ width: '100%' }} />
+                  </div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 text-center">
+                    Generating document, please wait...
                   </p>
                 </div>
               )}
 
-              <Button
-                onClick={handleGenerateReport}
-                disabled={
-                  isGenerating
-                  || !selectedCategory
-                  || (!hideRegionSelector && selectedRegions.length === 0)
-                  || (showDistrictSelector && selectedDistricts.length === 0)
-                  || (!hideRegionSelector && isRegionSelectionInvalid)
-                }
-                className="w-full bg-black text-white hover:bg-slate-800 font-bold text-sm h-11 rounded-xl transition-all duration-300 shadow-md"
-              >
-                {isGenerating ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                {isGenerating ? 'Generating Report(s)...' : 'Generate Report(s)'}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleGenerateReport}
+                  disabled={isGenerating || !!validationError}
+                  className="flex-1 bg-slate-900 text-white hover:bg-slate-800 font-bold text-xs h-10 rounded-xl transition-all duration-300 shadow-md"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-3.5 w-3.5" />
+                  )}
+                  {isGenerating ? 'Generating...' : 'Generate Report'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleClearFilters}
+                  disabled={isGenerating || (!selectedCategory && selectedRegions.length === 0)}
+                  className="h-10 rounded-xl border-slate-200 text-xs font-bold"
+                >
+                  Clear
+                </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
 
-        {/* Right Panel - Preview */}
-        <Card className="flex-1 flex flex-col shadow-xl border-slate-200 rounded-2xl overflow-hidden bg-white">
-          <CardHeader className="border-b bg-slate-50/50 p-5 flex flex-row items-center justify-between space-y-0">
+        {/* Right Panel - Preview Panel */}
+        <Card className="flex-1 flex flex-col shadow-lg border-slate-200 rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="border-b bg-slate-50/50 p-4 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
             <div>
-              <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-slate-700" /> Document Preview
+              <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-slate-700" /> Document Preview
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500 mt-1">
+              <CardDescription className="text-xs text-slate-500 mt-0.5 truncate max-w-[250px] sm:max-w-md">
                 {fileName ? `Viewing: ${fileName}` : "Generate a report to preview it here"}
               </CardDescription>
             </div>
-            {previewUrl && (
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={downloadDocument} className="rounded-xl h-9 border-slate-200 hover:bg-slate-50">
-                  <Download className="h-4 w-4 mr-2" /> Download
-                </Button>
-                <Button variant="ghost" size="icon" onClick={clearPreview} className="h-9 w-9 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            
+            {/* Preview Toolbar */}
+            <div className="flex items-center gap-1.5">
+              {previewUrl && (
+                <>
+                  <Button variant="outline" size="icon" onClick={handleRefreshPreview} title="Refresh Preview" className="h-8 w-8 rounded-lg border-slate-200">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={handlePrint} title="Print Document" className="h-8 w-8 rounded-lg border-slate-200">
+                    <Printer className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={downloadDocument} title="Download PDF" className="h-8 w-8 rounded-lg border-slate-200">
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => setIsFullscreen(!isFullscreen)} title="Toggle Fullscreen" className="h-8 w-8 rounded-lg border-slate-200">
+                    {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                  </Button>
+                </>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="flex-1 p-6 flex items-center justify-center bg-slate-50/50">
-            <div className="w-full h-full border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-inner flex items-center justify-center">
-              {previewUrl ? (
+
+          <CardContent className="flex-1 p-4 flex items-center justify-center bg-slate-50/50 relative min-h-0">
+            <div className="w-full h-full border border-slate-200 rounded-xl overflow-hidden bg-white shadow-inner flex items-center justify-center relative">
+              {isGenerating ? (
+                <div className="flex flex-col items-center justify-center text-center p-8">
+                  <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-100 animate-spin">
+                    <Loader2 className="h-6 w-6 text-slate-900" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800 mb-1">Generating Document</p>
+                  <p className="text-xs text-slate-500 max-w-xs">
+                    Compiling data and generating PDF. This may take a few moments...
+                  </p>
+                </div>
+              ) : previewUrl ? (
                 <iframe 
+                  key={previewKey}
+                  ref={iframeRef}
                   src={previewUrl} 
                   width="100%" 
                   height="100%" 
                   frameBorder="0"
                   title="Document preview"
-                  className="border-none"
+                  className="border-none w-full h-full"
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center text-center p-8 max-w-md">
-                  <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-100">
-                    <FileText className="h-8 w-8 text-slate-400" />
+                  <div className="w-14 h-14 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-100">
+                    <FileText className="h-6 w-6 text-slate-400" />
                   </div>
-                  <p className="text-base font-bold text-slate-800 mb-1">No Document Generated</p>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Select your desired category, region, and district filters on the left panel, then click "Generate Report(s)" to view the PDF document.
+                  <p className="text-sm font-bold text-slate-800 mb-1">No Document Generated</p>
+                  <p className="text-xs text-slate-500 leading-relaxed mb-4">
+                    Configure your desired category, region, and district filters on the left panel, then click "Generate Report" to view the PDF document.
                   </p>
+                  {selectedCategory && (
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 text-left w-full space-y-1">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Current Selection</span>
+                      <p className="text-xs font-bold text-slate-700 truncate">📁 {selectedCategory}</p>
+                      <p className="text-xs font-medium text-slate-500">
+                        🌍 {hideRegionSelector ? "All Eligible Regions" : selectedRegions.length > 0 ? `${selectedRegions.length} region(s)` : "No region selected"}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </CardContent>
-          
-          {/* Status Bar */}
-          <div className="p-4 border-t bg-slate-50 flex justify-between items-center text-xs">
-            <div className="flex items-center gap-2">
-              {hideRegionSelector ? (
-                <>
-                  <CheckCircle className="h-4 w-4 text-emerald-600" />
-                  <span className="text-emerald-700 font-bold uppercase tracking-wider text-[10px]">Auto-generating for eligible regions</span>
-                </>
-              ) : (
-                <>
-                  {(selectedRegions.length > 0 && !isSingleRegionRequired) || (isSingleRegionRequired && selectedRegions.length === 1) ? (
-                    <CheckCircle className="h-4 w-4 text-emerald-600" />
-                  ) : (
-                    <Ban className="h-4 w-4 text-red-500" />
-                  )}
-                  <span className={cn("font-bold uppercase tracking-wider text-[10px]", selectedRegions.length > 0 ? 'text-emerald-700' : 'text-red-500')}>
-                    {selectedRegions.length === 0 
-                      ? 'No Region Selected' 
-                      : selectedRegions.length === regions.length
-                        ? 'All Regions Selected'
-                        : `${selectedRegions.length} Regions Selected`}
-                  </span>
-                </>
-              )}
-            </div>
-            {showDistrictSelector && selectedDistricts.length > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setSelectedDistricts([])}
-                className="text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg h-8 px-3 font-semibold"
-              >
-                Clear Districts ({selectedDistricts.length})
-              </Button>
-            )}
-          </div>
         </Card>
       </div>
+
+      {/* Fullscreen Preview Overlay */}
+      {isFullscreen && previewUrl && (
+        <div className="fixed inset-0 bg-white z-[9999] flex flex-col">
+          <div className="h-14 border-b bg-slate-50 px-6 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-slate-700" />
+              <span className="font-bold text-sm text-slate-900">{fileName || "Document Preview"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleRefreshPreview} className="rounded-xl h-9">
+                <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePrint} className="rounded-xl h-9">
+                <Printer className="h-4 w-4 mr-2" /> Print
+              </Button>
+              <Button variant="outline" size="sm" onClick={downloadDocument} className="rounded-xl h-9">
+                <Download className="h-4 w-4 mr-2" /> Download
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setIsFullscreen(false)} className="h-9 w-9 rounded-xl">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 bg-slate-100 p-4">
+            <iframe 
+              key={previewKey}
+              ref={iframeRef}
+              src={previewUrl} 
+              width="100%" 
+              height="100%" 
+              frameBorder="0"
+              title="Fullscreen Document preview"
+              className="border rounded-xl bg-white shadow-lg w-full h-full"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
