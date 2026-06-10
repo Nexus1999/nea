@@ -91,7 +91,7 @@ const getReportHeader = (code: string, year: string, category: string): { title:
   
   const baseTitles: Record<string, string> = {
     'PSLE': `SHAJARA ZA MTIHANI WA DARASA LA SABA ${yearStr}`,
-    'SSNA': `SHAJARA ZA UPIMAJI WA KITAIFA WA DARASA LA SIT ${yearStr}`,
+    'SSNA': `SHAJARA ZA UPIMAJI WA KITAIFA WA DARASA LA SITA ${yearStr}`,
     'SFNA': `SHAJARA ZA UPIMAJI WA KITAIFA WA DARASA LA NNE ${yearStr}`,
     'FTNA': `SHAJARA ZA UPIMAJI WA KITAIFA WA KIDATO CHA PILI ${yearStr}`,
     'CSEE': `SHAJARA ZA MTIHANI WA KIDATO CHA NNE ${yearStr}`,
@@ -591,7 +591,7 @@ const StationeryReportsPage = () => {
 
           const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
-          const downloadedFileName = `BKM_Description_${code}_${year}_${regionName}.pdf`;
+          const downloadedFileName = `BKM ${regionName} ${code}-${year}.pdf`;
           generatedReports.push({ region: regionName, url, fileName: downloadedFileName });
 
       } else if (isSubjectPercentageReport) {
@@ -677,7 +677,7 @@ const StationeryReportsPage = () => {
 
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const downloadedFileName = `Stationeries_${code}_${year}_${selectedRegions.length > 1 ? 'MultiRegion' : (selectedRegions[0] || 'Region')}.pdf`;
+        const downloadedFileName = `Stationeries ${code} ${year} ${selectedRegions.length > 1 ? 'MultiRegion' : (selectedRegions[0] || 'Region')}.pdf`;
         generatedReports.push({ region: selectedRegions.join(', '), url, fileName: downloadedFileName });
       } else if (isSupervisorReport) {
           // Supervisors Forms (multi-region) - now handles FTNA under 'Stationeries' name
@@ -704,7 +704,7 @@ const StationeryReportsPage = () => {
 
           const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
-          const downloadedFileName = `Supervisor_Report_${code}_${year}_${selectedRegions.length > 1 ? 'MultiRegion' : (selectedRegions[0] || 'Region')}.pdf`;
+          const downloadedFileName = `Supervisors Forms ${code}-${year} ${selectedRegions.length > 1 ? 'MultiRegion' : (selectedRegions[0] || 'Region')}.pdf`;
           generatedReports.push({ region: selectedRegions.join(', '), url, fileName: downloadedFileName });
       } else if (isStationeryDescriptionReport) {
           // Generate one PDF per selected region using the existing edge function
@@ -746,7 +746,7 @@ const StationeryReportsPage = () => {
 
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
-            const downloadedFileName = `Stationery_Description_${code}_${year}_${regionName}.pdf`;
+            const downloadedFileName = `Stationeries ${regionName} ${code}-${year}.pdf`;
             generatedReports.push({ region: regionName, url, fileName: downloadedFileName });
           }
       } else {
