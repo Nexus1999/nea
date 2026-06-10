@@ -78,7 +78,7 @@ interface LabelItem {
   graph_loosesheets: number;
   bkm: number;
   container_type: string;
-  container_number: number;
+  container_number: string; // Matches DB schema (text null)
   total_containers: number;
   item: string;
   quantity: number;
@@ -127,29 +127,29 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
   }
 };
 
-// Map category id to database category string
-const categoryQueryMap: Record<string, string> = {
-  stationeries: "stationeries",
-  district_stationeries: "district_stationeries",
-  arabic_booklets: "Arabic Booklets",
-  ict_covers: "ICT Covers",
-  fine_arts_booklets: "Fine Arts Booklets",
-  braille_stationeries: "Braille Stationeries",
-  kitbags: "kitbags",
+// Map category id to database category string candidates to handle casing/naming mismatches
+const categoryQueryMap: Record<string, string[]> = {
+  stationeries: ["stationeries", "Stationeries"],
+  district_stationeries: ["district_stationeries", "District Stationeries", "district-stationeries"],
+  arabic_booklets: ["Arabic Booklets", "arabic_booklets", "arabic-booklets"],
+  ict_covers: ["ICT Covers", "ict_covers", "ict-covers"],
+  fine_arts_booklets: ["Fine Arts Booklets", "fine_arts_booklets", "fine-arts-booklets"],
+  braille_stationeries: ["Braille Stationeries", "braille_stationeries", "braille-stationeries"],
+  kitbags: ["kitbags", "Kitbags"],
 };
 
 // ---------- React Query Hook for Labels ----------
 const useLabels = (masterSummaryId: number | undefined, categoryId: string | null) => {
-  const dbCategory = categoryId ? categoryQueryMap[categoryId] : null;
+  const dbCategories = categoryId ? categoryQueryMap[categoryId] : null;
   return useQuery({
     queryKey: ["labels", masterSummaryId, categoryId],
     queryFn: async () => {
-      if (!masterSummaryId || !dbCategory) return [];
+      if (!masterSummaryId || !dbCategories) return [];
       const { data, error } = await supabase
         .from("labels")
         .select("*")
         .eq("mid", masterSummaryId)
-        .eq("category", dbCategory)
+        .in("category", dbCategories)
         .order("region", { ascending: true })
         .order("district", { ascending: true })
         .order("center_number", { ascending: true });
@@ -368,12 +368,12 @@ const LabelsManagementPage: React.FC = () => {
     if (!masterSummary || !selectedCategoryId) return;
     setIsGeneratingLabels(true);
     try {
-      const dbCategory = categoryQueryMap[selectedCategoryId] || selectedCategoryId;
+      const dbCategories = categoryQueryMap[selectedCategoryId] || [selectedCategoryId];
       const query = supabase
         .from("labels")
         .delete()
         .eq("mid", masterSummary.id)
-        .eq("category", dbCategory);
+        .in("category", dbCategories);
       if (selectedRegion !== "All") query.eq("region", selectedRegion);
       await query;
       showSuccess("Labels reset successfully!");
