@@ -433,7 +433,7 @@ const LabelsManagementPage: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          {selectedCategoryId === "stationeries" && stationery && (
+          {(selectedCategoryId === "stationeries" || selectedCategoryId === "district_stationeries") && stationery && (
             <Button
               variant="outline"
               size="sm"
