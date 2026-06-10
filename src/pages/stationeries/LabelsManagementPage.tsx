@@ -17,8 +17,10 @@ import {
   PlusCircle,
   RotateCcw,
   Loader2,
+  SlidersHorizontal,
+  RefreshCw,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -36,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import {
@@ -87,36 +90,38 @@ interface Category {
   id: string;
   name: string;
   icon: React.ElementType;
+  color: string;
+  bgColor: string;
 }
 
-// Category definitions per exam code
+// Category definitions per exam code with modern colors
 const getCategoriesForExam = (examCode: string | undefined): Category[] => {
   if (!examCode) return [];
   switch (examCode) {
     case "CSEE":
     case "ACSEE":
       return [
-        { id: "stationeries", name: "Stationeries", icon: Package },
-        { id: "arabic_booklets", name: "Arabic Booklets", icon: BookOpen },
-        { id: "ict_covers", name: "ICT Covers", icon: Cpu },
-        { id: "fine_arts_booklets", name: "Fine Arts Booklets", icon: Palette },
-        { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText },
-        { id: "kitbags", name: "Kitbags", icon: Briefcase },
+        { id: "stationeries", name: "Stationeries", icon: Package, color: "text-blue-600", bgColor: "bg-blue-50" },
+        { id: "arabic_booklets", name: "Arabic Booklets", icon: BookOpen, color: "text-emerald-600", bgColor: "bg-emerald-50" },
+        { id: "ict_covers", name: "ICT Covers", icon: Cpu, color: "text-purple-600", bgColor: "bg-purple-50" },
+        { id: "fine_arts_booklets", name: "Fine Arts Booklets", icon: Palette, color: "text-orange-600", bgColor: "bg-orange-50" },
+        { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
+        { id: "kitbags", name: "Kitbags", icon: Briefcase, color: "text-indigo-600", bgColor: "bg-indigo-50" },
       ];
     case "FTNA":
       return [
-        { id: "district_stationeries", name: "Stationeries", icon: Package },
-        { id: "ict_covers", name: "ICT Covers", icon: Cpu },
-        { id: "fine_arts_booklets", name: "Fine Arts Booklets", icon: Palette },
-        { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText },
+        { id: "district_stationeries", name: "Stationeries", icon: Package, color: "text-blue-600", bgColor: "bg-blue-50" },
+        { id: "ict_covers", name: "ICT Covers", icon: Cpu, color: "text-purple-600", bgColor: "bg-purple-50" },
+        { id: "fine_arts_booklets", name: "Fine Arts Booklets", icon: Palette, color: "text-orange-600", bgColor: "bg-orange-50" },
+        { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
       ];
     case "PSLE":
     case "SSNA":
     case "SFNA":
       return [
-        { id: "district_stationeries", name: "Stationeries", icon: Package },
-        { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText },
-        { id: "kitbags", name: "Kitbags", icon: Briefcase },
+        { id: "district_stationeries", name: "Stationeries", icon: Package, color: "text-blue-600", bgColor: "bg-blue-50" },
+        { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
+        { id: "kitbags", name: "Kitbags", icon: Briefcase, color: "text-indigo-600", bgColor: "bg-indigo-50" },
       ];
     default:
       return [];
@@ -153,9 +158,9 @@ const useLabels = (masterSummaryId: number | undefined, categoryId: string | nul
       return data as LabelItem[];
     },
     enabled: !!masterSummaryId && !!categoryId,
-    keepPreviousData: true, // keeps old data visible while fetching new
-    placeholderData: (prev) => prev, // immediately show previous data when switching categories
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    keepPreviousData: true,
+    placeholderData: (prev) => prev,
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -277,33 +282,33 @@ const LabelsManagementPage: React.FC = () => {
   // Table columns depend on active category
   const getTableColumns = useMemo(() => {
     const baseColumns = [
-      { header: "Region", accessor: "region", width: "w-[12%]" },
-      { header: "District", accessor: "district", width: "w-[12%]" },
-      { header: "Center No.", accessor: "center_number", width: "w-[10%]" },
+      { header: "Region", accessor: "region", width: "w-[15%]" },
+      { header: "District", accessor: "district", width: "w-[15%]" },
+      { header: "Center No.", accessor: "center_number", width: "w-[12%]" },
       {
         header: "Center Name",
         accessor: "center_name",
-        width: "w-[20%]",
+        width: "w-[40%]",
         render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
       },
     ];
 
     if (selectedCategoryId === "stationeries") {
       return [
-        { header: "Region", accessor: "region", width: "w-[9%]" },
+        { header: "Region", accessor: "region", width: "w-[10%]" },
         { header: "District", accessor: "district", width: "w-[10%]" },
-        { header: "Center No.", accessor: "center_number", width: "w-[9%]" },
+        { header: "Center No.", accessor: "center_number", width: "w-[10%]" },
         {
           header: "Center Name",
           accessor: "center_name",
-          width: "w-[10%]",
+          width: "w-[15%]",
           render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
         },
-        { header: "Normal B.", accessor: "normal_booklets", width: "w-[10%]" },
-        { header: "Graph B.", accessor: "graph_booklets", width: "w-[10%]" },
-        { header: "Normal LS", accessor: "normal_loosesheets", width: "w-[10%]" },
-        { header: "Graph LS", accessor: "graph_loosesheets", width: "w-[10%]" },
-        { header: "BKM", accessor: "bkm", width: "w-[4%]" },
+        { header: "Normal B.", accessor: "normal_booklets", width: "w-[8%]" },
+        { header: "Graph B.", accessor: "graph_booklets", width: "w-[8%]" },
+        { header: "Normal LS", accessor: "normal_loosesheets", width: "w-[8%]" },
+        { header: "Graph LS", accessor: "graph_loosesheets", width: "w-[8%]" },
+        { header: "BKM", accessor: "bkm", width: "w-[5%]" },
         { header: "Box", accessor: "container_number", width: "w-[5%]" },
         { header: "Boxes", accessor: "total_containers", width: "w-[5%]" },
       ];
@@ -352,7 +357,6 @@ const LabelsManagementPage: React.FC = () => {
       const { data, error } = await supabase.functions.invoke(invokeFunction, { body: payload });
       if (error) throw error;
       showSuccess("Labels generated successfully!");
-      // Invalidate the cache for this category
       await queryClient.invalidateQueries({ queryKey: ["labels", masterSummary.id, selectedCategoryId] });
     } catch (error: any) {
       showError(error.message || "Failed to generate labels.");
@@ -388,7 +392,7 @@ const LabelsManagementPage: React.FC = () => {
   if (loadingSummary) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner label="Loading labels management..." />
+        <Spinner label="Loading labels management..." size="lg" />
       </div>
     );
   }
@@ -407,175 +411,223 @@ const LabelsManagementPage: React.FC = () => {
   const categories = getCategoriesForExam(masterSummary.Code);
 
   return (
-    <div className="container mx-auto py-4 px-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Labels Management</h1>
-          <p className="text-gray-600 mt-1 font-extrabold">
-            {masterSummary.Code} - {masterSummary.Year}
-          </p>
+    <Card className="relative min-h-[600px] border-0 shadow-lg rounded-2xl overflow-hidden bg-white">
+      {/* Background loading overlay */}
+      {(labelsLoading || isGeneratingLabels) && (
+        <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-2xl">
+          <Spinner label={isGeneratingLabels ? "Generating labels..." : "Loading labels..."} size="lg" />
         </div>
+      )}
+
+      {/* Card Header */}
+      <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+            onClick={() => navigate("/dashboard/stationeries")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <CardTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              Labels Management
+            </CardTitle>
+            <CardDescription className="text-xs font-semibold text-slate-500 mt-0.5">
+              {masterSummary.Code} — {masterSummary.Year}
+            </CardDescription>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Category Dropdown Selector */}
-          <Select value={selectedCategoryId || ""} onValueChange={setSelectedCategoryId}>
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  <div className="flex items-center gap-2">
-                    <cat.icon className="h-4 w-4 text-slate-500" />
-                    <span>{cat.name}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Region Dropdown Selector */}
-          <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-            <SelectTrigger className="w-52">
-              <SelectValue placeholder="Select region" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Regions</SelectItem>
-              {regions.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {r}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" onClick={() => navigate("/dashboard/stationeries")}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          {selectedCategoryId === "stationeries" && stationery && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBoxLimitsDrawerOpen(true)}
+              className="h-9 rounded-xl border-blue-200 bg-blue-50/50 text-blue-600 hover:bg-blue-50 hover:text-blue-700 font-semibold text-xs"
+            >
+              <Settings className="h-3.5 w-3.5 mr-1.5" /> Box Limits
+            </Button>
+          )}
+          {selectedCategoryId === "kitbags" && stationery && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsKitbagLimitsDrawerOpen(true)}
+              className="h-9 rounded-xl border-emerald-200 bg-emerald-50/50 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 font-semibold text-xs"
+            >
+              <Settings className="h-3.5 w-3.5 mr-1.5" /> Kitbag Limits
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={handleCreateLabels}
+            disabled={isGeneratingLabels || !selectedCategoryId}
+            className="h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs gap-1.5"
+          >
+            <PlusCircle className="h-3.5 w-3.5" /> Create Labels
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetLabels}
+            disabled={isGeneratingLabels || !selectedCategoryId}
+            className="h-9 rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 font-semibold text-xs gap-1.5"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Reset
           </Button>
         </div>
-      </div>
+      </CardHeader>
 
-      {/* Main Content */}
-      <Card className="border-t-4 border-blue-600 shadow-xl rounded-xl">
-        <CardHeader className="flex flex-row items-center justify-between bg-slate-50/50 flex-wrap gap-3">
-          <div>
-            <CardTitle className="text-2xl font-bold flex items-center gap-2">
-              {currentCategory && (
-                <>
-                  <currentCategory.icon className="h-6 w-6 text-blue-600" />
-                  {currentCategory.name} Labels
-                </>
-              )}
-            </CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            {selectedCategoryId === "stationeries" && stationery && (
-              <Button
-                variant="outline"
-                onClick={() => setIsBoxLimitsDrawerOpen(true)}
-                className="bg-blue-50 text-blue-600"
-              >
-                <Settings className="h-4 w-4 mr-2" /> Box Limits
-              </Button>
-            )}
-            {selectedCategoryId === "kitbags" && stationery && (
-              <Button
-                variant="outline"
-                onClick={() => setIsKitbagLimitsDrawerOpen(true)}
-                className="bg-green-50 text-green-600"
-              >
-                <Settings className="h-4 w-4 mr-2" /> Kitbag Limits
-              </Button>
-            )}
-            <Button onClick={handleCreateLabels} disabled={isGeneratingLabels || !selectedCategoryId}>
-              {isGeneratingLabels ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <PlusCircle className="h-4 w-4 mr-2" />
-              )}
-              Create Labels
-            </Button>
-            <Button variant="destructive" onClick={handleResetLabels} disabled={isGeneratingLabels || !selectedCategoryId}>
-              <RotateCcw className="h-4 w-4 mr-2" /> Reset
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Search bar */}
-          <div className="flex items-center gap-2 mb-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      {/* Card Content */}
+      <CardContent className="p-6">
+        {/* Filters Toolbar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+          <div className="flex items-center gap-3 flex-1 max-w-md">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Search by center name, number or district..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
+                className="pl-9 h-10 rounded-xl border-slate-200 bg-white focus-visible:ring-slate-400"
               />
             </div>
           </div>
 
-          {/* Table with skeleton loading */}
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-gray-50">
-                <TableRow>
-                  {getTableColumns.map((col, idx) => (
-                    <TableHead key={idx} className={col.width}>
-                      {col.header}
-                    </TableHead>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Category Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Category:</span>
+              <Select value={selectedCategoryId || ""} onValueChange={setSelectedCategoryId}>
+                <SelectTrigger className="w-56 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id} className="rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-1 rounded-md ${cat.bgColor} ${cat.color}`}>
+                          <cat.icon className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="font-medium text-slate-700">{cat.name}</span>
+                      </div>
+                    </SelectItem>
                   ))}
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {labelsLoading && allLabels.length === 0 ? (
-                  // Show skeleton rows for initial load
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {getTableColumns.map((_, j) => (
-                        <TableCell key={j}>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
-                        </TableCell>
-                      ))}
-                      <TableCell>
-                        <div className="h-4 w-8 bg-gray-200 rounded animate-pulse" />
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Region Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Region:</span>
+              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                <SelectTrigger className="w-48 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
+                  <SelectValue placeholder="Select region" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="All" className="rounded-lg font-medium">All Regions</SelectItem>
+                  {regions.map((r) => (
+                    <SelectItem key={r} value={r} className="rounded-lg font-medium">
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* Table Section */}
+        <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-sm bg-white">
+          <Table>
+            <TableHeader className="bg-slate-50/75">
+              <TableRow className="border-b border-slate-100">
+                <TableHead className="w-[60px] text-xs font-bold uppercase tracking-wider text-slate-400 py-4 pl-6">S/N</TableHead>
+                {getTableColumns.map((col, idx) => (
+                  <TableHead key={idx} className={`${col.width} text-xs font-bold uppercase tracking-wider text-slate-400 py-4`}>
+                    {col.header}
+                  </TableHead>
+                ))}
+                <TableHead className="text-right text-xs font-bold uppercase tracking-wider text-slate-400 py-4 pr-6">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {labelsLoading && allLabels.length === 0 ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i} className="border-b border-slate-100">
+                    <TableCell className="pl-6 py-4">
+                      <div className="h-4 w-6 bg-slate-100 rounded animate-pulse" />
+                    </TableCell>
+                    {getTableColumns.map((_, j) => (
+                      <TableCell key={j} className="py-4">
+                        <div className="h-4 bg-slate-100 rounded animate-pulse w-full" />
                       </TableCell>
-                    </TableRow>
-                  ))
-                ) : currentLabels.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={getTableColumns.length + 1} className="text-center text-muted-foreground">
-                      No labels found. Click "Create Labels" to generate.
+                    ))}
+                    <TableCell className="pr-6 py-4 text-right">
+                      <div className="h-8 w-8 bg-slate-100 rounded-lg animate-pulse ml-auto" />
                     </TableCell>
                   </TableRow>
-                ) : (
-                  currentLabels.map((label, idx) => (
-                    <TableRow key={idx}>
-                      {getTableColumns.map((col, j) => (
-                        <TableCell key={j}>
-                          {col.render ? col.render(label) : (label as any)[col.accessor]}
-                        </TableCell>
-                      ))}
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon">
-                          <Printer className="h-4 w-4" />
-                        </Button>
+                ))
+              ) : currentLabels.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={getTableColumns.length + 2} className="text-center py-12 text-slate-400 font-medium">
+                    No labels found. Click "Create Labels" to generate.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                currentLabels.map((label, idx) => (
+                  <TableRow key={idx} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="text-xs font-semibold text-slate-400 py-4 pl-6">
+                      {(currentPage - 1) * itemsPerPage + idx + 1}
+                    </TableCell>
+                    {getTableColumns.map((col, j) => (
+                      <TableCell key={j} className="py-4 text-sm text-slate-600 font-medium">
+                        {col.render ? (
+                          col.render(label)
+                        ) : col.accessor === "center_number" ? (
+                          <span className="font-bold text-slate-700">{label.center_number}</span>
+                        ) : col.accessor === "region" || col.accessor === "district" ? (
+                          <span className="text-slate-500">{label[col.accessor as keyof LabelItem]}</span>
+                        ) : (
+                          <span className="font-semibold text-slate-800">{label[col.accessor as keyof LabelItem]}</span>
+                        )}
                       </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                    ))}
+                    <TableCell className="text-right py-4 pr-6">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                      >
+                        <Printer className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Background Fetching Indicator */}
+        {labelsFetching && !labelsLoading && allLabels.length > 0 && (
+          <div className="flex items-center justify-end gap-2 text-xs text-slate-400 mt-3 font-medium">
+            <RefreshCw className="h-3 w-3 animate-spin text-slate-400" />
+            <span>Updating labels in background...</span>
           </div>
-          {/* Update indicator (background fetch) */}
-          {labelsFetching && !labelsLoading && allLabels.length > 0 && (
-            <div className="text-xs text-muted-foreground text-right mt-1">Updating labels…</div>
-          )}
-          {totalPages > 1 && (
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-6">
             <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </CardContent>
 
       {/* Drawers */}
       {stationery && masterSummary.Code && (
@@ -596,7 +648,7 @@ const LabelsManagementPage: React.FC = () => {
           />
         </>
       )}
-    </div>
+    </Card>
   );
 };
 
