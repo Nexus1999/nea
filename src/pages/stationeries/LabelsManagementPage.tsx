@@ -280,18 +280,6 @@ const LabelsManagementPage: React.FC = () => {
 
   // Table columns depend on active category
   const getTableColumns = useMemo(() => {
-    const baseColumns = [
-      { header: "Region", accessor: "region", width: "w-[15%]" },
-      { header: "District", accessor: "district", width: "w-[15%]" },
-      { header: "Center No.", accessor: "center_number", width: "w-[12%]" },
-      {
-        header: "Center Name",
-        accessor: "center_name",
-        width: "w-[40%]",
-        render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
-      },
-    ];
-
     if (selectedCategoryId === "stationeries") {
       return [
         { header: "Region", accessor: "region", width: "w-[10%]" },
@@ -312,7 +300,23 @@ const LabelsManagementPage: React.FC = () => {
         { header: "Boxes", accessor: "total_containers", width: "w-[5%]" },
       ];
     }
-    return baseColumns;
+
+    // For all other categories (including primary exam district stationeries, braille, kitbags, etc.)
+    return [
+      { header: "Region", accessor: "region", width: "w-[12%]" },
+      { header: "District", accessor: "district", width: "w-[12%]" },
+      { header: "Center No.", accessor: "center_number", width: "w-[10%]" },
+      {
+        header: "Center Name",
+        accessor: "center_name",
+        width: "w-[25%]",
+        render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
+      },
+      { header: "Item", accessor: "item", width: "w-[10%]" },
+      { header: "Quantity", accessor: "quantity", width: "w-[10%]" },
+      { header: "Box", accessor: "container_number", width: "w-[8%]" },
+      { header: "Boxes", accessor: "total_containers", width: "w-[8%]" },
+    ];
   }, [selectedCategoryId]);
 
   // ---------- Mutations (Create & Reset Labels) ----------
@@ -604,8 +608,9 @@ const LabelsManagementPage: React.FC = () => {
                         key={j}
                         className={cn(
                           "py-4 text-sm text-slate-600 font-medium",
-                          selectedCategoryId === "stationeries" &&
-                            ["normal_booklets", "graph_booklets", "normal_loosesheets", "graph_loosesheets", "bkm", "container_number", "total_containers"].includes(col.accessor) &&
+                          ((selectedCategoryId === "stationeries" &&
+                            ["normal_booklets", "graph_booklets", "normal_loosesheets", "graph_loosesheets", "bkm", "container_number", "total_containers"].includes(col.accessor)) ||
+                            ["quantity", "container_number", "total_containers"].includes(col.accessor)) &&
                             "text-center"
                         )}
                       >
