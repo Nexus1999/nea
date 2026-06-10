@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Package,
   BookOpen,
   Cpu,
@@ -17,7 +16,6 @@ import {
   PlusCircle,
   RotateCcw,
   Loader2,
-  SlidersHorizontal,
   RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -38,7 +36,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import {
@@ -422,14 +419,6 @@ const LabelsManagementPage: React.FC = () => {
       {/* Card Header */}
       <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
-            onClick={() => navigate("/dashboard/stationeries")}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
           <div>
             <CardTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
               Labels Management
