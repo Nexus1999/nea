@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Loader2,
   RefreshCw,
+  Boxes,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,7 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "ict_covers", name: "ICT Covers", icon: Cpu, color: "text-purple-600", bgColor: "bg-purple-50" },
         { id: "fine_arts_booklets", name: "Fine Arts Booklets", icon: Palette, color: "text-orange-600", bgColor: "bg-orange-50" },
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
+        { id: "bkm", name: "BKM", icon: Boxes, color: "text-teal-600", bgColor: "bg-teal-50" },
         { id: "kitbags", name: "Kitbags", icon: Briefcase, color: "text-indigo-600", bgColor: "bg-indigo-50" },
       ];
     case "FTNA":
@@ -113,6 +115,7 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "ict_covers", name: "ICT Covers", icon: Cpu, color: "text-purple-600", bgColor: "bg-purple-50" },
         { id: "fine_arts_booklets", name: "Fine Arts Booklets", icon: Palette, color: "text-orange-600", bgColor: "bg-orange-50" },
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
+        { id: "bkm", name: "BKM", icon: Boxes, color: "text-teal-600", bgColor: "bg-teal-50" },
       ];
     case "PSLE":
     case "SSNA":
@@ -136,6 +139,7 @@ const categoryQueryMap: Record<string, string[]> = {
   fine_arts_booklets: ["Fine Arts Booklets", "fine_arts_booklets", "fine-arts-booklets"],
   braille_stationeries: ["Braille Stationeries", "braille_stationeries", "braille-stationeries"],
   kitbags: ["kitbags", "Kitbags"],
+  bkm: ["bkm", "BKM"],
 };
 
 // ---------- React Query Hook for Labels ----------
@@ -278,8 +282,11 @@ const LabelsManagementPage: React.FC = () => {
     setCurrentPage(1);
   }, [selectedRegion, debouncedSearchTerm, selectedCategoryId]);
 
-  // Table columns depend on active category
+  // Table columns depend on active category and exam code
   const getTableColumns = useMemo(() => {
+    const examCode = masterSummary?.Code || "";
+    const isPrimary = ["PSLE", "SSNA", "SFNA"].includes(examCode);
+
     if (selectedCategoryId === "stationeries") {
       return [
         { header: "Region", accessor: "region", width: "w-[10%]" },
@@ -301,7 +308,113 @@ const LabelsManagementPage: React.FC = () => {
       ];
     }
 
-    // For all other categories (including primary exam district stationeries, braille, kitbags, etc.)
+    if (selectedCategoryId === "district_stationeries") {
+      return [
+        { header: "Region", accessor: "region", width: "w-[15%]" },
+        { header: "District", accessor: "district", width: "w-[15%]" },
+        { header: "Item", accessor: "item", width: "w-[15%]" },
+        { header: "Quantity", accessor: "quantity", width: "w-[15%]" },
+        { header: "Box", accessor: "container_number", width: "w-[10%]" },
+        { header: "Boxes", accessor: "total_containers", width: "w-[10%]" },
+      ];
+    }
+
+    if (selectedCategoryId === "braille_stationeries") {
+      return [
+        { header: "Region", accessor: "region", width: "w-[10%]" },
+        { header: "District", accessor: "district", width: "w-[10%]" },
+        { header: "Center No.", accessor: "center_number", width: "w-[10%]" },
+        {
+          header: "Center Name",
+          accessor: "center_name",
+          width: "w-[20%]",
+          render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
+        },
+        { header: "Sheets", accessor: "quantity", width: "w-[10%]" },
+        { header: "BKM", accessor: "bkm", width: "w-[10%]" },
+        { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
+        { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
+      ];
+    }
+
+    if (selectedCategoryId === "kitbags") {
+      return [
+        { header: "Region", accessor: "region", width: "w-[25%]" },
+        { header: "Kitbags", accessor: "quantity", width: "w-[25%]" },
+        { header: "Box", accessor: "container_number", width: "w-[15%]" },
+        { header: "Boxes", accessor: "total_containers", width: "w-[15%]" },
+      ];
+    }
+
+    if (selectedCategoryId === "ict_covers") {
+      return [
+        { header: "Region", accessor: "region", width: "w-[10%]" },
+        { header: "District", accessor: "district", width: "w-[10%]" },
+        { header: "Center No.", accessor: "center_number", width: "w-[10%]" },
+        {
+          header: "Center Name",
+          accessor: "center_name",
+          width: "w-[25%]",
+          render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
+        },
+        { header: "ICT Covers", accessor: "quantity", width: "w-[10%]" },
+        { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
+        { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
+      ];
+    }
+
+    if (selectedCategoryId === "fine_arts_booklets") {
+      return [
+        { header: "Region", accessor: "region", width: "w-[10%]" },
+        { header: "District", accessor: "district", width: "w-[10%]" },
+        { header: "Center No.", accessor: "center_number", width: "w-[10%]" },
+        {
+          header: "Center Name",
+          accessor: "center_name",
+          width: "w-[20%]",
+          render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
+        },
+        { header: "Fine Arts Booklets", accessor: "quantity", width: "w-[10%]" },
+        { header: "BKM", accessor: "bkm", width: "w-[10%]" },
+        { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
+        { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
+      ];
+    }
+
+    if (selectedCategoryId === "arabic_booklets") {
+      return [
+        { header: "Region", accessor: "region", width: "w-[10%]" },
+        { header: "District", accessor: "district", width: "w-[10%]" },
+        { header: "Center No.", accessor: "center_number", width: "w-[10%]" },
+        {
+          header: "Center Name",
+          accessor: "center_name",
+          width: "w-[25%]",
+          render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
+        },
+        { header: "Arabic Booklets", accessor: "quantity", width: "w-[10%]" },
+        { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
+        { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
+      ];
+    }
+
+    if (selectedCategoryId === "bkm") {
+      return [
+        { header: "Region", accessor: "region", width: "w-[10%]" },
+        { header: "District", accessor: "district", width: "w-[10%]" },
+        { header: "Center No.", accessor: "center_number", width: "w-[10%]" },
+        {
+          header: "Center Name",
+          accessor: "center_name",
+          width: "w-[25%]",
+          render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
+        },
+        { header: "BKM", accessor: "bkm", width: "w-[10%]" },
+        { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
+        { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
+      ];
+    }
+
     return [
       { header: "Region", accessor: "region", width: "w-[12%]" },
       { header: "District", accessor: "district", width: "w-[12%]" },
@@ -317,7 +430,7 @@ const LabelsManagementPage: React.FC = () => {
       { header: "Box", accessor: "container_number", width: "w-[8%]" },
       { header: "Boxes", accessor: "total_containers", width: "w-[8%]" },
     ];
-  }, [selectedCategoryId]);
+  }, [selectedCategoryId, masterSummary]);
 
   // ---------- Mutations (Create & Reset Labels) ----------
   const handleCreateLabels = async () => {
@@ -610,7 +723,7 @@ const LabelsManagementPage: React.FC = () => {
                           "py-4 text-sm text-slate-600 font-medium",
                           ((selectedCategoryId === "stationeries" &&
                             ["normal_booklets", "graph_booklets", "normal_loosesheets", "graph_loosesheets", "bkm", "container_number", "total_containers"].includes(col.accessor)) ||
-                            ["quantity", "container_number", "total_containers"].includes(col.accessor)) &&
+                            ["quantity", "bkm", "container_number", "total_containers"].includes(col.accessor)) &&
                             "text-center"
                         )}
                       >
