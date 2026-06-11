@@ -1,3 +1,6 @@
+// No external dependencies required.
+// The QR code uses quickchart.io – a free, reliable HTTPS service.
+
 export const renderDistrictStationeriesLabels = (
   labels: any[],
   examCode: string,
@@ -35,23 +38,19 @@ export const renderDistrictStationeriesLabels = (
 
         <div class="item-quantity-panel">
           <div class="item-box">
-            <div class="label-small">ITEM CODE</div>
             <div class="item-value">${label.item || "N/A"}</div>
           </div>
           <div class="divider-vertical"></div>
           <div class="qty-box">
-            <div class="label-small">QUANTITY</div>
             <div class="qty-value">${label.quantity || 0}</div>
           </div>
         </div>
 
         <div class="bottom-row">
           <div class="box-number">
-            <div class="label-small">CONTAINER</div>
-            <div class="box-value">${label.container_number}/${label.total_containers}</div>
+            <div class="box-value"> BOX ${label.container_number}/${label.total_containers}</div>
           </div>
           <div class="qr-wrapper">
-            <div class="qr-label">SCAN ME</div>
             <img src="${qrUrl}" alt="QR Code" />
           </div>
         </div>
@@ -64,8 +63,7 @@ export const renderDistrictStationeriesLabels = (
     <html>
       <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>District Stationery Labels - ${examCode} ${examYear}</title>
+        <title>District Stationery Labels</title>
         <style>
           * {
             margin: 0;
@@ -102,6 +100,7 @@ export const renderDistrictStationeriesLabels = (
             margin: 0;
           }
 
+          /* Two labels per A4 page container */
           .page-container {
             width: 210mm;
             height: 297mm;
@@ -115,6 +114,7 @@ export const renderDistrictStationeriesLabels = (
             box-shadow: 0 10px 40px rgba(0,0,0,0.1);
           }
 
+          /* Label card layout mixed with V1 styling gradients */
           .label-card {
             border: 1px solid #d4af37;
             border-radius: 28px;
@@ -124,16 +124,11 @@ export const renderDistrictStationeriesLabels = (
             display: flex;
             flex-direction: column;
             box-shadow: 0 8px 24px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
-            transition: all 0.3s ease;
             position: relative;
             box-sizing: border-box;
           }
 
-          .label-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 32px rgba(0,0,0,0.12);
-          }
-
+          /* Gold top bar accent from V1 */
           .gold-accent {
             position: absolute;
             top: 0;
@@ -144,29 +139,31 @@ export const renderDistrictStationeriesLabels = (
             border-radius: 28px 28px 0 0;
           }
 
+          /* UPDATED: Exam Badge with Light Cream BG, Gold Border, and Pure Black Text */
           .exam-badge {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border: 1px solid #d4af37;
+            background: #fff9f0;
+            border: 2px solid #d4af37;
             border-radius: 50px;
             padding: 8px 24px;
             font-size: 18px;
-            font-weight: 600;
+            font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 2px;
-            color: #d4af37;
+            color: #000000;
             text-align: center;
             margin-bottom: 16px;
             align-self: center;
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
           }
 
           .badge-icon {
             font-size: 16px;
           }
 
+          /* Region sizing and text gradients from V1 */
           .region {
             font-family: 'Georgia', 'Times New Roman', 'Elephant', serif;
             font-size: 68px;
@@ -183,6 +180,7 @@ export const renderDistrictStationeriesLabels = (
             text-shadow: 2px 2px 4px rgba(0,0,0,0.05);
           }
 
+          /* District font scaling and dotted border line from V1 */
           .district {
             font-size: 46px;
             font-weight: 800;
@@ -225,21 +223,13 @@ export const renderDistrictStationeriesLabels = (
             background: linear-gradient(135deg, #fff9f0 0%, #ffffff 100%);
           }
 
+          /* Vertical gold panel separator line from V1 */
           .divider-vertical {
             width: 2px;
             background: linear-gradient(180deg, #d4af37 0%, #f5e6a3 50%, #d4af37 100%);
           }
 
-          .label-small {
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 2.5px;
-            color: #6c757d;
-            margin-bottom: 10px;
-            font-family: 'Inter', sans-serif;
-          }
-
+          /* Content panel sizes from V1 */
           .item-value, .qty-value {
             font-size: 48px;
             font-weight: 800;
@@ -260,68 +250,38 @@ export const renderDistrictStationeriesLabels = (
             margin-top: auto;
           }
 
+          /* UPDATED: Box Number identical theme match to Exam Badge (Cream BG, Gold Border, Black Text) */
           .box-number {
             flex: 1;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border: 1px solid #d4af37;
+            background: #fff9f0;
+            border: 2px solid #d4af37;
             border-radius: 20px;
             padding: 12px 16px;
             text-align: center;
             position: relative;
             overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
           }
 
-          .box-number::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(212,175,55,0.1) 0%, transparent 70%);
-            transform: rotate(45deg);
-          }
-
-          .box-number .label-small {
-            color: #d4af37;
-            margin-bottom: 6px;
-          }
-
+          /* Big blocky digital-font size for box quantities with pure black color */
           .box-value {
             font-size: 56px;
             font-weight: 900;
             font-family: 'Georgia', 'Times New Roman', monospace;
-            color: #d4af37;
+            color: #000000;
             line-height: 1;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
           }
 
+          /* Clean QR wrapping styling with gold border line */
           .qr-wrapper {
             background: white;
             border: 2px solid #d4af37;
             border-radius: 20px;
             padding: 12px;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            transition: all 0.3s ease;
-          }
-
-          .qr-wrapper:hover {
-            transform: scale(1.02);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
-          }
-
-          .qr-label {
-            font-size: 8px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: #d4af37;
-            font-family: 'Inter', sans-serif;
           }
 
           .qr-wrapper img {
@@ -330,6 +290,7 @@ export const renderDistrictStationeriesLabels = (
             display: block;
           }
 
+          /* Elegant gold dashed cutting lane divider */
           .cut-line {
             border-top: 2px dashed #d4af37;
             width: 100%;
