@@ -51,6 +51,17 @@ import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
 
+// Import Print Utilities
+import { printLabels } from "@/utils/labels/printEngine";
+import { renderStationeriesLabels } from "@/utils/labels/stationeries";
+import { renderDistrictStationeriesLabels } from "@/utils/labels/districtStationeries";
+import { renderArabicBookletsLabels } from "@/utils/labels/arabicBooklets";
+import { renderIctCoversLabels } from "@/utils/labels/ictCovers";
+import { renderFineArtsBookletsLabels } from "@/utils/labels/fineArtsBooklets";
+import { renderBrailleStationeriesLabels } from "@/utils/labels/brailleStationeries";
+import { renderBkmLabels } from "@/utils/labels/bkm";
+import { renderKitbagsLabels } from "@/utils/labels/kitbags";
+
 // ---------- Helper Functions ----------
 function abbreviateSchoolName(name: string): string {
   if (!name) return "";
@@ -458,6 +469,51 @@ const LabelsManagementPage: React.FC = () => {
     ];
   }, [selectedCategoryId, masterSummary]);
 
+  // ---------- Print Handler ----------
+  const handlePrint = (labelToPrint?: LabelItem) => {
+    const labelsToProcess = labelToPrint ? [labelToPrint] : filteredLabels;
+    if (labelsToProcess.length === 0) {
+      showError("No labels available to print.");
+      return;
+    }
+
+    const examCode = masterSummary?.Code || "";
+    const examYear = String(masterSummary?.Year || "");
+
+    let htmlContent = "";
+    switch (selectedCategoryId) {
+      case "stationeries":
+        htmlContent = renderStationeriesLabels(labelsToProcess, examCode, examYear);
+        break;
+      case "district_stationeries":
+        htmlContent = renderDistrictStationeriesLabels(labelsToProcess, examCode, examYear);
+        break;
+      case "arabic_booklets":
+        htmlContent = renderArabicBookletsLabels(labelsToProcess, examCode, examYear);
+        break;
+      case "ict_covers":
+        htmlContent = renderIctCoversLabels(labelsToProcess, examCode, examYear);
+        break;
+      case "fine_arts_booklets":
+        htmlContent = renderFineArtsBookletsLabels(labelsToProcess, examCode, examYear);
+        break;
+      case "braille_stationeries":
+        htmlContent = renderBrailleStationeriesLabels(labelsToProcess, examCode, examYear);
+        break;
+      case "bkm":
+        htmlContent = renderBkmLabels(labelsToProcess, examCode, examYear);
+        break;
+      case "kitbags":
+        htmlContent = renderKitbagsLabels(labelsToProcess, examCode, examYear);
+        break;
+      default:
+        showError("Printing is not supported for this category yet.");
+        return;
+    }
+
+    printLabels(htmlContent);
+  };
+
   // ---------- Mutations (Create & Reset Labels) ----------
   const handleCreateLabels = async () => {
     if (!masterSummary || !stationery?.id || !selectedCategoryId) return;
@@ -650,6 +706,15 @@ const LabelsManagementPage: React.FC = () => {
             </Button>
           )}
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePrint()}
+            disabled={isGeneratingLabels || filteredLabels.length === 0}
+            className="h-9 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-xs gap-1.5"
+          >
+            <Printer className="h-3.5 w-3.5" /> Print All
+          </Button>
+          <Button
             size="sm"
             onClick={handleCreateLabels}
             disabled={isGeneratingLabels || !selectedCategoryId}
@@ -821,6 +886,7 @@ const LabelsManagementPage: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => handlePrint(label)}
                         className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                       >
                         <Printer className="h-4 w-4" />
