@@ -539,6 +539,8 @@ const LabelsManagementPage: React.FC = () => {
         examCode: masterSummary.Code,
         activeTab: selectedCategoryId,
         region: selectedRegion !== "All" ? selectedRegion : null,
+        region_id: selectedRegion !== "All" ? selectedRegion : null,
+        regionId: selectedRegion !== "All" ? selectedRegion : null,
       };
 
       if (selectedCategoryId === "stationeries") {
