@@ -233,7 +233,7 @@ const StationeriesPage = () => {
                         </Button>
                         <Button
                           variant="ghost" size="icon" className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                          title="Labels Management" onClick={() => navigate(`/dashboard/mastersummaries/${s.mid}/labels`)}
+                          title="Labels Management" onClick={() => navigate(`/dashboard/stationeries/${s.mid}/labels`)}
                         >
                           <Tags className="h-4 w-4" />
                         </Button>

@@ -105,7 +105,7 @@ const App = () => (
               <Route path="mastersummaries/version/:id" element={<VersionManagementPage />} />
               <Route path="mastersummaries/special-needs/:id" element={<SpecialNeedsPage />} />
               <Route path="mastersummaries/special-needs/:id/:specialNeedType/details" element={<SpecialNeedDetailsPage />} />
-              <Route path="mastersummaries/:masterSummaryId/labels" element={<LabelsManagementPage />} />
+        
 
 
                {/* Supervisors Routes */}
@@ -153,6 +153,7 @@ const App = () => (
                <Route path="stationeries" element={<StationeriesPage />} />
               <Route path="stationeries/reports/:masterSummaryId" element={<StationeryReportsPage />} />
               <Route path="stationeries/summary/:stationeryId" element={<StationerySummaryPage />} />
+              <Route path="stationeries/:masterSummaryId/labels" element={<LabelsManagementPage />} />
 
 
               {/* Add more routes as needed */}
