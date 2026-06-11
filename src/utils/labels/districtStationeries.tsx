@@ -28,7 +28,7 @@ export const renderDistrictStationeriesLabels = (
         <!-- Top badge: exam code + year -->
         <div class="exam-badge">${examCode} • ${examYear}</div>
 
-        <!-- Region (prominent) -->
+        <!-- Region (prominent with Elephant font) -->
         <div class="region">${label.region || "N/A"}</div>
 
         <!-- District -->
@@ -114,17 +114,17 @@ export const renderDistrictStationeriesLabels = (
             justify-content: space-between;
             page-break-after: always;
             background: white;
-            padding: 12mm 12mm;
+            padding: 10mm 12mm;
             box-sizing: border-box;
           }
 
           /* Single label card – sized perfectly to fit two on A4 with margins */
           .label-card {
-            border: 1.5px solid #1e293b;
-            border-radius: 20px;
+            border: 2px solid #0f172a;
+            border-radius: 24px;
             background: white;
-            padding: 16px 20px 20px 20px;
-            height: 120mm;
+            padding: 18px 24px 22px 24px;
+            height: 122mm;
             display: flex;
             flex-direction: column;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -138,46 +138,47 @@ export const renderDistrictStationeriesLabels = (
             content: '';
             position: absolute;
             top: 0;
-            left: 20px;
-            right: 20px;
-            height: 4px;
+            left: 24px;
+            right: 24px;
+            height: 5px;
             background: #0f172a;
             border-radius: 4px 4px 0 0;
           }
 
           .exam-badge {
             background: #f1f5f9;
-            border: 1px solid #cbd5e1;
+            border: 1.5px solid #cbd5e1;
             border-radius: 40px;
-            padding: 6px 16px;
-            font-size: 13px;
-            font-weight: 700;
+            padding: 8px 22px;
+            font-size: 16px;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
             color: #0f172a;
             text-align: center;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             align-self: center;
           }
 
           .region {
-            font-size: 44px;
-            font-weight: 800;
+            font-family: 'Elephant', 'Impact', 'Georgia', serif;
+            font-size: 56px;
+            font-weight: 900;
             text-transform: uppercase;
             color: #0f172a;
             text-align: center;
             letter-spacing: -0.5px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             line-height: 1.1;
           }
 
           .district {
-            font-size: 32px;
-            font-weight: 800;
+            font-size: 38px;
+            font-weight: 900;
             text-transform: uppercase;
             color: #1e293b;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             line-height: 1.2;
             word-break: break-word;
           }
@@ -185,36 +186,36 @@ export const renderDistrictStationeriesLabels = (
           .item-quantity-panel {
             display: flex;
             flex-direction: row;
-            border-radius: 16px;
-            border: 1.5px solid #e2e8f0;
+            border-radius: 18px;
+            border: 2px solid #cbd5e1;
             background: #f8fafc;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             overflow: hidden;
           }
 
           .item-box, .qty-box {
             flex: 1;
-            padding: 12px 8px;
+            padding: 14px 10px;
             text-align: center;
             background: white;
           }
 
           .item-box {
-            border-right: 1.5px solid #e2e8f0;
+            border-right: 2px solid #cbd5e1;
           }
 
           .label-small {
-            font-size: 9px;
-            font-weight: 700;
+            font-size: 11px;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: #475569;
-            margin-bottom: 6px;
+            letter-spacing: 2px;
+            color: #334155;
+            margin-bottom: 8px;
           }
 
           .item-value, .qty-value {
-            font-size: 36px;
-            font-weight: 800;
+            font-size: 44px;
+            font-weight: 900;
             color: #0f172a;
             line-height: 1;
           }
@@ -224,22 +225,22 @@ export const renderDistrictStationeriesLabels = (
             flex-direction: row;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
+            gap: 20px;
             margin-top: auto;
           }
 
           .box-number {
             flex: 1;
             background: #f1f5f9;
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            padding: 8px 12px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 18px;
+            padding: 10px 14px;
             text-align: center;
           }
 
           .box-value {
-            font-size: 30px;
-            font-weight: 800;
+            font-size: 36px;
+            font-weight: 900;
             font-family: monospace;
             color: #0f172a;
             line-height: 1;
@@ -247,25 +248,25 @@ export const renderDistrictStationeriesLabels = (
 
           .qr-wrapper {
             background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            padding: 6px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 18px;
+            padding: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
           }
 
           .qr-wrapper img {
-            width: 70px;
+            width: 80px;
             height: auto;
             display: block;
           }
 
           /* Cut line between labels */
           .cut-line {
-            border-top: 2px dashed #64748b;
+            border-top: 2px dashed #475569;
             width: 100%;
-            margin: 14px 0;
+            margin: 10px 0;
             position: relative;
             text-align: center;
           }
@@ -276,12 +277,12 @@ export const renderDistrictStationeriesLabels = (
             left: 50%;
             transform: translateX(-50%);
             background: white;
-            padding: 0 18px;
-            font-size: 9px;
+            padding: 0 20px;
+            font-size: 10px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: #334155;
+            letter-spacing: 2px;
+            color: #1e293b;
             font-family: monospace;
           }
 
