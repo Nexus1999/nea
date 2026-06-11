@@ -1,350 +1,344 @@
-export interface LabelItem {
-  id: number;
-  mid: number;
-  region: string;
-  district: string;
-  center_name: string;
-  center_number: string;
-  normal_booklets: number;
-  graph_booklets: number;
-  normal_loosesheets: number;
-  graph_loosesheets: number;
-  bkm: number;
-  container_type: string;
-  container_number: string;
-  total_containers: number;
-  item: string;
-  quantity: number;
-  category: string;
-}
-
-export function renderDistrictStationeriesLabels(
-  labels: LabelItem[],
+export const renderDistrictStationeriesLabels = (
+  labels: any[],
   examCode: string,
   examYear: string
-): string {
+): string => {
+  // Helper: generate QR code URL (encodes all relevant fields)
+  const generateQRData = (label: any): string => {
+    const payload = [
+      `EXAM:${examCode}`,
+      `YEAR:${examYear}`,
+      `REGION:${label.region || ""}`,
+      `DISTRICT:${label.district || ""}`,
+      `ITEM:${label.item || ""}`,
+      `QTY:${label.quantity || 0}`,
+      `BOX:${label.container_number}/${label.total_containers}`,
+    ].join(" | ");
+    return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
+  };
+
+  const singleLabel = (label: any) => {
+    const qrUrl = generateQRData(label);
+
+    return `
+      <div class="label-card">
+        <!-- Corner Marks -->
+        <div class="corner-tl"></div>
+        <div class="corner-tr"></div>
+        <div class="corner-bl"></div>
+        <div class="corner-br"></div>
+
+        <!-- Watermark -->
+        <div class="watermark">${examCode}</div>
+
+        <!-- Top badge: exam code + year -->
+        <div class="exam-badge">
+           <span>${examCode}</span>
+           <span>${examYear}</span>
+        </div>
+
+        <!-- Region (prominent with Elephant font) -->
+        <div class="region">${label.region || "N/A"}</div>
+
+        <!-- District -->
+        <div class="district">${label.district || "N/A"}</div>
+
+        <!-- Item code + quantity (side by side) -->
+        <div class="item-quantity-panel">
+          <div class="item-box">
+            <div class="item-value">${label.item || "N/A"}</div>
+          </div>
+          <div class="qty-box">
+            <div class="qty-value">${label.quantity || 0}</div>
+          </div>
+        </div>
+
+        <!-- Bottom row: box number + QR (no text under QR) -->
+        <div class="bottom-row">
+          <div class="box-number">
+            <div class="box-value">BOX ${label.container_number}/${label.total_containers}</div>
+          </div>
+          <div class="qr-wrapper">
+            <img src="${qrUrl}" alt="QR Code" />
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  // Build the full HTML document with print‑optimised CSS
   return `
-    <style>
-      .district-label-card {
-        position: relative;
-        border: 2px solid #0f172a;
-        border-radius: 16px;
-        padding: 24px;
-        box-sizing: border-box;
-        height: 105mm;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        page-break-inside: avoid;
-        background-color: #fff;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        overflow: hidden;
-        text-rendering: geometricPrecision;
-        font-variant-numeric: tabular-nums;
-      }
-      
-      /* Corner Marks */
-      .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-      .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-      .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-      .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>District Stationery Labels</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
 
-      /* Watermark */
-      .watermark {
-        position: absolute;
-        right: 20px;
-        top: 50%;
-        transform: translateY(-50%);
-        font-size: 140px;
-        font-weight: 900;
-        color: rgba(15, 23, 42, 0.03);
-        pointer-events: none;
-        z-index: 0;
-        user-select: none;
-      }
+          /* Hide browser print headers/footers (URL, date, page numbers) */
+          @media print {
+            @page {
+              margin: 0;
+              size: A4 portrait;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              background: white;
+            }
+            .no-print {
+              display: none;
+            }
+            /* Ensure background colours print (for high contrast) */
+            * {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+          }
 
-      .label-header {
-        text-align: center;
-        border-bottom: 2px dashed #e2e8f0;
-        padding-bottom: 12px;
-        margin-bottom: 12px;
-        z-index: 1;
-      }
-      
-      .label-header h1 {
-        font-size: 13px;
-        margin: 0;
-        text-transform: uppercase;
-        font-weight: 800;
-        letter-spacing: 1px;
-        color: #0f172a;
-      }
+          body {
+            background: #e5e7eb;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0;
+            margin: 0;
+            text-rendering: geometricPrecision;
+            font-variant-numeric: tabular-nums;
+          }
 
-      .exam-badge {
-        display: flex;
-        gap: 10px;
-        justify-content: center;
-        margin-top: 8px;
-      }
-      
-      .exam-badge span {
-        padding: 4px 12px;
-        border-radius: 999px;
-        background: #f8fafc;
-        font-size: 10px;
-        font-weight: 800;
-        border: 1px solid #e2e8f0;
-        color: #0f172a;
-        text-transform: uppercase;
-      }
+          /* Each page container holds exactly two labels and a cut line, sized to standard A4 */
+          .page-container {
+            width: 210mm;
+            height: 297mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            page-break-after: always;
+            background: white;
+            padding: 10mm 12mm;
+            box-sizing: border-box;
+          }
 
-      .label-body {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        gap: 12px;
-        z-index: 1;
-      }
+          /* Single label card – sized perfectly to fit two on A4 with margins */
+          .label-card {
+            border: 2px solid #0f172a;
+            border-radius: 24px;
+            background: white;
+            padding: 18px 24px 22px 24px;
+            height: 122mm;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: none;
+            position: relative;
+            box-sizing: border-box;
+            overflow: hidden;
+          }
 
-      .location-info {
-        background-color: #f8fafc;
-        padding: 12px;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-      }
+          /* Left decorative line (black & white friendly) */
+          .label-card::before {
+            content: '';
+            position: absolute;
+            top: 24px;
+            bottom: 24px;
+            left: 0;
+            width: 5px;
+            background: #0f172a;
+            border-radius: 0 4px 4px 0;
+          }
 
-      .region-title {
-        font-size: 10px;
-        font-weight: 800;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
+          /* Corner Marks */
+          .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
 
-      .region-value {
-        font-size: 18px;
-        font-weight: 900;
-        color: #0f172a;
-        text-transform: uppercase;
-        margin-bottom: 6px;
-      }
+          /* Watermark */
+          .watermark {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 140px;
+            font-weight: 900;
+            color: rgba(15, 23, 42, 0.03);
+            pointer-events: none;
+            z-index: 0;
+            user-select: none;
+          }
 
-      .district-title {
-        font-size: 10px;
-        font-weight: 800;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
+          .exam-badge {
+            display: flex;
+            gap: 14px;
+            align-self: center;
+            margin-bottom: 12px;
+          }
 
-      .district-value {
-        font-size: 16px;
-        font-weight: 800;
-        color: #0f172a;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
+          .exam-badge span {
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: #f8fafc;
+            border: 1.5px solid #cbd5e1;
+            font-size: 16px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #0f172a;
+          }
 
-      .item-details {
-        border: 1.5px solid #0f172a;
-        border-radius: 12px;
-        padding: 12px;
-        background-color: #fff;
-      }
+          .region {
+            font-family: 'Elephant', 'Impact', 'Georgia', serif;
+            font-size: 72px;
+            font-weight: 900;
+            text-transform: uppercase;
+            color: #0f172a;
+            text-align: center;
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
+            line-height: 1.1;
+            z-index: 1;
+          }
 
-      .item-label {
-        font-size: 9px;
-        font-weight: 800;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 4px;
-      }
+          .district {
+            font-size: 50px;
+            font-weight: 900;
+            text-transform: uppercase;
+            color: #1e293b;
+            text-align: center;
+            margin-bottom: 16px;
+            line-height: 1.2;
+            word-break: break-word;
+            letter-spacing: 0.5px;
+            z-index: 1;
+          }
 
-      .item-name {
-        font-size: 15px;
-        font-weight: 800;
-        color: #0f172a;
-        text-transform: uppercase;
-      }
+          .item-quantity-panel {
+            display: flex;
+            flex-direction: row;
+            border-radius: 18px;
+            border: 2px solid #cbd5e1;
+            background: #f8fafc;
+            margin-bottom: 16px;
+            overflow: hidden;
+            z-index: 1;
+          }
 
-      .item-qty-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px dashed #e2e8f0;
-      }
+          .item-box, .qty-box {
+            flex: 1;
+            padding: 14px 10px;
+            text-align: center;
+            background: white;
+          }
 
-      .qty-label {
-        font-size: 10px;
-        font-weight: 800;
-        color: #64748b;
-        text-transform: uppercase;
-      }
+          .item-box {
+            border-right: 2px solid #cbd5e1;
+          }
 
-      .qty-value {
-        font-size: 18px;
-        font-weight: 900;
-        color: #0f172a;
-      }
+          .item-value, .qty-value {
+            font-size: 50px;
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1;
+          }
 
-      .label-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-top: 2px solid #0f172a;
-        padding-top: 12px;
-        margin-top: 8px;
-        z-index: 1;
-      }
+          .bottom-row {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-top: auto;
+            z-index: 1;
+          }
 
-      .box-hero {
-        font-size: 72px;
-        font-weight: 900;
-        letter-spacing: -2px;
-        line-height: 0.95;
-        color: #0f172a;
-        font-variant-numeric: tabular-nums;
-      }
+          .box-number {
+            flex: 1;
+            background: #f1f5f9;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 18px;
+            padding: 10px 14px;
+            text-align: center;
+          }
 
-      .box-hero-label {
-        font-size: 10px;
-        font-weight: 800;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 2px;
-      }
+          .box-value {
+            font-size: 72px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            line-height: 0.95;
+            color: #0f172a;
+            font-variant-numeric: tabular-nums;
+          }
 
-      .qr-container {
-        border: 1.5px solid #cbd5e1;
-        box-shadow:
-          0 1px 3px rgba(0,0,0,.05),
-          inset 0 1px 0 rgba(255,255,255,.8);
-        padding: 10px;
-        background: white;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
+          .qr-wrapper {
+            background: white;
+            border: 1.5px solid #cbd5e1;
+            box-shadow:
+              0 1px 3px rgba(0,0,0,.05),
+              inset 0 1px 0 rgba(255,255,255,.8);
+            padding: 10px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
 
-      .cut-line {
-        grid-column: span 2;
-        text-align: center;
-        margin: 16px 0;
-        position: relative;
-        page-break-inside: avoid;
-      }
+          .qr-wrapper img {
+            width: 80px;
+            height: auto;
+            display: block;
+          }
 
-      .cut-line::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 50%;
-        border-top: 1px dashed #94a3b8;
-        z-index: 1;
-      }
+          /* Cut line between labels */
+          .cut-line {
+            border-top: 2px dashed #475569;
+            width: 100%;
+            margin: 10px 0;
+            position: relative;
+            text-align: center;
+          }
 
-      .cut-line span {
-        position: relative;
-        z-index: 2;
-        background-color: #f1f5f9;
-        padding: 0 16px;
-        color: #64748b;
-        font-weight: 700;
-        font-size: 9px;
-        letter-spacing: 4px;
-        text-transform: uppercase;
-      }
+          .cut-line span {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 0 20px;
+            font-size: 9px;
+            letter-spacing: 4px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: #1e293b;
+            font-family: monospace;
+          }
 
-      @media print {
-        .cut-line span {
-          background-color: #fff;
-        }
-      }
-    </style>
-
-    ${labels
-      .map((label, index) => {
-        const isEven = index % 2 === 1;
-        const formattedBoxNum = String(label.container_number).padStart(2, '0');
-        const formattedTotalBoxes = String(label.total_containers).padStart(2, '0');
-
-        const cardHtml = `
-          <div class="district-label-card">
-            <!-- Corner Marks -->
-            <div class="corner-tl"></div>
-            <div class="corner-tr"></div>
-            <div class="corner-bl"></div>
-            <div class="corner-br"></div>
-
-            <!-- Watermark -->
-            <div class="watermark">${examCode}</div>
-
-            <!-- Header -->
-            <div class="label-header">
-              <h1>National Examinations Council of Tanzania</h1>
-              <div class="exam-badge">
-                <span>${examCode}</span>
-                <span>${examYear}</span>
+          /* Ensure no extra text anywhere */
+          body, div, span, p {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        </style>
+      </head>
+      <body>
+        ${labels
+          .map((label) => {
+            return `
+              <div class="page-container">
+                ${singleLabel(label)}
+                <div class="cut-line"><span>CUT HERE</span></div>
+                ${singleLabel(label)}
               </div>
-            </div>
-
-            <!-- Body -->
-            <div class="label-body">
-              <div class="location-info">
-                <div class="region-title">Region</div>
-                <div class="region-value">${label.region}</div>
-                <div class="district-title">District</div>
-                <div class="district-value">${label.district}</div>
-              </div>
-
-              <div class="item-details">
-                <div class="item-label">Stationery Item</div>
-                <div class="item-name">${label.item || 'District Stationery Pack'}</div>
-                <div class="item-qty-row">
-                  <span class="qty-label">Quantity</span>
-                  <span class="qty-value">${label.quantity}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Footer -->
-            <div class="label-footer">
-              <div>
-                <div class="box-hero-label">Box Number</div>
-                <div class="box-hero">${formattedBoxNum}/${formattedTotalBoxes}</div>
-              </div>
-              <div class="qr-container">
-                <!-- Placeholder QR Code using SVG for crisp printing -->
-                <svg width="60" height="60" viewBox="0 0 29 29" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M0 0H7V7H0V0ZM2 2V5H5V2H2Z" fill="#0F172A"/>
-                  <path d="M22 0H29V7H22V0ZM24 2V5H27V2H24Z" fill="#0F172A"/>
-                  <path d="M0 22H7V29H0V22ZM2 24V27H5V24H2Z" fill="#0F172A"/>
-                  <path d="M9 0H11V2H9V0ZM13 0H15V4H13V0ZM17 0H20V2H17V0ZM9 4H11V6H9V4ZM17 4H20V6H17V4ZM9 8H11V11H9V8ZM13 8H15V10H13V8ZM17 8H20V11H17V8ZM22 9H24V11H22V9ZM26 9H29V11H26V9Z" fill="#0F172A"/>
-                  <path d="M0 9H2V11H0V9ZM4 9H7V11H4V9ZM0 13H3V15H0V13ZM5 13H7V15H5V13ZM9 13H12V15H9V13ZM14 13H16V15H14V13ZM18 13H20V15H18V13ZM22 13H25V15H22V13ZM27 13H29V15H27V13Z" fill="#0F172A"/>
-                  <path d="M9 17H11V20H9V17ZM13 17H16V19H13V17ZM18 17H20V20H18V17ZM22 17H24V19H22V17ZM26 17H29V20H26V17Z" fill="#0F172A"/>
-                  <path d="M9 22H11V24H9V22ZM13 22H15V25H13V22ZM17 22H20V24H17V22ZM22 22H24V25H22V22ZM26 22H29V24H26V22Z" fill="#0F172A"/>
-                  <path d="M9 26H12V29H9V26ZM14 26H16V29H14V26ZM18 26H20V29H18V26ZM22 26H25V29H22V26ZM27 26H29V29H27V26Z" fill="#0F172A"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-        `;
-
-        const cutLineHtml = isEven ? `
-          <div class="cut-line">
-            <span>CUT HERE</span>
-          </div>
-        ` : '';
-
-        return cardHtml + cutLineHtml;
-      })
-      .join('')}
+            `;
+          })
+          .join("")}
+      </body>
+    </html>
   `;
-}
+};
