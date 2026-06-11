@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,6 +19,10 @@ import {
   Loader2,
   RefreshCw,
   Boxes,
+  X,
+  Maximize2,
+  Minimize2,
+  Download,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,7 +56,124 @@ import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
 
 // Import Print Utilities
-import { printLabels } from "@/utils/labels/printEngine";
+import { generateLabelsHtml } from "@/utils/labels/printEngine";
+import { renderStationeriesLabels } from "@/utils/labels/stationeries";
+import { renderDistrictStationeriesLabels } from "@/utils/labels/districtStationeries";
+import { renderArabicBookletsLabels } from "@/utils/labels/arabicBooklets";
+import { renderIctCoversLabels } from "@/utils/labels/ictCovers";
+import { renderFineArtsBookletsLabels } from "@/utils/labels/fineArtsBooklets";
+import { renderBrailleStationeriesLabels } from "@/utils/labels/brailleStationeries";
+import { renderBkmLabels } from "@/utils/labels/bkm";
+import { renderKitbagsLabels } from "@/utils/labels/kitbags";
+
+// ---------- Helper Functions ----------
+function abbreviateSchoolName(name: string): string {
+  if (!name) return "";
+  return name
+    .replace(/\bPRIMARY SCHOOL\b/gi, "PS")
+    .replace(/\bSECONDARY SCHOOL\b/gi, "SS")
+    .replace(/\bHIGH SCHOOL\b/gi, "HS")
+    .replace(/\bTEACHERS'? COLLEGE\b/gi, "TC")
+    .replace(/\bTEACHERS'? TRAINING COLLEGE\b/gi, "TC")
+    .replace(/\bSEMINARY\b/gi, "SEM")
+    .replace(/\bISLAMIC SEMINARY\b/gi, "ISL SEM")
+    .trim();
+}
+
+// ---------- Types ----------
+interface LabelItem {
+  id: number;
+  mid: number;
+  region: string;
+  district: string;
+  center_name: string;
+  center_number: string;
+  normal_booklets: number;
+  graph_booklets: number;
+  normal_loosesheets: number;
+  graph_loosesheets: number;
+  bkm: number;
+  container_type: string;
+  container_number: string; // Matches DB schema (text null)
+  total_containers: number;
+  item: string;
+  quantity: number;
+  category: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+}
+
+// Category definitions per exam code with modern colors
+const getCategoriesForExam = (examCode: string | undefined): Category[] => {
+  if (!examCode) return [];
+  switch (examCode) {
+    case "CSEE":
+    case "ACSEE":
+      return<dyad-write path="src/pages/stationeries/LabelsManagementPage.tsx" description="Completing the LabelsManagementPage component with the integrated interactive Print Preview Modal.">
+"use client";
+
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Package,
+  BookOpen,
+  Cpu,
+  Palette,
+  FileText,
+  Briefcase,
+  Settings,
+  Printer,
+  Search,
+  PlusCircle,
+  RotateCcw,
+  Loader2,
+  RefreshCw,
+  Boxes,
+  X,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { showError, showSuccess } from "@/utils/toast";
+import {
+  fetchMasterSummaryById,
+  fetchBoxLimitsSettings,
+} from "@/integrations/supabase/stationery-settings-api";
+import { MasterSummaryOption, Stationery } from "@/types/stationeries";
+import BoxLimitsDrawer from "@/components/stationeries/BoxLimitsDrawer";
+import KitbagLimitsDrawer from "@/components/stationeries/KitbagLimitsDrawer";
+import PaginationControls from "@/components/ui/pagination-controls";
+import Spinner from "@/components/Spinner";
+import { cn } from "@/lib/utils";
+
+// Import Print Utilities
+import { generateLabelsHtml } from "@/utils/labels/printEngine";
 import { renderStationeriesLabels } from "@/utils/labels/stationeries";
 import { renderDistrictStationeriesLabels } from "@/utils/labels/districtStationeries";
 import { renderArabicBookletsLabels } from "@/utils/labels/arabicBooklets";
@@ -180,6 +301,7 @@ const LabelsManagementPage: React.FC = () => {
   const { masterSummaryId } = useParams<{ masterSummaryId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Master summary & stationery state
   const [masterSummary, setMasterSummary] = useState<MasterSummaryOption | null>(null);
@@ -199,6 +321,11 @@ const LabelsManagementPage: React.FC = () => {
   const [isBoxLimitsDrawerOpen, setIsBoxLimitsDrawerOpen] = useState(false);
   const [isKitbagLimitsDrawerOpen, setIsKitbagLimitsDrawerOpen] = useState(false);
   const [isGeneratingLabels, setIsGeneratingLabels] = useState(false);
+
+  // Print Preview Modal states
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Load master summary and stationery
   useEffect(() => {
@@ -511,7 +638,11 @@ const LabelsManagementPage: React.FC = () => {
         return;
     }
 
-    printLabels(htmlContent);
+    const fullHtml = generateLabelsHtml(htmlContent);
+    const blob = new Blob([fullHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    setPreviewUrl(url);
+    setIsPreviewOpen(true);
   };
 
   // ---------- Mutations (Create & Reset Labels) ----------
@@ -933,6 +1064,76 @@ const LabelsManagementPage: React.FC = () => {
             examCode={masterSummary.Code}
           />
         </>
+      )}
+
+      {/* Print Preview Modal */}
+      {isPreviewOpen && previewUrl && (
+        <div className={cn(
+          "fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 transition-all",
+          isFullscreen ? "p-0" : "p-4"
+        )}>
+          <div className={cn(
+            "bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 transition-all duration-300",
+            isFullscreen ? "w-full h-full rounded-none" : "w-full max-w-5xl h-[85vh]"
+          )}>
+            {/* Modal Header */}
+            <div className="h-14 border-b bg-slate-50 px-6 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-slate-700" />
+                <span className="font-bold text-sm text-slate-900">
+                  Print Preview — {currentCategory?.name || "Labels"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (iframeRef.current && iframeRef.current.contentWindow) {
+                      iframeRef.current.contentWindow.focus();
+                      iframeRef.current.contentWindow.print();
+                    }
+                  }}
+                  className="rounded-xl h-9 border-slate-200 text-xs font-bold"
+                >
+                  <Printer className="h-4 w-4 mr-2" /> Print Labels
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="h-9 w-9 rounded-xl border-slate-200"
+                >
+                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setIsPreviewOpen(false);
+                    setPreviewUrl(null);
+                  }}
+                  className="h-9 w-9 rounded-xl text-slate-500 hover:text-slate-900"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Modal Body (Iframe Preview) */}
+            <div className="flex-1 bg-slate-100 p-4 overflow-hidden">
+              <iframe
+                ref={iframeRef}
+                src={previewUrl}
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                title="Labels Print Preview"
+                className="border rounded-xl bg-white shadow-lg w-full h-full"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </Card>
   );
