@@ -78,7 +78,7 @@ export const renderDistrictStationeriesLabels = (
           @media print {
             @page {
               margin: 0;
-              size: A4;
+              size: A4 portrait;
             }
             body {
               margin: 0;
@@ -98,33 +98,39 @@ export const renderDistrictStationeriesLabels = (
           body {
             background: #e5e7eb;
             font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
-            padding: 8mm 4mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0;
+            margin: 0;
           }
 
-          /* Each page container holds two labels and a cut line */
+          /* Each page container holds exactly two labels and a cut line, sized to standard A4 */
           .page-container {
-            width: 100%;
+            width: 210mm;
+            height: 297mm;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             page-break-after: always;
             background: white;
-            padding: 8mm 4mm;
-            margin-bottom: 0;
+            padding: 12mm 12mm;
+            box-sizing: border-box;
           }
 
-          /* Single label card – 122mm height (typical for half A4) */
+          /* Single label card – sized perfectly to fit two on A4 with margins */
           .label-card {
             border: 1.5px solid #1e293b;
             border-radius: 20px;
             background: white;
-            padding: 12px 18px 16px 18px;
-            height: 122mm;
+            padding: 16px 20px 20px 20px;
+            height: 120mm;
             display: flex;
             flex-direction: column;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             transition: none;
             position: relative;
+            box-sizing: border-box;
           }
 
           /* Top decorative line (black & white friendly) */
