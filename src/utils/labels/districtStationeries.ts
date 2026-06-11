@@ -184,7 +184,7 @@ export const renderDistrictStationeriesLabels = (
           .exam-badge span {
             padding: 6px 14px;
             border-radius: 999px;
-            background: #f8fafc;
+            background: transparent;
             border: 1.5px solid #cbd5e1;
             font-size: 16px;
             font-weight: 800;
@@ -224,7 +224,7 @@ export const renderDistrictStationeriesLabels = (
             flex-direction: row;
             border-radius: 18px;
             border: 2px solid #cbd5e1;
-            background: #f8fafc;
+            background: transparent;
             margin-bottom: 16px;
             overflow: hidden;
             z-index: 1;
@@ -234,7 +234,7 @@ export const renderDistrictStationeriesLabels = (
             flex: 1;
             padding: 14px 10px;
             text-align: center;
-            background: white;
+            background: transparent;
           }
 
           .item-box {
@@ -260,7 +260,7 @@ export const renderDistrictStationeriesLabels = (
 
           .box-number {
             flex: 1;
-            background: #f1f5f9;
+            background: transparent;
             border: 1.5px solid #cbd5e1;
             border-radius: 18px;
             padding: 10px 14px;
