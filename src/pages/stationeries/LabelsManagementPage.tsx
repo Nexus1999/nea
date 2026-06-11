@@ -400,7 +400,7 @@ const LabelsManagementPage: React.FC = () => {
           width: "w-[20%]",
           render: (label: LabelItem) => abbreviateSchoolName(label.center_name),
         },
-        { header: "Fine Arts Booklets", accessor: "quantity", width: "w-[10%]" },
+        { header: "Fine Arts Booklets", accessor: "quantity", width: "w-[15%]" },
         { header: "BKM", accessor: "bkm", width: "w-[10%]" },
         { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
         { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
@@ -495,6 +495,7 @@ const LabelsManagementPage: React.FC = () => {
       } else if (selectedCategoryId === "kitbags") {
         invokeFunction = "pack-kitbag-labels";
       }
+     else if (selectedCategoryId === "bkm") {
 
       const { data, error } = await supabase.functions.invoke(invokeFunction, { body: payload });
       if (error) throw error;
