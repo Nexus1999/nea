@@ -468,6 +468,7 @@ const LabelsManagementPage: React.FC = () => {
         masterSummaryId: masterSummary.id,
         stationeryId: stationery.id,
         examCode: masterSummary.Code,
+        activeTab: selectedCategoryId,
         region: selectedRegion !== "All" ? selectedRegion : null,
       };
 
