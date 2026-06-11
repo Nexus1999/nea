@@ -153,10 +153,7 @@ const useLabels = (masterSummaryId: number | undefined, categoryId: string | nul
         .from("labels")
         .select("*")
         .eq("mid", masterSummaryId)
-        .in("category", dbCategories)
-        .order("region", { ascending: true })
-        .order("district", { ascending: true })
-        .order("center_number", { ascending: true });
+        .in("category", dbCategories);
       if (error) throw error;
       return data as LabelItem[];
     },
@@ -250,7 +247,7 @@ const LabelsManagementPage: React.FC = () => {
     isFetching: labelsFetching,
   } = useLabels(masterSummary?.id, selectedCategoryId);
 
-  // Client-side filtering + pagination
+  // Client-side filtering, sorting + pagination
   const filteredLabels = useMemo(() => {
     let filtered = [...allLabels];
     if (selectedRegion !== "All") {
@@ -265,6 +262,35 @@ const LabelsManagementPage: React.FC = () => {
           label.district.toLowerCase().includes(term)
       );
     }
+
+    // Sort by region, district, center_number, and container_number (treated as a number)
+    filtered.sort((a, b) => {
+      // 1. Region
+      const regA = a.region || "";
+      const regB = b.region || "";
+      if (regA !== regB) return regA.localeCompare(regB);
+
+      // 2. District
+      const distA = a.district || "";
+      const distB = b.district || "";
+      if (distA !== distB) return distA.localeCompare(distB);
+
+      // 3. Center Number
+      const cNumA = a.center_number || "";
+      const cNumB = b.center_number || "";
+      if (cNumA !== cNumB) return cNumA.localeCompare(cNumB);
+
+      // 4. Container Number (treated as number)
+      const numA = parseInt(a.container_number || "0", 10);
+      const numB = parseInt(b.container_number || "0", 10);
+      if (isNaN(numA) && isNaN(numB)) {
+        return (a.container_number || "").localeCompare(b.container_number || "");
+      }
+      if (isNaN(numA)) return 1;
+      if (isNaN(numB)) return -1;
+      return numA - numB;
+    });
+
     return filtered;
   }, [allLabels, selectedRegion, debouncedSearchTerm]);
 
