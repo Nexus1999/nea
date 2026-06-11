@@ -495,11 +495,31 @@ const LabelsManagementPage: React.FC = () => {
       } else if (selectedCategoryId === "kitbags") {
         invokeFunction = "pack-kitbag-labels";
       } else if (selectedCategoryId === "bkm") {
-        invokeFunction = "pack-bkm-labels";
+        invokeFunction = "pack-bkm-into-center_envelopes";
       }
 
-      const { data, error } = await supabase.functions.invoke(invokeFunction, { body: payload });
-      if (error) throw error;
+      if (selectedCategoryId === "bkm") {
+        const regionsToProcess = selectedRegion === "All" ? regions : [selectedRegion];
+        if (regionsToProcess.length === 0) {
+          showError("No regions available to generate BKM labels.");
+          setIsGeneratingLabels(false);
+          return;
+        }
+        for (const r of regionsToProcess) {
+          const { error } = await supabase.functions.invoke(invokeFunction, {
+            body: {
+              mid: masterSummary.id,
+              code: masterSummary.Code,
+              region: r,
+            }
+          });
+          if (error) throw error;
+        }
+      } else {
+        const { data, error } = await supabase.functions.invoke(invokeFunction, { body: payload });
+        if (error) throw error;
+      }
+
       showSuccess("Labels generated successfully!");
       await queryClient.invalidateQueries({ queryKey: ["labels", masterSummary.id, selectedCategoryId] });
     } catch (error: any) {
