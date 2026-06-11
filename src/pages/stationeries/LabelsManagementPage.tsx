@@ -514,11 +514,41 @@ const LabelsManagementPage: React.FC = () => {
               region: r,
             }
           });
-          if (error) throw error;
+          if (error) {
+            let errMsg = error.message;
+            if (error.context && typeof error.context.json === 'function') {
+              try {
+                const body = await error.context.json();
+                if (body && body.error) errMsg = body.error;
+              } catch (_) {}
+            } else if (error.context && error.context.text) {
+              try {
+                const text = await error.context.text();
+                const body = JSON.parse(text);
+                if (body && body.error) errMsg = body.error;
+              } catch (_) {}
+            }
+            throw new Error(`Region ${r}: ${errMsg}`);
+          }
         }
       } else {
         const { data, error } = await supabase.functions.invoke(invokeFunction, { body: payload });
-        if (error) throw error;
+        if (error) {
+          let errMsg = error.message;
+          if (error.context && typeof error.context.json === 'function') {
+            try {
+              const body = await error.context.json();
+              if (body && body.error) errMsg = body.error;
+            } catch (_) {}
+          } else if (error.context && error.context.text) {
+            try {
+              const text = await error.context.text();
+              const body = JSON.parse(text);
+              if (body && body.error) errMsg = body.error;
+            } catch (_) {}
+          }
+          throw new Error(errMsg);
+        }
       }
 
       showSuccess("Labels generated successfully!");
