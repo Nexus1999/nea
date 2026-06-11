@@ -17,26 +17,6 @@ export const renderDistrictStationeriesLabels = (
       `QTY:${label.quantity || 0}`,
       `BOX:${label.container_number}/${label.total_containers}`,
     ].join(" | ");
-    return `https://quick<dyad-write path="src/utils/labels/districtStationeries.tsx" description="Writing the complete, fully functional District Stationeries label template with the exact layout, styling, and QR code generation.">
-// No external dependencies required.
-// The QR code uses quickchart.io – a free, reliable HTTPS service.
-
-export const renderDistrictStationeriesLabels = (
-  labels: any[],
-  examCode: string,
-  examYear: string
-): string => {
-  // Helper: generate QR code URL (encodes all relevant fields)
-  const generateQRData = (label: any): string => {
-    const payload = [
-      `EXAM:${examCode}`,
-      `YEAR:${examYear}`,
-      `REGION:${label.region || ""}`,
-      `DISTRICT:${label.district || ""}`,
-      `ITEM:${label.item || ""}`,
-      `QTY:${label.quantity || 0}`,
-      `BOX:${label.container_number}/${label.total_containers}`,
-    ].join(" | ");
     return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
   };
 
