@@ -30,7 +30,7 @@ export const renderBrailleStationeriesLabels = (
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "52px" : "58px";
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "48px" : "54px";
     const districtName = (label.district || "N/A").toUpperCase();
     const centerNumberRaw = label.center_number || "N/A";
     const abbreviatedCenter = abbreviateCenterName(label.center_name);
@@ -147,36 +147,36 @@ export const renderBrailleStationeriesLabels = (
             background: white;
             padding: 10mm 12mm;
             box-sizing: border-box;
-            gap: 6mm;
           }
           .label-card {
             border: 2px solid #0f172a;
-            border-radius: 28px;
+            border-radius: 24px;
             background: white;
-            padding: 22px 28px 28px;
+            padding: 18px 24px 22px 24px;
+            height: 122mm;
             display: flex;
             flex-direction: column;
-            flex: 1;
             position: relative;
             box-sizing: border-box;
+            overflow: hidden;
           }
           .label-card::before {
             content: '';
             position: absolute;
-            top: 28px;
-            bottom: 28px;
+            top: 24px;
+            bottom: 24px;
             left: 0;
-            width: 6px;
+            width: 5px;
             background: #0f172a;
-            border-radius: 0 6px 6px 0;
+            border-radius: 0 4px 4px 0;
           }
-          .corner-tl { top: 14px; left: 14px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 18px; height: 18px; }
-          .corner-tr { top: 14px; right: 14px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 18px; height: 18px; }
-          .corner-bl { bottom: 14px; left: 14px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 18px; height: 18px; }
-          .corner-br { bottom: 14px; right: 14px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 18px; height: 18px; }
+          .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
           .watermark {
             position: absolute;
-            right: 24px;
+            right: 20px;
             top: 50%;
             transform: translateY(-50%);
             font-size: 140px;
@@ -189,28 +189,28 @@ export const renderBrailleStationeriesLabels = (
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 28px;
+            margin-bottom: 12px;
             z-index: 2;
           }
           .exam-badge-left {
-            border: 1.8px solid #1e293b;
+            border: 1.5px solid #cbd5e1;
             border-radius: 60px;
-            padding: 6px 18px;
+            padding: 4px 12px;
           }
           .exam-badge-left span {
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 800;
-            letter-spacing: 1.2px;
+            letter-spacing: 1px;
             text-transform: uppercase;
             color: #0f172a;
           }
           .center-badge-right {
             background: #0f172a;
             border-radius: 48px;
-            padding: 6px 20px;
+            padding: 4px 16px;
           }
           .center-badge-right span {
-            font-size: 22px;
+            font-size: 16px;
             font-weight: 900;
             color: white;
             letter-spacing: 1px;
@@ -222,28 +222,28 @@ export const renderBrailleStationeriesLabels = (
             color: #0f172a;
             text-align: center;
             letter-spacing: -0.3px;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             line-height: 1.1;
           }
           .district {
-            font-size: 42px;
+            font-size: 32px;
             font-weight: 900;
             text-transform: uppercase;
             color: #1e293b;
             text-align: center;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             line-height: 1.2;
             word-break: break-word;
           }
           .center-abbr {
             text-align: center;
-            font-size: 26px;
+            font-size: 20px;
             font-weight: 800;
             text-transform: uppercase;
             background: #f1f5f9;
             display: inline-block;
-            margin: 0 auto 24px auto;
-            padding: 6px 24px;
+            margin: 0 auto 12px auto;
+            padding: 4px 16px;
             border-radius: 48px;
             color: #0c4a6e;
             letter-spacing: 1px;
@@ -254,33 +254,33 @@ export const renderBrailleStationeriesLabels = (
           .stats-vertical {
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            margin-bottom: 28px;
+            gap: 10px;
+            margin-bottom: 12px;
           }
           .stat-item {
             background: #fef9e3;
-            border-radius: 28px;
-            border-left: 6px solid #0f172a;
+            border-radius: 18px;
+            border-left: 5px solid #0f172a;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 14px 28px;
+            padding: 8px 16px;
           }
           .stat-label {
-            font-size: 24px;
+            font-size: 16px;
             font-weight: 800;
             text-transform: uppercase;
             color: #1e293b;
           }
           .stat-value {
-            font-size: 44px;
+            font-size: 24px;
             font-weight: 900;
             font-family: monospace;
             color: #0f172a;
             background: white;
-            padding: 4px 20px;
+            padding: 2px 12px;
             border-radius: 44px;
-            min-width: 100px;
+            min-width: 70px;
             text-align: center;
             border: 1px solid #cbd5e1;
           }
@@ -288,14 +288,14 @@ export const renderBrailleStationeriesLabels = (
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 24px;
+            gap: 20px;
             margin-top: auto;
           }
           .box-number {
             flex: 1;
-            border: 2px solid #cbd5e1;
-            border-radius: 32px;
-            padding: 12px 10px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 18px;
+            padding: 10px 14px;
             text-align: center;
             background: #ffffffcc;
           }
@@ -308,12 +308,12 @@ export const renderBrailleStationeriesLabels = (
           }
           .qr-wrapper {
             background: white;
-            border: 2px solid #cbd5e1;
+            border: 1.5px solid #cbd5e1;
             padding: 8px;
-            border-radius: 28px;
+            border-radius: 18px;
           }
           .qr-wrapper img {
-            width: 86px;
+            width: 80px;
             height: auto;
             display: block;
           }
