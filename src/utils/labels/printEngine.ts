@@ -1,214 +1,149 @@
-export const generateLabelsHtml = (htmlContent: string): string => {
+"use client";
+
+/**
+ * Generates the full HTML wrapper for printing labels.
+ * Includes a beautiful, modern floating action bar with a download/print button
+ * that is automatically hidden when printing.
+ */
+export function generateLabelsHtml(contentHtml: string): string {
   return `
-    <html>
-      <head>
-        <title>Print Labels</title>
-        <style>
-          @page {
-            size: A4 portrait;
-            margin: 10mm;
-          }
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>Print Labels</title>
+      <style>
+        /* Global Styles */
+        body {
+          margin: 0;
+          padding: 0;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          background-color: #f1f5f9;
+          color: #1e293b;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        /* Floating Action Bar */
+        .action-bar {
+          position: fixed;
+          top: 16px;
+          right: 16px;
+          display: flex;
+          gap: 12px;
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(8px);
+          padding: 10px 16px;
+          border-radius: 12px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02);
+          border: 1px solid rgba(226, 232, 240, 0.8);
+          z-index: 99999;
+          transition: all 0.2s ease;
+        }
+
+        .action-bar:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .action-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 8px 16px;
+          font-size: 13px;
+          font-weight: 600;
+          border-radius: 8px;
+          cursor: pointer;
+          border: none;
+          transition: all 0.15s ease;
+        }
+
+        .btn-primary {
+          background-color: #0f172a;
+          color: #ffffff;
+        }
+
+        .btn-primary:hover {
+          background-color: #1e293b;
+        }
+
+        .btn-secondary {
+          background-color: #ffffff;
+          color: #334155;
+          border: 1px solid #cbd5e1;
+        }
+
+        .btn-secondary:hover {
+          background-color: #f8fafc;
+          border-color: #94a3b8;
+        }
+
+        /* Label Container */
+        .labels-container {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 20px;
+          padding: 60px 40px 40px 40px;
+          max-width: 1000px;
+          margin: 0 auto;
+        }
+
+        /* Print Specific Styles */
+        @media print {
           body {
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f1f5f9;
-            padding: 20px;
-            -webkit-print-color-adjust: exact;
+            background-color: #ffffff;
+          }
+          .no-print {
+            display: none !important;
           }
           .labels-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            max-width: 210mm;
-            margin: 0 auto;
-            box-sizing: border-box;
+            padding: 0 !important;
+            margin: 0 !important;
+            gap: 0 !important;
+            display: block !important;
           }
           .label-card {
-            border: 2px solid #000;
-            border-radius: 12px;
-            padding: 16px;
-            box-sizing: border-box;
-            height: 90mm;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
             page-break-inside: avoid;
-            position: relative;
-            background-color: #fff;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            break-inside: avoid;
+            margin-bottom: 20px;
           }
-          .label-header {
-            text-align: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 6px;
-            margin-bottom: 8px;
-          }
-          .label-header h1 {
-            font-size: 11px;
-            margin: 0;
-            text-transform: uppercase;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-          }
-          .label-header h2 {
-            font-size: 10px;
-            margin: 4px 0 0 0;
-            color: #111;
-            font-weight: 700;
-          }
-          .label-body {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            gap: 6px;
-          }
-          .center-info {
-            background-color: #f8fafc;
-            padding: 8px;
-            border-radius: 8px;
-            border: 1.5px solid #000;
-          }
-          .center-code {
-            font-size: 20px;
-            font-weight: 900;
-            text-align: center;
-            letter-spacing: 1px;
-          }
-          .center-name {
-            font-size: 11px;
-            font-weight: bold;
-            text-align: center;
-            text-transform: uppercase;
-            margin-top: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          .meta-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            font-size: 11px;
-          }
-          .meta-item {
-            border: 1px solid #cbd5e1;
-            padding: 6px;
-            border-radius: 6px;
-          }
-          .meta-label {
-            font-size: 8px;
-            text-transform: uppercase;
-            color: #64748b;
-            font-weight: bold;
-          }
-          .meta-value {
-            font-weight: bold;
-            font-size: 11px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          .items-box {
-            border: 1.5px solid #000;
-            border-radius: 8px;
-            padding: 8px;
-            background-color: #fafafa;
-          }
-          .items-title {
-            font-size: 9px;
-            font-weight: 800;
-            text-transform: uppercase;
-            border-bottom: 1px solid #000;
-            padding-bottom: 4px;
-            margin-bottom: 6px;
-          }
-          .items-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
-            font-size: 10px;
-          }
-          .item-row {
-            display: flex;
-            justify-content: space-between;
-            border-bottom: 1px dashed #e2e8f0;
-            padding-bottom: 2px;
-          }
-          .item-row:last-child {
-            border-bottom: none;
-          }
-          .item-name {
-            font-weight: 600;
-          }
-          .item-qty {
-            font-weight: 800;
-          }
-          .label-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-top: 1.5px solid #000;
-            padding-top: 8px;
-            margin-top: 6px;
-          }
-          .box-indicator {
-            background-color: #000;
-            color: #fff;
-            padding: 6px 12px;
-            font-weight: 900;
-            font-size: 14px;
-            border-radius: 6px;
-            text-align: center;
-            min-width: 90px;
-          }
-          .category-badge {
-            font-size: 10px;
-            font-weight: 800;
-            text-transform: uppercase;
-            border: 1.5px solid #000;
-            padding: 4px 10px;
-            border-radius: 9999px;
-            background-color: #fff;
-          }
-          @media print {
-            body {
-              background-color: white;
-              padding: 0;
-            }
-            .labels-container {
-              grid-template-columns: 1fr 1fr;
-              gap: 12px;
-            }
-            .label-card {
-              page-break-inside: avoid;
-              box-shadow: none;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="labels-container">
-          ${htmlContent}
-        </div>
-      </body>
+        }
+      </style>
+    </head>
+    <body>
+      <!-- Floating Action Bar (Hidden during print) -->
+      <div class="action-bar no-print">
+        <button class="action-btn btn-secondary" onclick="window.print()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          Print Labels
+        </button>
+        <button class="action-btn btn-primary" onclick="downloadAsHtml()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download HTML
+        </button>
+      </div>
+
+      <div class="labels-container">
+        ${contentHtml}
+      </div>
+
+      <script>
+        function downloadAsHtml() {
+          const htmlContent = document.documentElement.outerHTML;
+          const blob = new Blob([htmlContent], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'NECTA_Labels_' + new Date().toISOString().slice(0,10) + '.html';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      </script>
+    </body>
     </html>
   `;
-};
-
-export const printLabels = (htmlContent: string) => {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    alert("Please allow popups to print labels.");
-    return;
-  }
-
-  printWindow.document.write(generateLabelsHtml(htmlContent));
-  printWindow.document.close();
-  
-  // Trigger print once loaded
-  printWindow.onload = function() {
-    printWindow.print();
-    setTimeout(function() { printWindow.close(); }, 500);
-  };
-};
+}
