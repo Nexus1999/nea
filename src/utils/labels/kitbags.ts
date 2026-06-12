@@ -3,11 +3,13 @@ export const renderKitbagsLabels = (
   examCode: string,
   examYear: string
 ): string => {
+  // Helper: generate QR code URL (encodes all relevant fields)
   const generateQRData = (label: any): string => {
     const payload = [
       `EXAM:${examCode}`,
       `YEAR:${examYear}`,
       `REGION:${label.region || ""}`,
+      `ITEM:${label.item || "KITBAGS"}`,
       `QTY:${label.quantity || 0}`,
       `BOX:${label.container_number}/${label.total_containers}`,
     ].join(" | ");
@@ -16,8 +18,8 @@ export const renderKitbagsLabels = (
 
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
-    const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "69px" : "76px";
+    // Condition for region font size
+    const regionFontSize = label.region?.toUpperCase() === "DAR ES SALAAM" ? "69px" : "76px";
 
     return `
       <div class="label-card">
@@ -32,20 +34,23 @@ export const renderKitbagsLabels = (
 
         <!-- Top badge: exam code + year -->
         <div class="exam-badge">
-           <span>${examCode}</span>
-           <span>${examYear}</span>
+           <span>${examCode}-${examYear}</span>
         </div>
 
-        <!-- Region (No District Field) -->
-        <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
+        <!-- Region (prominent with Elephant font) - dynamic font size -->
+        <div class="region" style="font-size: ${regionFontSize}; margin-bottom: 24px;">${label.region || "N/A"}</div>
 
-        <!-- Center Info & Item Details -->
-        <div class="center-info">
-          <div class="center-name">KITBAGS</div>
-          <div class="item-badge">QUANTITY: ${label.quantity || 0}</div>
+        <!-- Item code + quantity (side by side) -->
+        <div class="item-quantity-panel">
+          <div class="item-box">
+            <div class="item-value">${label.item || "KITBAGS"}</div>
+          </div>
+          <div class="qty-box">
+            <div class="qty-value">${label.quantity || 0}</div>
+          </div>
         </div>
 
-        <!-- Bottom row: box number + QR -->
+        <!-- Bottom row: box number + QR (no text under QR) -->
         <div class="bottom-row">
           <div class="box-number">
             <div class="box-value">BOX ${label.container_number}/${label.total_containers}</div>
@@ -58,6 +63,7 @@ export const renderKitbagsLabels = (
     `;
   };
 
+  // Build the full HTML document with print‑optimised CSS
   return `
     <!DOCTYPE html>
     <html>
@@ -71,6 +77,7 @@ export const renderKitbagsLabels = (
             box-sizing: border-box;
           }
 
+          /* Hide browser print headers/footers (URL, date, page numbers) */
           @media print {
             @page {
               margin: 0;
@@ -81,12 +88,10 @@ export const renderKitbagsLabels = (
               padding: 0;
               background: white;
             }
-            .page-container {
-              page-break-inside: avoid;
+            .no-print {
+              display: none;
             }
-            .page-container:last-child {
-              page-break-after: avoid;
-            }
+            /* Ensure background colours print (for high contrast) */
             * {
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
@@ -105,6 +110,7 @@ export const renderKitbagsLabels = (
             font-variant-numeric: tabular-nums;
           }
 
+          /* Each page container holds exactly two labels and a cut line, sized to standard A4 */
           .page-container {
             width: 210mm;
             height: 297mm;
@@ -112,16 +118,12 @@ export const renderKitbagsLabels = (
             flex-direction: column;
             justify-content: space-between;
             page-break-after: always;
-            page-break-inside: avoid;
             background: white;
             padding: 10mm 12mm;
             box-sizing: border-box;
           }
 
-          .page-container:last-child {
-            page-break-after: avoid;
-          }
-
+          /* Single label card – sized perfectly to fit two on A4 with margins */
           .label-card {
             border: 2px solid #0f172a;
             border-radius: 24px;
@@ -131,11 +133,13 @@ export const renderKitbagsLabels = (
             display: flex;
             flex-direction: column;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: none;
             position: relative;
             box-sizing: border-box;
             overflow: hidden;
           }
 
+          /* Left decorative line (black & white friendly) */
           .label-card::before {
             content: '';
             position: absolute;
@@ -147,11 +151,13 @@ export const renderKitbagsLabels = (
             border-radius: 0 4px 4px 0;
           }
 
+          /* Corner Marks */
           .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
           .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
           .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
           .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
 
+          /* Watermark */
           .watermark {
             position: absolute;
             right: 20px;
@@ -177,7 +183,7 @@ export const renderKitbagsLabels = (
             border-radius: 999px;
             background: transparent;
             border: 1.5px solid #cbd5e1;
-            font-size: 16px;
+            font-size: 30px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 1.5px;
@@ -191,39 +197,38 @@ export const renderKitbagsLabels = (
             color: #0f172a;
             text-align: center;
             letter-spacing: -0.5px;
-            margin-bottom: 24px;
             line-height: 1.1;
             z-index: 1;
+            /* Default font size is overridden by inline style for DAR ES SALAAM */
           }
 
-          .center-info {
+          .item-quantity-panel {
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            flex-direction: row;
             border-radius: 18px;
             border: 2px solid #cbd5e1;
-            padding: 12px;
-            margin-bottom: 16px;
+            background: transparent;
+            margin-bottom: 06px;
+            overflow: hidden;
             z-index: 1;
           }
 
-          .center-name {
-            font-size: 20px;
-            font-weight: 800;
-            color: #334155;
-            text-transform: uppercase;
+          .item-box, .qty-box {
+            flex: 1;
+            padding: 08px 10px;
             text-align: center;
-            margin-bottom: 8px;
+            background: transparent;
           }
 
-          .item-badge {
-            font-size: 16px;
+          .item-box {
+            border-right: 2px solid #cbd5e1;
+          }
+
+          .item-value, .qty-value {
+            font-size: 55px;
             font-weight: 900;
             color: #0f172a;
-            background: #f1f5f9;
-            padding: 4px 12px;
-            border-radius: 8px;
-            border: 1px solid #cbd5e1;
+            line-height: 1;
           }
 
           .bottom-row {
@@ -232,7 +237,7 @@ export const renderKitbagsLabels = (
             align-items: center;
             justify-content: space-between;
             gap: 20px;
-            margin-top: auto;
+            margin-top: 3px;
             z-index: 1;
           }
 
@@ -246,7 +251,7 @@ export const renderKitbagsLabels = (
           }
 
           .box-value {
-            font-size: 72px;
+            font-size: 75px;
             font-weight: 900;
             letter-spacing: -2px;
             line-height: 0.95;
@@ -273,6 +278,7 @@ export const renderKitbagsLabels = (
             display: block;
           }
 
+          /* Cut line between labels */
           .cut-line {
             border-top: 2px dashed #475569;
             width: 100%;
@@ -295,6 +301,12 @@ export const renderKitbagsLabels = (
             color: #1e293b;
             font-family: monospace;
           }
+
+          /* Ensure no extra text anywhere */
+          body, div, span, p {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
         </style>
       </head>
       <body>
@@ -303,7 +315,7 @@ export const renderKitbagsLabels = (
             return `
               <div class="page-container">
                 ${singleLabel(label)}
-                <div class="cut-line"><span>CUT HERE</span></div>
+                <div class="cut-line"><span></span></div>
                 ${singleLabel(label)}
               </div>
             `;
