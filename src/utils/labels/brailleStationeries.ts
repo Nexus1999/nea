@@ -22,7 +22,7 @@ export const renderBrailleStationeriesLabels = (
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "42px" : "48px";
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "36px" : "42px";
     const districtName = (label.district || "N/A").toUpperCase();
     const centerNumberRaw = label.center_number || "N/A";
     const abbreviatedCenter = abbreviateSchoolName(label.center_name).toUpperCase();
@@ -33,35 +33,45 @@ export const renderBrailleStationeriesLabels = (
 
     return `
       <div class="label-card">
+        <!-- Classic Corner Accents -->
         <div class="corner-tl"></div>
         <div class="corner-tr"></div>
         <div class="corner-bl"></div>
         <div class="corner-br"></div>
         <div class="watermark">${examCode}</div>
 
+        <!-- Top Header Row -->
         <div class="top-row">
-          <div class="exam-badge-left"><span>${examCode}-${examYear}</span></div>
-          <div class="center-badge-right"><span>${centerNumberRaw}</span></div>
+          <div class="exam-badge-left">
+            <span>${examCode} — ${examYear}</span>
+          </div>
+          <div class="center-badge-right">
+            <span>${centerNumberRaw}</span>
+          </div>
         </div>
 
+        <!-- Region & District -->
         <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
         <div class="district">${districtName}</div>
         <div class="center-abbr">${abbreviatedCenter}</div>
 
-        <div class="stats-vertical">
-          <div class="stat-item">
-            <span class="stat-label">📄 BRAILLE SHEETS</span>
-            <span class="stat-value">${sheetsQty}</span>
+        <!-- Enlarged & Beautiful Classic Stats Blocks -->
+        <div class="stats-grid">
+          <div class="stat-block sheets-block">
+            <div class="stat-header">BRAILLE SHEETS</div>
+            <div class="stat-value">${sheetsQty}</div>
           </div>
-          <div class="stat-item">
-            <span class="stat-label">🔍 BRAILLE BKM</span>
-            <span class="stat-value">${bkmQty}</span>
+          <div class="stat-block bkm-block">
+            <div class="stat-header">BRAILLE BKM</div>
+            <div class="stat-value">${bkmQty}</div>
           </div>
         </div>
 
+        <!-- Bottom Row: Box Number & QR Code -->
         <div class="bottom-row">
-          <div class="box-number">
-            <div class="box-value">${containerNum}/${totalContainers}</div>
+          <div class="box-number-container">
+            <div class="box-label">CONTAINER</div>
+            <div class="box-value">${containerNum} / ${totalContainers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -121,7 +131,7 @@ export const renderBrailleStationeriesLabels = (
             }
           }
           body {
-            background: #e5e7eb;
+            background: #e2e8f0;
             font-family: 'Inter', 'Segoe UI', system-ui, Arial, sans-serif;
             display: flex;
             flex-direction: column;
@@ -142,172 +152,196 @@ export const renderBrailleStationeriesLabels = (
             overflow: hidden;
           }
           .label-card {
-            border: 2px solid #0f172a;
-            border-radius: 20px;
-            background: white;
-            padding: 14px 20px;
-            height: 112mm;
+            border: 3px double #0f172a;
+            border-radius: 24px;
+            background: #fffdf9; /* Classic warm cream background */
+            padding: 18px 24px;
+            height: 122mm;
             display: flex;
             flex-direction: column;
             position: relative;
             box-sizing: border-box;
             overflow: hidden;
+            box-shadow: inset 0 0 40px rgba(15, 23, 42, 0.02);
           }
-          .label-card::before {
-            content: '';
-            position: absolute;
-            top: 20px;
-            bottom: 20px;
-            left: 0;
-            width: 5px;
-            background: #0f172a;
-            border-radius: 0 4px 4px 0;
-          }
-          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
-          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
-          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
-          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
+          
+          /* Classic Corner Accents */
+          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          
           .watermark {
             position: absolute;
             right: 20px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 120px;
+            font-size: 130px;
             font-weight: 900;
-            color: rgba(15, 23, 42, 0.03);
+            color: rgba(15, 23, 42, 0.02);
             pointer-events: none;
             user-select: none;
+            z-index: 0;
           }
           .top-row {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
             margin-bottom: 8px;
             z-index: 2;
           }
           .exam-badge-left {
-            border: 1.5px solid #cbd5e1;
+            border: 1.5px solid #0f172a;
             border-radius: 60px;
-            padding: 3px 10px;
+            padding: 3px 12px;
+            background: white;
           }
           .exam-badge-left span {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 800;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
             text-transform: uppercase;
             color: #0f172a;
           }
           .center-badge-right {
             background: #0f172a;
             border-radius: 48px;
-            padding: 3px 14px;
+            padding: 4px 18px;
           }
           .center-badge-right span {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 900;
             color: white;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
           }
           .region {
-            font-family: 'Elephant', 'Impact', 'Georgia', serif;
+            font-family: 'Georgia', 'Times New Roman', serif;
             font-weight: 900;
             text-transform: uppercase;
             color: #0f172a;
             text-align: center;
-            letter-spacing: -0.3px;
+            letter-spacing: 1px;
             margin-bottom: 2px;
             line-height: 1.1;
+            z-index: 2;
           }
           .district {
-            font-size: 28px;
-            font-weight: 900;
+            font-size: 26px;
+            font-weight: 800;
             text-transform: uppercase;
-            color: #1e293b;
+            color: #334155;
             text-align: center;
             margin-bottom: 6px;
             line-height: 1.2;
             word-break: break-word;
+            letter-spacing: 0.5px;
+            z-index: 2;
           }
           .center-abbr {
             text-align: center;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 800;
             text-transform: uppercase;
             background: #f1f5f9;
             display: inline-block;
-            margin: 0 auto 8px auto;
-            padding: 3px 12px;
+            margin: 0 auto 10px auto;
+            padding: 4px 14px;
             border-radius: 48px;
-            color: #0c4a6e;
+            color: #0f172a;
             letter-spacing: 1px;
-            border: 1px solid #cbd5e1;
+            border: 1.5px solid #0f172a;
             max-width: 90%;
             word-break: break-word;
+            z-index: 2;
           }
-          .stats-vertical {
+          
+          /* Enlarged & Classic Stats Grid */
+          .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 10px;
+            z-index: 2;
+          }
+          .stat-block {
+            background: white;
+            border: 2px solid #0f172a;
+            border-radius: 16px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin-bottom: 8px;
-          }
-          .stat-item {
-            background: #fef9e3;
-            border-radius: 14px;
-            border-left: 4px solid #0f172a;
-            display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 6px 12px;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
           }
-          .stat-label {
-            font-size: 14px;
+          .sheets-block {
+            border-top: 6px solid #b45309; /* Classic Amber/Gold Accent */
+          }
+          .bkm-block {
+            border-top: 6px solid #0f172a; /* Classic Deep Slate Accent */
+          }
+          .stat-header {
+            font-size: 11px;
             font-weight: 800;
-            text-transform: uppercase;
-            color: #1e293b;
+            color: #64748b;
+            letter-spacing: 1.5px;
+            margin-bottom: 4px;
+            text-align: center;
           }
           .stat-value {
-            font-size: 20px;
+            font-size: 42px;
             font-weight: 900;
-            font-family: monospace;
+            font-family: 'Georgia', serif;
             color: #0f172a;
-            background: white;
-            padding: 2px 10px;
-            border-radius: 44px;
-            min-width: 60px;
-            text-align: center;
-            border: 1px solid #cbd5e1;
+            line-height: 1;
           }
+          
           .bottom-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
+            gap: 20px;
             margin-top: auto;
+            z-index: 2;
           }
-          .box-number {
+          .box-number-container {
             flex: 1;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 14px;
-            padding: 8px 10px;
+            border: 2px solid #0f172a;
+            border-radius: 16px;
+            padding: 8px 12px;
             text-align: center;
-            background: #ffffffcc;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+          }
+          .box-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: #64748b;
+            letter-spacing: 2px;
+            margin-bottom: 2px;
           }
           .box-value {
-            font-size: 60px;
+            font-size: 36px;
             font-weight: 900;
-            letter-spacing: -2px;
-            line-height: 0.95;
             color: #0f172a;
+            line-height: 1;
+            font-family: 'Georgia', serif;
           }
           .qr-wrapper {
             background: white;
-            border: 1.5px solid #cbd5e1;
+            border: 2px solid #0f172a;
             padding: 6px;
-            border-radius: 14px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
           }
           .qr-wrapper img {
-            width: 70px;
-            height: auto;
+            width: 68px;
+            height: 68px;
             display: block;
           }
           .cut-line {
@@ -315,7 +349,7 @@ export const renderBrailleStationeriesLabels = (
             width: 100%;
             position: relative;
             text-align: center;
-            margin: 2px 0;
+            margin: 4px 0;
           }
           .cut-line span {
             position: absolute;
