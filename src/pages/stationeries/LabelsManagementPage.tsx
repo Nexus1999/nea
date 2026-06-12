@@ -520,7 +520,13 @@ const LabelsManagementPage: React.FC = () => {
         return;
     }
 
-    const fullHtml = generateLabelsHtml(htmlContent);
+    // If the template already returns a full HTML document, use it directly.
+    // Otherwise, wrap it in the print engine's layout.
+    const trimmedHtml = htmlContent.trim();
+    const fullHtml = trimmedHtml.startsWith("<!DOCTYPE") || trimmedHtml.startsWith("<html")
+      ? htmlContent
+      : generateLabelsHtml(htmlContent);
+
     const blob = new Blob([fullHtml], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     setPreviewUrl(url);
@@ -882,7 +888,7 @@ const LabelsManagementPage: React.FC = () => {
                           "py-4 text-sm text-slate-600 font-medium",
                           ((selectedCategoryId === "stationeries" &&
                             ["normal_booklets", "graph_booklets", "normal_loosesheets", "graph_loosesheets", "bkm", "container_number", "total_containers"].includes(col.accessor)) ||
-                            ["quantity", "bkm", "container_number", "total_containers"].includes(col.accessor)) &&
+                            ["text-center", "quantity", "bkm", "container_number", "total_containers"].includes(col.accessor)) &&
                             "text-center"
                         )}
                       >
