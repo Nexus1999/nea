@@ -43,7 +43,7 @@ export const renderKitbagsLabels = (
         <!-- Item code + quantity (side by side) -->
         <div class="item-quantity-panel">
           <div class="item-box">
-            <div class="item-value">${label.item || "KITBAGS"}</div>
+            <div class="item-value">KITBAGS</div>
           </div>
           <div class="qty-box">
             <div class="qty-value">${label.quantity || 0}</div>
