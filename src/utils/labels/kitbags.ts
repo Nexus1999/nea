@@ -37,7 +37,7 @@ export const renderKitbagsLabels = (
         </div>
 
         <!-- Region (No District Field) -->
-        <div class="region" style="font-size: ${regionFontSize}; margin-bottom: 24px;">${regionName}</div>
+        <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
 
         <!-- Center Info & Item Details -->
         <div class="center-info">
@@ -191,6 +191,7 @@ export const renderKitbagsLabels = (
             color: #0f172a;
             text-align: center;
             letter-spacing: -0.5px;
+            margin-bottom: 24px;
             line-height: 1.1;
             z-index: 1;
           }
