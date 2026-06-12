@@ -12,7 +12,7 @@ export const renderBrailleStationeriesLabels = (
       `CENTER:${label.center_number || ""} - ${label.center_name || ""}`,
       `SHEETS:${label.quantity || 0}`,
       `BKM:${label.bkm || 0}`,
-      `ENVELOPE:${label.container_number}/${label.total_containers}`,
+      `BOX:${label.container_number}/${label.total_containers}`,
     ].join(" | ");
     return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
   };
@@ -20,7 +20,7 @@ export const renderBrailleStationeriesLabels = (
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "44px" : "50px";
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "50px" : "56px";
 
     return `
       <div class="label-card">
@@ -33,10 +33,10 @@ export const renderBrailleStationeriesLabels = (
         <!-- Watermark -->
         <div class="watermark">${examCode}</div>
 
-        <!-- Top Header Badge -->
+        <!-- Top badge: exam code + year -->
         <div class="exam-badge">
-           <span class="badge-exam">${examCode}</span>
-           <span class="badge-year">${examYear}</span>
+           <span>${examCode}</span>
+           <span>${examYear}</span>
         </div>
 
         <!-- Region & District -->
@@ -62,11 +62,10 @@ export const renderBrailleStationeriesLabels = (
           </table>
         </div>
 
-        <!-- Bottom row: envelope number + QR -->
+        <!-- Bottom row: box number + QR -->
         <div class="bottom-row">
-          <div class="envelope-badge">
-            <div class="envelope-title">ENVELOPE</div>
-            <div class="envelope-value">${label.container_number}/${label.total_containers}</div>
+          <div class="box-number">
+            <div class="box-value">BOX ${label.container_number}/${label.total_containers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -112,8 +111,8 @@ export const renderBrailleStationeriesLabels = (
           }
 
           body {
-            background: #f8fafc;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: #e5e7eb;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -132,7 +131,7 @@ export const renderBrailleStationeriesLabels = (
             page-break-after: always;
             page-break-inside: avoid;
             background: white;
-            padding: 12mm 14mm;
+            padding: 10mm 12mm;
             box-sizing: border-box;
           }
 
@@ -142,40 +141,40 @@ export const renderBrailleStationeriesLabels = (
 
           .label-card {
             border: 2px solid #0f172a;
-            border-radius: 20px;
+            border-radius: 24px;
             background: white;
-            padding: 20px 24px;
-            height: 120mm;
+            padding: 18px 24px 22px 24px;
+            height: 122mm;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             position: relative;
             box-sizing: border-box;
             overflow: hidden;
           }
 
-          /* Left accent bar for a modern look */
           .label-card::before {
             content: '';
             position: absolute;
-            top: 20px;
-            bottom: 20px;
+            top: 24px;
+            bottom: 24px;
             left: 0;
-            width: 6px;
+            width: 5px;
             background: #0f172a;
             border-radius: 0 4px 4px 0;
           }
 
-          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
-          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
-          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
-          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
+          .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
 
           .watermark {
             position: absolute;
-            right: 24px;
+            right: 20px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 130px;
+            font-size: 140px;
             font-weight: 900;
             color: rgba(15, 23, 42, 0.03);
             pointer-events: none;
@@ -185,50 +184,42 @@ export const renderBrailleStationeriesLabels = (
 
           .exam-badge {
             display: flex;
-            gap: 8px;
+            gap: 14px;
             align-self: center;
-            margin-bottom: 10px;
-            z-index: 1;
+            margin-bottom: 12px;
           }
 
           .exam-badge span {
-            padding: 4px 12px;
+            padding: 6px 14px;
             border-radius: 999px;
-            font-size: 14px;
+            background: transparent;
+            border: 1.5px solid #cbd5e1;
+            font-size: 16px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1px;
-          }
-
-          .badge-exam {
-            background: #0f172a;
-            color: white;
-          }
-
-          .badge-year {
-            border: 1.5px solid #0f172a;
+            letter-spacing: 1.5px;
             color: #0f172a;
           }
 
           .region {
-            font-family: 'Inter', system-ui, sans-serif;
+            font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
             text-transform: uppercase;
             color: #0f172a;
             text-align: center;
             letter-spacing: -0.5px;
-            margin-bottom: 2px;
+            margin-bottom: 4px;
             line-height: 1.1;
             z-index: 1;
           }
 
           .district {
-            font-size: 30px;
-            font-weight: 700;
+            font-size: 36px;
+            font-weight: 900;
             text-transform: uppercase;
-            color: #475569;
+            color: #1e293b;
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             line-height: 1.2;
             word-break: break-word;
             letter-spacing: 0.5px;
@@ -239,30 +230,28 @@ export const renderBrailleStationeriesLabels = (
             display: flex;
             flex-direction: column;
             align-items: center;
-            border-radius: 16px;
-            border: 1.5px solid #e2e8f0;
-            padding: 12px 18px;
-            margin-bottom: 12px;
+            border-radius: 18px;
+            border: 2px solid #cbd5e1;
+            padding: 12px 20px;
+            margin-bottom: 16px;
             z-index: 1;
-            background: #f8fafc;
+            background: #fafafa;
           }
 
           .center-number {
-            font-size: 28px;
-            font-weight: 800;
+            font-size: 32px;
+            font-weight: 900;
             color: #0f172a;
-            margin-bottom: 2px;
-            letter-spacing: 0.5px;
+            margin-bottom: 4px;
           }
 
           .center-name {
-            font-size: 15px;
-            font-weight: 700;
+            font-size: 18px;
+            font-weight: 800;
             color: #334155;
             text-transform: uppercase;
             text-align: center;
-            margin-bottom: 10px;
-            line-height: 1.3;
+            margin-bottom: 12px;
           }
 
           .contents-table {
@@ -273,7 +262,7 @@ export const renderBrailleStationeriesLabels = (
 
           .contents-table td {
             padding: 6px 0;
-            font-size: 14px;
+            font-size: 16px;
             color: #0f172a;
             border-bottom: 1px dashed #cbd5e1;
           }
@@ -284,16 +273,13 @@ export const renderBrailleStationeriesLabels = (
 
           .item-name {
             text-align: left;
-            font-weight: 700;
-            color: #475569;
-            letter-spacing: 0.5px;
+            font-weight: 800;
           }
 
           .item-qty {
             text-align: right;
-            font-weight: 800;
-            font-size: 16px;
-            color: #0f172a;
+            font-weight: 900;
+            font-size: 18px;
           }
 
           .bottom-row {
@@ -301,76 +287,68 @@ export const renderBrailleStationeriesLabels = (
             flex-direction: row;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
+            gap: 20px;
             margin-top: auto;
             z-index: 1;
           }
 
-          .envelope-badge {
+          .box-number {
             flex: 1;
-            background: #f8fafc;
-            border: 1.5px solid #0f172a;
-            border-radius: 14px;
-            padding: 8px 12px;
+            background: transparent;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 18px;
+            padding: 10px 14px;
             text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
           }
 
-          .envelope-title {
-            font-size: 11px;
-            font-weight: 800;
-            color: #475569;
-            letter-spacing: 1.5px;
-            margin-bottom: 2px;
-          }
-
-          .envelope-value {
-            font-size: 44px;
+          .box-value {
+            font-size: 72px;
             font-weight: 900;
-            letter-spacing: -1px;
-            line-height: 1;
+            letter-spacing: -2px;
+            line-height: 0.95;
             color: #0f172a;
+            font-variant-numeric: tabular-nums;
           }
 
           .qr-wrapper {
             background: white;
-            border: 1.5px solid #e2e8f0;
-            padding: 8px;
-            border-radius: 14px;
+            border: 1.5px solid #cbd5e1;
+            box-shadow:
+              0 1px 3px rgba(0,0,0,.05),
+              inset 0 1px 0 rgba(255,255,255,.8);
+            padding: 10px;
+            border-radius: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
           }
 
           .qr-wrapper img {
-            width: 72px;
+            width: 80px;
             height: auto;
             display: block;
           }
 
           .cut-line {
-            border-top: 2px dashed #cbd5e1;
+            border-top: 2px dashed #475569;
             width: 100%;
-            margin: 8px 0;
+            margin: 10px 0;
             position: relative;
             text-align: center;
           }
 
           .cut-line span {
             position: absolute;
-            top: -10px;
+            top: -12px;
             left: 50%;
             transform: translateX(-50%);
             background: white;
-            padding: 0 16px;
+            padding: 0 20px;
             font-size: 9px;
-            letter-spacing: 3px;
-            font-weight: 700;
+            letter-spacing: 4px;
+            font-weight: 800;
             text-transform: uppercase;
-            color: #94a3b8;
+            color: #1e293b;
             font-family: monospace;
           }
         </style>
