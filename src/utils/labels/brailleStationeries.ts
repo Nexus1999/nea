@@ -22,7 +22,7 @@ export const renderBrailleStationeriesLabels = (
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "48px" : "54px";
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "42px" : "48px";
     const districtName = (label.district || "N/A").toUpperCase();
     const centerNumberRaw = label.center_number || "N/A";
     const abbreviatedCenter = abbreviateSchoolName(label.center_name).toUpperCase();
@@ -137,16 +137,16 @@ export const renderBrailleStationeriesLabels = (
             flex-direction: column;
             justify-content: space-between;
             background: white;
-            padding: 8mm 12mm;
+            padding: 10mm 12mm;
             box-sizing: border-box;
             overflow: hidden;
           }
           .label-card {
             border: 2px solid #0f172a;
-            border-radius: 24px;
+            border-radius: 20px;
             background: white;
-            padding: 16px 24px;
-            height: 120mm;
+            padding: 14px 20px;
+            height: 112mm;
             display: flex;
             flex-direction: column;
             position: relative;
@@ -156,23 +156,23 @@ export const renderBrailleStationeriesLabels = (
           .label-card::before {
             content: '';
             position: absolute;
-            top: 24px;
-            bottom: 24px;
+            top: 20px;
+            bottom: 20px;
             left: 0;
             width: 5px;
             background: #0f172a;
             border-radius: 0 4px 4px 0;
           }
-          .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
+          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
+          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
+          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 14px; height: 14px; }
           .watermark {
             position: absolute;
             right: 20px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 140px;
+            font-size: 120px;
             font-weight: 900;
             color: rgba(15, 23, 42, 0.03);
             pointer-events: none;
@@ -182,16 +182,16 @@ export const renderBrailleStationeriesLabels = (
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             z-index: 2;
           }
           .exam-badge-left {
             border: 1.5px solid #cbd5e1;
             border-radius: 60px;
-            padding: 4px 12px;
+            padding: 3px 10px;
           }
           .exam-badge-left span {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 800;
             letter-spacing: 1px;
             text-transform: uppercase;
@@ -200,10 +200,10 @@ export const renderBrailleStationeriesLabels = (
           .center-badge-right {
             background: #0f172a;
             border-radius: 48px;
-            padding: 4px 16px;
+            padding: 3px 14px;
           }
           .center-badge-right span {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 900;
             color: white;
             letter-spacing: 1px;
@@ -215,28 +215,28 @@ export const renderBrailleStationeriesLabels = (
             color: #0f172a;
             text-align: center;
             letter-spacing: -0.3px;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             line-height: 1.1;
           }
           .district {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 900;
             text-transform: uppercase;
             color: #1e293b;
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             line-height: 1.2;
             word-break: break-word;
           }
           .center-abbr {
             text-align: center;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 800;
             text-transform: uppercase;
             background: #f1f5f9;
             display: inline-block;
-            margin: 0 auto 12px auto;
-            padding: 4px 16px;
+            margin: 0 auto 8px auto;
+            padding: 3px 12px;
             border-radius: 48px;
             color: #0c4a6e;
             letter-spacing: 1px;
@@ -247,33 +247,33 @@ export const renderBrailleStationeriesLabels = (
           .stats-vertical {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            margin-bottom: 12px;
+            gap: 8px;
+            margin-bottom: 8px;
           }
           .stat-item {
             background: #fef9e3;
-            border-radius: 18px;
-            border-left: 5px solid #0f172a;
+            border-radius: 14px;
+            border-left: 4px solid #0f172a;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 16px;
+            padding: 6px 12px;
           }
           .stat-label {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 800;
             text-transform: uppercase;
             color: #1e293b;
           }
           .stat-value {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 900;
             font-family: monospace;
             color: #0f172a;
             background: white;
-            padding: 2px 12px;
+            padding: 2px 10px;
             border-radius: 44px;
-            min-width: 70px;
+            min-width: 60px;
             text-align: center;
             border: 1px solid #cbd5e1;
           }
@@ -281,19 +281,19 @@ export const renderBrailleStationeriesLabels = (
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 20px;
+            gap: 16px;
             margin-top: auto;
           }
           .box-number {
             flex: 1;
             border: 1.5px solid #cbd5e1;
-            border-radius: 18px;
-            padding: 10px 14px;
+            border-radius: 14px;
+            padding: 8px 10px;
             text-align: center;
             background: #ffffffcc;
           }
           .box-value {
-            font-size: 72px;
+            font-size: 60px;
             font-weight: 900;
             letter-spacing: -2px;
             line-height: 0.95;
@@ -302,11 +302,11 @@ export const renderBrailleStationeriesLabels = (
           .qr-wrapper {
             background: white;
             border: 1.5px solid #cbd5e1;
-            padding: 8px;
-            border-radius: 18px;
+            padding: 6px;
+            border-radius: 14px;
           }
           .qr-wrapper img {
-            width: 80px;
+            width: 70px;
             height: auto;
             display: block;
           }
@@ -315,7 +315,7 @@ export const renderBrailleStationeriesLabels = (
             width: 100%;
             position: relative;
             text-align: center;
-            margin: 4px 0;
+            margin: 2px 0;
           }
           .cut-line span {
             position: absolute;
