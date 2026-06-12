@@ -16,6 +16,8 @@ export const renderKitbagsLabels = (
 
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
+    const regionName = (label.region || "N/A").toUpperCase();
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "69px" : "76px";
 
     return `
       <div class="label-card">
@@ -34,10 +36,10 @@ export const renderKitbagsLabels = (
            <span>${examYear}</span>
         </div>
 
-        <!-- Region -->
-        <div class="region">${label.region || "N/A"}</div>
+        <!-- Region (No District Field) -->
+        <div class="region" style="font-size: ${regionFontSize}; margin-bottom: 24px;">${regionName}</div>
 
-        <!-- Item Details -->
+        <!-- Center Info & Item Details -->
         <div class="center-info">
           <div class="center-name">KITBAGS</div>
           <div class="item-badge">QUANTITY: ${label.quantity || 0}</div>
@@ -184,13 +186,11 @@ export const renderKitbagsLabels = (
 
           .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
-            font-size: 56px;
             font-weight: 900;
             text-transform: uppercase;
             color: #0f172a;
             text-align: center;
             letter-spacing: -0.5px;
-            margin-bottom: 4px;
             line-height: 1.1;
             z-index: 1;
           }
@@ -207,8 +207,8 @@ export const renderKitbagsLabels = (
           }
 
           .center-name {
-            font-size: 24px;
-            font-weight: 900;
+            font-size: 20px;
+            font-weight: 800;
             color: #334155;
             text-transform: uppercase;
             text-align: center;

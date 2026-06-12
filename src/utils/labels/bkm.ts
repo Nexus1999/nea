@@ -18,6 +18,8 @@ export const renderBkmLabels = (
 
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
+    const regionName = (label.region || "N/A").toUpperCase();
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "62px" : "72px";
 
     return `
       <div class="label-card">
@@ -37,13 +39,13 @@ export const renderBkmLabels = (
         </div>
 
         <!-- Region & District -->
-        <div class="region">${label.region || "N/A"}</div>
-        <div class="district">${label.district || "N/A"}</div>
+        <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
+        <div class="district">${(label.district || "N/A").toUpperCase()}</div>
 
         <!-- Center Info & Item Details -->
         <div class="center-info">
           <div class="center-number">${label.center_number || "N/A"}</div>
-          <div class="center-name">${label.center_name || "N/A"}</div>
+          <div class="center-name">${(label.center_name || "N/A").toUpperCase()}</div>
           <div class="item-badge">BKM: ${label.bkm || 0}</div>
         </div>
 
@@ -175,12 +177,12 @@ export const renderBkmLabels = (
           }
 
           .exam-badge span {
-            padding: 6px 14px;
+            padding: 8px 18px;
             border-radius: 999px;
             background: transparent;
-            border: 1.5px solid #cbd5e1;
-            font-size: 16px;
-            font-weight: 800;
+            border: 2px solid #0f172a;
+            font-size: 20px;
+            font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 1.5px;
             color: #0f172a;
@@ -188,7 +190,6 @@ export const renderBkmLabels = (
 
           .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
-            font-size: 56px;
             font-weight: 900;
             text-transform: uppercase;
             color: #0f172a;
@@ -200,7 +201,7 @@ export const renderBkmLabels = (
           }
 
           .district {
-            font-size: 36px;
+            font-size: 42px;
             font-weight: 900;
             text-transform: uppercase;
             color: #1e293b;
@@ -224,14 +225,14 @@ export const renderBkmLabels = (
           }
 
           .center-number {
-            font-size: 32px;
+            font-size: 38px;
             font-weight: 900;
             color: #0f172a;
             margin-bottom: 4px;
           }
 
           .center-name {
-            font-size: 20px;
+            font-size: 24px;
             font-weight: 800;
             color: #334155;
             text-transform: uppercase;
@@ -240,13 +241,13 @@ export const renderBkmLabels = (
           }
 
           .item-badge {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 900;
             color: #0f172a;
             background: #f1f5f9;
-            padding: 4px 12px;
+            padding: 6px 16px;
             border-radius: 8px;
-            border: 1px solid #cbd5e1;
+            border: 1.5px solid #0f172a;
           }
 
           .bottom-row {
