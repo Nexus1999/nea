@@ -19,6 +19,8 @@ export const renderDistrictStationeriesLabels = (
 
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
+    // Condition for region font size
+    const regionFontSize = label.region?.toUpperCase() === "DAR ES SALAAM" ? "69px" : "76px";
 
     return `
       <div class="label-card">
@@ -33,12 +35,11 @@ export const renderDistrictStationeriesLabels = (
 
         <!-- Top badge: exam code + year -->
         <div class="exam-badge">
-           <span>${examCode}</span>
-           <span>${examYear}</span>
+           <span>${examCode}-${examYear}</span>
         </div>
 
-        <!-- Region (prominent with Elephant font) -->
-        <div class="region">${label.region || "N/A"}</div>
+        <!-- Region (prominent with Elephant font) - dynamic font size -->
+        <div class="region" style="font-size: ${regionFontSize};">${label.region || "N/A"}</div>
 
         <!-- District -->
         <div class="district">${label.district || "N/A"}</div>
@@ -186,7 +187,7 @@ export const renderDistrictStationeriesLabels = (
             border-radius: 999px;
             background: transparent;
             border: 1.5px solid #cbd5e1;
-            font-size: 16px;
+            font-size: 30px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 1.5px;
@@ -195,15 +196,15 @@ export const renderDistrictStationeriesLabels = (
 
           .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
-            font-size: 78px;
             font-weight: 900;
             text-transform: uppercase;
             color: #0f172a;
             text-align: center;
             letter-spacing: -0.5px;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
             line-height: 1.1;
             z-index: 1;
+            /* Default font size is overridden by inline style for DAR ES SALAAM */
           }
 
           .district {
@@ -212,7 +213,7 @@ export const renderDistrictStationeriesLabels = (
             text-transform: uppercase;
             color: #1e293b;
             text-align: center;
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             line-height: 1.2;
             word-break: break-word;
             letter-spacing: 0.5px;
@@ -225,14 +226,14 @@ export const renderDistrictStationeriesLabels = (
             border-radius: 18px;
             border: 2px solid #cbd5e1;
             background: transparent;
-            margin-bottom: 16px;
+            margin-bottom: 06px;
             overflow: hidden;
             z-index: 1;
           }
 
           .item-box, .qty-box {
             flex: 1;
-            padding: 14px 10px;
+            padding: 08px 10px;
             text-align: center;
             background: transparent;
           }
@@ -254,7 +255,7 @@ export const renderDistrictStationeriesLabels = (
             align-items: center;
             justify-content: space-between;
             gap: 20px;
-            margin-top: auto;
+            margin-top: 3px;
             z-index: 1;
           }
 
@@ -332,7 +333,7 @@ export const renderDistrictStationeriesLabels = (
             return `
               <div class="page-container">
                 ${singleLabel(label)}
-                <div class="cut-line"><span>CUT HERE</span></div>
+                <div class="cut-line"><span></span></div>
                 ${singleLabel(label)}
               </div>
             `;
