@@ -79,6 +79,12 @@ export const renderKitbagsLabels = (
               padding: 0;
               background: white;
             }
+            .page-container {
+              page-break-inside: avoid;
+            }
+            .page-container:last-child {
+              page-break-after: avoid;
+            }
             * {
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
@@ -104,9 +110,14 @@ export const renderKitbagsLabels = (
             flex-direction: column;
             justify-content: space-between;
             page-break-after: always;
+            page-break-inside: avoid;
             background: white;
             padding: 10mm 12mm;
             box-sizing: border-box;
+          }
+
+          .page-container:last-child {
+            page-break-after: avoid;
           }
 
           .label-card {

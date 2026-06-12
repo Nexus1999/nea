@@ -127,6 +127,9 @@ export function renderStationeriesLabels(
               page-break-after: always;
               page-break-inside: avoid;
             }
+            .a4-page-container:last-child {
+              page-break-after: avoid;
+            }
             * {
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
@@ -156,6 +159,7 @@ export function renderStationeriesLabels(
             box-shadow: 0 4px 20px rgba(0,0,0,0.05);
             margin-bottom: 20px;
             overflow: hidden;
+            page-break-inside: avoid;
           }
 
           /* Individual label bounding boxes fitting symmetrically onto the page */
