@@ -21,7 +21,7 @@ export const renderIctCoversLabels = (
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "36px" : "42px";
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "38px" : "44px";
     const districtName = (label.district || "N/A").toUpperCase();
     const centerNumberRaw = label.center_number || "N/A";
     const abbreviatedCenter = abbreviateSchoolName(label.center_name).toUpperCase();
@@ -187,11 +187,11 @@ export const renderIctCoversLabels = (
           .exam-badge-left {
             border: 1.5px solid #0f172a;
             border-radius: 60px;
-            padding: 3px 12px;
+            padding: 4px 14px;
             background: white;
           }
           .exam-badge-left span {
-            font-size: 13px;
+            font-size: 16px;
             font-weight: 800;
             letter-spacing: 1.5px;
             text-transform: uppercase;
@@ -200,32 +200,32 @@ export const renderIctCoversLabels = (
           .center-badge-right {
             background: #0f172a;
             border-radius: 48px;
-            padding: 4px 18px;
+            padding: 5px 20px;
           }
           .center-badge-right span {
-            font-size: 15px;
+            font-size: 18px;
             font-weight: 900;
             color: white;
             letter-spacing: 1.5px;
           }
           .region {
-            font-family: 'Georgia', 'Times New Roman', serif;
+            font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
             text-transform: uppercase;
             color: #0f172a;
             text-align: center;
-            letter-spacing: 1px;
-            margin-bottom: 2px;
+            letter-spacing: -0.5px;
+            margin-bottom: 4px;
             line-height: 1.1;
             z-index: 2;
           }
           .district {
-            font-size: 26px;
-            font-weight: 800;
+            font-size: 32px;
+            font-weight: 900;
             text-transform: uppercase;
-            color: #334155;
+            color: #1e293b;
             text-align: center;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             line-height: 1.2;
             word-break: break-word;
             letter-spacing: 0.5px;
@@ -233,13 +233,13 @@ export const renderIctCoversLabels = (
           }
           .center-abbr {
             text-align: center;
-            font-size: 16px;
+            font-size: 20px;
             font-weight: 800;
             text-transform: uppercase;
             background: #f1f5f9;
             display: inline-block;
-            margin: 0 auto 10px auto;
-            padding: 4px 14px;
+            margin: 0 auto 12px auto;
+            padding: 6px 16px;
             border-radius: 48px;
             color: #0f172a;
             letter-spacing: 1px;
