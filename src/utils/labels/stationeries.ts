@@ -1,314 +1,292 @@
-export const renderStationeriesLabels = (
-  labels: any[],
+"use client";
+
+interface LabelItem {
+  id: number;
+  mid: number;
+  region: string;
+  district: string;
+  center_name: string;
+  center_number: string;
+  normal_booklets: number;
+  graph_booklets: number;
+  normal_loosesheets: number;
+  graph_loosesheets: number;
+  bkm: number;
+  container_type: string;
+  container_number: string;
+  total_containers: number;
+  item: string;
+  quantity: number;
+  category: string;
+}
+
+/**
+ * Renders high-fidelity stationery box labels resembling the official NECTA PDF layout.
+ */
+export function renderStationeriesLabels(
+  labels: LabelItem[],
   examCode: string,
   examYear: string
-): string => {
-  const generateQRData = (label: any): string => {
-    const payload = [
-      `EXAM:${examCode}`,
-      `YEAR:${examYear}`,
-      `REGION:${label.region || ""}`,
-      `DISTRICT:${label.district || ""}`,
-      `CENTER:${label.center_number || ""} - ${label.center_name || ""}`,
-      `BOX:${label.container_number}/${label.total_containers}`,
-    ].join(" | ");
-    return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
-  };
+): string {
+  return labels
+    .map((label) => {
+      const boxNum = label.container_number || "1";
+      const totalBoxes = label.total_containers || 1;
+      
+      return `
+        <div class="label-card">
+          <div class="label-inner">
+            <!-- Header -->
+            <div class="label-header">
+              <div class="necta-title">THE NATIONAL EXAMINATIONS COUNCIL OF TANZANIA</div>
+              <div class="exam-badge">${examCode} ${examYear}</div>
+              <div class="label-subject">STATIONERY BOX LABEL</div>
+            </div>
 
-  const singleLabel = (label: any) => {
-    const qrUrl = generateQRData(label);
-
-    return `
-      <div class="label-card">
-        <!-- Corner Marks -->
-        <div class="corner-tl"></div>
-        <div class="corner-tr"></div>
-        <div class="corner-bl"></div>
-        <div class="corner-br"></div>
-
-        <!-- Watermark -->
-        <div class="watermark">${examCode}</div>
-
-        <!-- Top badge: exam code + year -->
-        <div class="exam-badge">
-           <span>${examCode}</span>
-           <span>${examYear}</span>
-        </div>
-
-        <!-- Region & District -->
-        <div class="region">${label.region || "N/A"}</div>
-        <div class="district">${label.district || "N/A"}</div>
-
-        <!-- Center Info -->
-        <div class="center-info">
-          <div class="center-number">${label.center_number || "N/A"}</div>
-          <div class="center-name">${label.center_name || "N/A"}</div>
-        </div>
-
-        <!-- Bottom row: box number + QR -->
-        <div class="bottom-row">
-          <div class="box-number">
-            <div class="box-value">BOX ${label.container_number}/${label.total_containers}</div>
-          </div>
-          <div class="qr-wrapper">
-            <img src="${qrUrl}" alt="QR Code" />
-          </div>
-        </div>
-      </div>
-    `;
-  };
-
-  return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8" />
-        <title>Stationery Labels</title>
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-
-          @media print {
-            @page {
-              margin: 0;
-              size: A4 portrait;
-            }
-            body {
-              margin: 0;
-              padding: 0;
-              background: white;
-            }
-            * {
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-          }
-
-          body {
-            background: #e5e7eb;
-            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 0;
-            margin: 0;
-            text-rendering: geometricPrecision;
-            font-variant-numeric: tabular-nums;
-          }
-
-          .page-container {
-            width: 210mm;
-            height: 297mm;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            page-break-after: always;
-            background: white;
-            padding: 10mm 12mm;
-            box-sizing: border-box;
-          }
-
-          .label-card {
-            border: 2px solid #0f172a;
-            border-radius: 24px;
-            background: white;
-            padding: 18px 24px 22px 24px;
-            height: 122mm;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            position: relative;
-            box-sizing: border-box;
-            overflow: hidden;
-          }
-
-          .label-card::before {
-            content: '';
-            position: absolute;
-            top: 24px;
-            bottom: 24px;
-            left: 0;
-            width: 5px;
-            background: #0f172a;
-            border-radius: 0 4px 4px 0;
-          }
-
-          .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-
-          .watermark {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 140px;
-            font-weight: 900;
-            color: rgba(15, 23, 42, 0.03);
-            pointer-events: none;
-            z-index: 0;
-            user-select: none;
-          }
-
-          .exam-badge {
-            display: flex;
-            gap: 14px;
-            align-self: center;
-            margin-bottom: 12px;
-          }
-
-          .exam-badge span {
-            padding: 6px 14px;
-            border-radius: 999px;
-            background: transparent;
-            border: 1.5px solid #cbd5e1;
-            font-size: 16px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: #0f172a;
-          }
-
-          .region {
-            font-family: 'Elephant', 'Impact', 'Georgia', serif;
-            font-size: 56px;
-            font-weight: 900;
-            text-transform: uppercase;
-            color: #0f172a;
-            text-align: center;
-            letter-spacing: -0.5px;
-            margin-bottom: 4px;
-            line-height: 1.1;
-            z-index: 1;
-          }
-
-          .district {
-            font-size: 36px;
-            font-weight: 900;
-            text-transform: uppercase;
-            color: #1e293b;
-            text-align: center;
-            margin-bottom: 12px;
-            line-height: 1.2;
-            word-break: break-word;
-            letter-spacing: 0.5px;
-            z-index: 1;
-          }
-
-          .center-info {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            border-radius: 18px;
-            border: 2px solid #cbd5e1;
-            padding: 12px;
-            margin-bottom: 16px;
-            z-index: 1;
-          }
-
-          .center-number {
-            font-size: 32px;
-            font-weight: 900;
-            color: #0f172a;
-            margin-bottom: 4px;
-          }
-
-          .center-name {
-            font-size: 20px;
-            font-weight: 800;
-            color: #334155;
-            text-transform: uppercase;
-            text-align: center;
-          }
-
-          .bottom-row {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-            margin-top: auto;
-            z-index: 1;
-          }
-
-          .box-number {
-            flex: 1;
-            background: transparent;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 18px;
-            padding: 10px 14px;
-            text-align: center;
-          }
-
-          .box-value {
-            font-size: 72px;
-            font-weight: 900;
-            letter-spacing: -2px;
-            line-height: 0.95;
-            color: #0f172a;
-            font-variant-numeric: tabular-nums;
-          }
-
-          .qr-wrapper {
-            background: white;
-            border: 1.5px solid #cbd5e1;
-            box-shadow:
-              0 1px 3px rgba(0,0,0,.05),
-              inset 0 1px 0 rgba(255,255,255,.8);
-            padding: 10px;
-            border-radius: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-          .qr-wrapper img {
-            width: 80px;
-            height: auto;
-            display: block;
-          }
-
-          .cut-line {
-            border-top: 2px dashed #475569;
-            width: 100%;
-            margin: 10px 0;
-            position: relative;
-            text-align: center;
-          }
-
-          .cut-line span {
-            position: absolute;
-            top: -12px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 0 20px;
-            font-size: 9px;
-            letter-spacing: 4px;
-            font-weight: 800;
-            text-transform: uppercase;
-            color: #1e293b;
-            font-family: monospace;
-          }
-        </style>
-      </head>
-      <body>
-        ${labels
-          .map((label) => {
-            return `
-              <div class="page-container">
-                ${singleLabel(label)}
-                <div class="cut-line"><span>CUT HERE</span></div>
-                ${singleLabel(label)}
+            <!-- Metadata Grid -->
+            <div class="meta-grid">
+              <div class="meta-row">
+                <span class="meta-label">REGION:</span>
+                <span class="meta-value">${label.region.toUpperCase()}</span>
               </div>
-            `;
-          })
-          .join("")}
-      </body>
-    </html>
-  `;
-};
+              <div class="meta-row">
+                <span class="meta-label">DISTRICT:</span>
+                <span class="meta-value">${label.district.toUpperCase()}</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">CENTER:</span>
+                <span class="meta-value highlight-text">${label.center_number} - ${label.center_name.toUpperCase()}</span>
+              </div>
+            </div>
+
+            <!-- Contents Table -->
+            <table class="contents-table">
+              <thead>
+                <tr>
+                  <th>STATIONERY ITEM</th>
+                  <th class="text-center">QUANTITY</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>NORMAL BOOKLETS</td>
+                  <td class="text-center qty-cell">${label.normal_booklets || 0}</td>
+                </tr>
+                <tr>
+                  <td>GRAPH BOOKLETS</td>
+                  <td class="text-center qty-cell">${label.graph_booklets || 0}</td>
+                </tr>
+                <tr>
+                  <td>NORMAL LOOSE SHEETS</td>
+                  <td class="text-center qty-cell">${label.normal_loosesheets || 0}</td>
+                </tr>
+                <tr>
+                  <td>GRAPH LOOSE SHEETS</td>
+                  <td class="text-center qty-cell">${label.graph_loosesheets || 0}</td>
+                </tr>
+                <tr class="bkm-row">
+                  <td>BKM (BLACK KRAFT MANILA)</td>
+                  <td class="text-center qty-cell font-bold">${label.bkm || 0}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Footer Box Info -->
+            <div class="label-footer">
+              <div class="box-indicator">
+                BOX <span class="box-number">${boxNum}</span> OF <span class="box-total">${totalBoxes}</span>
+              </div>
+              <div class="security-seal">
+                <div class="seal-text">NECTA SECURITY SEAL</div>
+                <div class="seal-barcode">|||||||||||||||||||||||||||||||||</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    })
+    .join("") + `
+      <style>
+        /* Label Card Styling */
+        .label-card {
+          background: #ffffff;
+          border: 4px double #000000;
+          padding: 24px;
+          box-sizing: border-box;
+          width: 100%;
+          max-width: 460px;
+          margin: 10px auto;
+          position: relative;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          page-break-inside: avoid;
+        }
+
+        .label-inner {
+          border: 1px solid #e2e8f0;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        /* Header */
+        .label-header {
+          text-align: center;
+          border-bottom: 2px solid #000000;
+          padding-bottom: 12px;
+        }
+
+        .necta-title {
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.5px;
+          color: #0f172a;
+          margin-bottom: 6px;
+        }
+
+        .exam-badge {
+          display: inline-block;
+          background-color: #000000;
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 900;
+          padding: 4px 16px;
+          border-radius: 4px;
+          margin-bottom: 6px;
+          letter-spacing: 1px;
+        }
+
+        .label-subject {
+          font-size: 16px;
+          font-weight: 900;
+          color: #000000;
+          letter-spacing: 1px;
+        }
+
+        /* Metadata Grid */
+        .meta-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          background-color: #f8fafc;
+          padding: 12px;
+          border-radius: 6px;
+          border: 1px solid #e2e8f0;
+        }
+
+        .meta-row {
+          display: flex;
+          align-items: flex-start;
+          font-size: 12px;
+        }
+
+        .meta-label {
+          font-weight: 800;
+          color: #475569;
+          width: 80px;
+          flex-shrink: 0;
+        }
+
+        .meta-value {
+          font-weight: 700;
+          color: #0f172a;
+        }
+
+        .highlight-text {
+          color: #000000;
+          font-size: 13px;
+        }
+
+        /* Contents Table */
+        .contents-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 4px;
+        }
+
+        .contents-table th {
+          background-color: #f1f5f9;
+          border: 1px solid #cbd5e1;
+          padding: 8px;
+          font-size: 11px;
+          font-weight: 800;
+          text-align: left;
+          color: #334155;
+        }
+
+        .contents-table td {
+          border: 1px solid #cbd5e1;
+          padding: 8px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #0f172a;
+        }
+
+        .qty-cell {
+          font-size: 14px;
+          font-weight: 800;
+        }
+
+        .bkm-row {
+          background-color: #f8fafc;
+        }
+
+        .text-center {
+          text-align: center;
+        }
+
+        /* Footer Box Info */
+        .label-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-top: 2px solid #000000;
+          padding-top: 12px;
+          margin-top: 8px;
+        }
+
+        .box-indicator {
+          font-size: 14px;
+          font-weight: 900;
+          color: #000000;
+        }
+
+        .box-number {
+          font-size: 20px;
+          text-decoration: underline;
+        }
+
+        .box-total {
+          font-size: 20px;
+        }
+
+        .security-seal {
+          text-align: right;
+        }
+
+        .seal-text {
+          font-size: 9px;
+          font-weight: 800;
+          color: #64748b;
+          letter-spacing: 0.5px;
+        }
+
+        .seal-barcode {
+          font-family: monospace;
+          font-size: 12px;
+          letter-spacing: -1px;
+          color: #0f172a;
+          margin-top: 2px;
+        }
+
+        /* Print Adjustments */
+        @media print {
+          .label-card {
+            box-shadow: none;
+            margin: 15px auto;
+            page-break-inside: avoid;
+          }
+        }
+      </style>
+    `;
+}
