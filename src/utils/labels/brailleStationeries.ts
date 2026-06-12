@@ -1,3 +1,5 @@
+import { abbreviateSchoolName } from "./abbreviate";
+
 export const renderBrailleStationeriesLabels = (
   labels: any[],
   examCode: string,
@@ -17,23 +19,13 @@ export const renderBrailleStationeriesLabels = (
     return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
   };
 
-  const abbreviateCenterName = (fullName: string | undefined): string => {
-    if (!fullName) return "N/A";
-    const cleaned = fullName.trim().toUpperCase();
-    if (cleaned.length <= 20) return cleaned;
-    const words = cleaned.split(/[\s\-]+/);
-    let acronym = words.map(w => w[0]).join('');
-    if (acronym.length > 8) acronym = acronym.slice(0, 8);
-    return acronym || cleaned.substring(0, 10);
-  };
-
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     const regionName = (label.region || "N/A").toUpperCase();
     const regionFontSize = regionName === "DAR ES SALAAM" ? "48px" : "54px";
     const districtName = (label.district || "N/A").toUpperCase();
     const centerNumberRaw = label.center_number || "N/A";
-    const abbreviatedCenter = abbreviateCenterName(label.center_name);
+    const abbreviatedCenter = abbreviateSchoolName(label.center_name).toUpperCase();
     const sheetsQty = label.quantity || 0;
     const bkmQty = label.bkm || 0;
     const containerNum = label.container_number || "?";
@@ -69,7 +61,7 @@ export const renderBrailleStationeriesLabels = (
 
         <div class="bottom-row">
           <div class="box-number">
-            <div class="box-value">BOX ${containerNum}/${totalContainers}</div>
+            <div class="box-value">${containerNum}/${totalContainers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -145,15 +137,16 @@ export const renderBrailleStationeriesLabels = (
             flex-direction: column;
             justify-content: space-between;
             background: white;
-            padding: 10mm 12mm;
+            padding: 8mm 12mm;
             box-sizing: border-box;
+            overflow: hidden;
           }
           .label-card {
             border: 2px solid #0f172a;
             border-radius: 24px;
             background: white;
-            padding: 18px 24px 22px 24px;
-            height: 122mm;
+            padding: 16px 24px;
+            height: 120mm;
             display: flex;
             flex-direction: column;
             position: relative;
@@ -189,7 +182,7 @@ export const renderBrailleStationeriesLabels = (
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             z-index: 2;
           }
           .exam-badge-left {
