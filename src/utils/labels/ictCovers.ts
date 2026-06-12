@@ -21,7 +21,7 @@ export const renderIctCoversLabels = (
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "38px" : "44px";
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "50px" : "50px";
     const districtName = (label.district || "N/A").toUpperCase();
     const centerNumberRaw = label.center_number || "N/A";
     const abbreviatedCenter = abbreviateSchoolName(label.center_name).toUpperCase();
@@ -41,7 +41,7 @@ export const renderIctCoversLabels = (
         <!-- Top Header Row -->
         <div class="top-row">
           <div class="exam-badge-left">
-            <span>${examCode} — ${examYear}</span>
+            <span>${examCode}-${examYear}</span>
           </div>
           <div class="center-badge-right">
             <span>${centerNumberRaw}</span>
@@ -64,8 +64,8 @@ export const renderIctCoversLabels = (
         <!-- Bottom Row: Box Number & QR Code -->
         <div class="bottom-row">
           <div class="box-number-container">
-            <div class="box-label">CONTAINER</div>
-            <div class="box-value">${containerNum} / ${totalContainers}</div>
+           
+            <div class="box-value">${containerNum}/${totalContainers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -191,7 +191,7 @@ export const renderIctCoversLabels = (
             background: white;
           }
           .exam-badge-left span {
-            font-size: 16px;
+            font-size: 22px;
             font-weight: 800;
             letter-spacing: 1.5px;
             text-transform: uppercase;
@@ -203,7 +203,7 @@ export const renderIctCoversLabels = (
             padding: 5px 20px;
           }
           .center-badge-right span {
-            font-size: 18px;
+            font-size: 22px;
             font-weight: 900;
             color: white;
             letter-spacing: 1.5px;
@@ -220,7 +220,7 @@ export const renderIctCoversLabels = (
             z-index: 2;
           }
           .district {
-            font-size: 32px;
+            font-size: 35px;
             font-weight: 900;
             text-transform: uppercase;
             color: #1e293b;
@@ -233,7 +233,7 @@ export const renderIctCoversLabels = (
           }
           .center-abbr {
             text-align: center;
-            font-size: 20px;
+            font-size: 25px;
             font-weight: 800;
             text-transform: uppercase;
             background: #f1f5f9;
@@ -272,7 +272,7 @@ export const renderIctCoversLabels = (
             border-top: 6px solid #7c3aed; /* Purple Accent */
           }
           .stat-header {
-            font-size: 11px;
+            font-size: 22px;
             font-weight: 800;
             color: #64748b;
             letter-spacing: 1.5px;
@@ -280,7 +280,7 @@ export const renderIctCoversLabels = (
             text-align: center;
           }
           .stat-value {
-            font-size: 46px;
+            font-size: 50px;
             font-weight: 900;
             font-family: 'Georgia', serif;
             color: #0f172a;
@@ -307,18 +307,18 @@ export const renderIctCoversLabels = (
             justify-content: center;
           }
           .box-label {
-            font-size: 10px;
+            font-size: 50px;
             font-weight: 800;
             color: #64748b;
             letter-spacing: 2px;
             margin-bottom: 2px;
           }
           .box-value {
-            font-size: 36px;
+            font-size: 50px;
             font-weight: 900;
             color: #0f172a;
             line-height: 1;
-            font-family: 'Georgia', serif;
+            font-family: 'arial', 'Georgia', serif;
           }
           .qr-wrapper {
             background: white;
