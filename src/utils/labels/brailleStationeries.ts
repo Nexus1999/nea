@@ -10,7 +10,8 @@ export const renderBrailleStationeriesLabels = (
       `REGION:${label.region || ""}`,
       `DISTRICT:${label.district || ""}`,
       `CENTER:${label.center_number || ""} - ${label.center_name || ""}`,
-      `QTY:${label.quantity || 0}`,
+      `SHEETS:${label.quantity || 0}`,
+      `BKM:${label.bkm || 0}`,
       `BOX:${label.container_number}/${label.total_containers}`,
     ].join(" | ");
     return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
@@ -18,6 +19,8 @@ export const renderBrailleStationeriesLabels = (
 
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
+    const regionName = (label.region || "N/A").toUpperCase();
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "50px" : "56px";
 
     return `
       <div class="label-card">
@@ -37,14 +40,26 @@ export const renderBrailleStationeriesLabels = (
         </div>
 
         <!-- Region & District -->
-        <div class="region">${label.region || "N/A"}</div>
-        <div class="district">${label.district || "N/A"}</div>
+        <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
+        <div class="district">${(label.district || "N/A").toUpperCase()}</div>
 
         <!-- Center Info & Item Details -->
         <div class="center-info">
           <div class="center-number">${label.center_number || "N/A"}</div>
-          <div class="center-name">${label.center_name || "N/A"}</div>
-          <div class="item-badge">BRAILLE SHEETS: ${label.quantity || 0}</div>
+          <div class="center-name">${(label.center_name || "N/A").toUpperCase()}</div>
+          
+          <table class="contents-table">
+            <tbody>
+              <tr>
+                <td class="item-name">BRAILLE SHEETS</td>
+                <td class="item-qty">${label.quantity || 0}</td>
+              </tr>
+              <tr>
+                <td class="item-name">BRAILLE BKM</td>
+                <td class="item-qty">${label.bkm || 0}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- Bottom row: box number + QR -->
@@ -188,7 +203,6 @@ export const renderBrailleStationeriesLabels = (
 
           .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
-            font-size: 56px;
             font-weight: 900;
             text-transform: uppercase;
             color: #0f172a;
@@ -218,9 +232,10 @@ export const renderBrailleStationeriesLabels = (
             align-items: center;
             border-radius: 18px;
             border: 2px solid #cbd5e1;
-            padding: 12px;
+            padding: 12px 20px;
             margin-bottom: 16px;
             z-index: 1;
+            background: #fafafa;
           }
 
           .center-number {
@@ -231,22 +246,40 @@ export const renderBrailleStationeriesLabels = (
           }
 
           .center-name {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 800;
             color: #334155;
             text-transform: uppercase;
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
           }
 
-          .item-badge {
+          .contents-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+          }
+
+          .contents-table td {
+            padding: 6px 0;
             font-size: 16px;
-            font-weight: 900;
             color: #0f172a;
-            background: #f1f5f9;
-            padding: 4px 12px;
-            border-radius: 8px;
-            border: 1px solid #cbd5e1;
+            border-bottom: 1px dashed #cbd5e1;
+          }
+
+          .contents-table tr:last-child td {
+            border-bottom: none;
+          }
+
+          .item-name {
+            text-align: left;
+            font-weight: 800;
+          }
+
+          .item-qty {
+            text-align: right;
+            font-weight: 900;
+            font-size: 18px;
           }
 
           .bottom-row {
