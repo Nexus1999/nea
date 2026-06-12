@@ -43,7 +43,7 @@ export const renderBrailleStationeriesLabels = (
         <!-- Top Header Row -->
         <div class="top-row">
           <div class="exam-badge-left">
-            <span>${examCode} — ${examYear}</span>
+            <span>${examCode}-${examYear}</span>
           </div>
           <div class="center-badge-right">
             <span>${centerNumberRaw}</span>
