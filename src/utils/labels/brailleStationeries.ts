@@ -17,55 +17,59 @@ export const renderBrailleStationeriesLabels = (
     return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
   };
 
+  const abbreviateCenterName = (fullName: string | undefined): string => {
+    if (!fullName) return "N/A";
+    const cleaned = fullName.trim().toUpperCase();
+    if (cleaned.length <= 20) return cleaned;
+    const words = cleaned.split(/[\s\-]+/);
+    let acronym = words.map(w => w[0]).join('');
+    if (acronym.length > 8) acronym = acronym.slice(0, 8);
+    return acronym || cleaned.substring(0, 10);
+  };
+
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "50px" : "56px";
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "52px" : "58px";
+    const districtName = (label.district || "N/A").toUpperCase();
+    const centerNumberRaw = label.center_number || "N/A";
+    const abbreviatedCenter = abbreviateCenterName(label.center_name);
+    const sheetsQty = label.quantity || 0;
+    const bkmQty = label.bkm || 0;
+    const containerNum = label.container_number || "?";
+    const totalContainers = label.total_containers || "?";
 
     return `
       <div class="label-card">
-        <!-- Corner Marks -->
         <div class="corner-tl"></div>
         <div class="corner-tr"></div>
         <div class="corner-bl"></div>
         <div class="corner-br"></div>
-
-        <!-- Watermark -->
         <div class="watermark">${examCode}</div>
 
-        <!-- Top badge: exam code + year -->
-        <div class="exam-badge">
-           <span>${examCode}</span>
-           <span>${examYear}</span>
+        <div class="top-row">
+          <div class="exam-badge-left"><span>${examCode}-${examYear}</span></div>
+          <div class="center-badge-right"><span>${centerNumberRaw}</span></div>
         </div>
 
-        <!-- Region & District -->
         <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
-        <div class="district">${(label.district || "N/A").toUpperCase()}</div>
+        <div class="district">${districtName}</div>
+        <div class="center-abbr">${abbreviatedCenter}</div>
 
-        <!-- Center Info & Item Details -->
-        <div class="center-info">
-          <div class="center-number">${label.center_number || "N/A"}</div>
-          <div class="center-name">${(label.center_name || "N/A").toUpperCase()}</div>
-          
-          <table class="contents-table">
-            <tbody>
-              <tr>
-                <td class="item-name">BRAILLE SHEETS</td>
-                <td class="item-qty">${label.quantity || 0}</td>
-              </tr>
-              <tr>
-                <td class="item-name">BRAILLE BKM</td>
-                <td class="item-qty">${label.bkm || 0}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="stats-vertical">
+          <div class="stat-item">
+            <span class="stat-label">📄 BRAILLE SHEETS</span>
+            <span class="stat-value">${sheetsQty}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">🔍 BRAILLE BKM</span>
+            <span class="stat-value">${bkmQty}</span>
+          </div>
         </div>
 
-        <!-- Bottom row: box number + QR -->
         <div class="bottom-row">
           <div class="box-number">
-            <div class="box-value">BOX ${label.container_number}/${label.total_containers}</div>
+            <div class="box-value">BOX ${containerNum}/${totalContainers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -75,19 +79,33 @@ export const renderBrailleStationeriesLabels = (
     `;
   };
 
+  // Group labels into pages of 2
+  const pages: string[] = [];
+  for (let i = 0; i < labels.length; i += 2) {
+    const firstLabel = singleLabel(labels[i]);
+    const secondLabel = i + 1 < labels.length ? singleLabel(labels[i + 1]) : null;
+    const cutLine = secondLabel ? `<div class="cut-line"><span>CUT HERE</span></div>` : '';
+    pages.push(`
+      <div class="page-container">
+        ${firstLabel}
+        ${cutLine}
+        ${secondLabel || ''}
+      </div>
+    `);
+  }
+
   return `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="UTF-8" />
-        <title>Braille Stationeries Labels</title>
+        <title>Braille Stationeries Labels (2 per page)</title>
         <style>
           * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
           }
-
           @media print {
             @page {
               margin: 0;
@@ -99,6 +117,7 @@ export const renderBrailleStationeriesLabels = (
               background: white;
             }
             .page-container {
+              page-break-after: always;
               page-break-inside: avoid;
             }
             .page-container:last-child {
@@ -109,112 +128,105 @@ export const renderBrailleStationeriesLabels = (
               print-color-adjust: exact;
             }
           }
-
           body {
             background: #e5e7eb;
-            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 0;
             margin: 0;
-            text-rendering: geometricPrecision;
             font-variant-numeric: tabular-nums;
           }
-
           .page-container {
             width: 210mm;
             height: 297mm;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            page-break-after: always;
-            page-break-inside: avoid;
             background: white;
             padding: 10mm 12mm;
             box-sizing: border-box;
+            gap: 6mm;
           }
-
-          .page-container:last-child {
-            page-break-after: avoid;
-          }
-
           .label-card {
             border: 2px solid #0f172a;
-            border-radius: 24px;
+            border-radius: 28px;
             background: white;
-            padding: 18px 24px 22px 24px;
-            height: 122mm;
+            padding: 22px 28px 28px;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            flex: 1;
             position: relative;
             box-sizing: border-box;
-            overflow: hidden;
           }
-
           .label-card::before {
             content: '';
             position: absolute;
-            top: 24px;
-            bottom: 24px;
+            top: 28px;
+            bottom: 28px;
             left: 0;
-            width: 5px;
+            width: 6px;
             background: #0f172a;
-            border-radius: 0 4px 4px 0;
+            border-radius: 0 6px 6px 0;
           }
-
-          .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-
+          .corner-tl { top: 14px; left: 14px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 18px; height: 18px; }
+          .corner-tr { top: 14px; right: 14px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 18px; height: 18px; }
+          .corner-bl { bottom: 14px; left: 14px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 18px; height: 18px; }
+          .corner-br { bottom: 14px; right: 14px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 18px; height: 18px; }
           .watermark {
             position: absolute;
-            right: 20px;
+            right: 24px;
             top: 50%;
             transform: translateY(-50%);
             font-size: 140px;
             font-weight: 900;
             color: rgba(15, 23, 42, 0.03);
             pointer-events: none;
-            z-index: 0;
             user-select: none;
           }
-
-          .exam-badge {
+          .top-row {
             display: flex;
-            gap: 14px;
-            align-self: center;
-            margin-bottom: 12px;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 28px;
+            z-index: 2;
           }
-
-          .exam-badge span {
-            padding: 6px 14px;
-            border-radius: 999px;
-            background: transparent;
-            border: 1.5px solid #cbd5e1;
-            font-size: 16px;
+          .exam-badge-left {
+            border: 1.8px solid #1e293b;
+            border-radius: 60px;
+            padding: 6px 18px;
+          }
+          .exam-badge-left span {
+            font-size: 18px;
             font-weight: 800;
+            letter-spacing: 1.2px;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
             color: #0f172a;
           }
-
+          .center-badge-right {
+            background: #0f172a;
+            border-radius: 48px;
+            padding: 6px 20px;
+          }
+          .center-badge-right span {
+            font-size: 22px;
+            font-weight: 900;
+            color: white;
+            letter-spacing: 1px;
+          }
           .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
             text-transform: uppercase;
             color: #0f172a;
             text-align: center;
-            letter-spacing: -0.5px;
-            margin-bottom: 4px;
+            letter-spacing: -0.3px;
+            margin-bottom: 6px;
             line-height: 1.1;
-            z-index: 1;
           }
-
           .district {
-            font-size: 36px;
+            font-size: 42px;
             font-weight: 900;
             text-transform: uppercase;
             color: #1e293b;
@@ -222,121 +234,96 @@ export const renderBrailleStationeriesLabels = (
             margin-bottom: 12px;
             line-height: 1.2;
             word-break: break-word;
-            letter-spacing: 0.5px;
-            z-index: 1;
           }
-
-          .center-info {
+          .center-abbr {
+            text-align: center;
+            font-size: 26px;
+            font-weight: 800;
+            text-transform: uppercase;
+            background: #f1f5f9;
+            display: inline-block;
+            margin: 0 auto 24px auto;
+            padding: 6px 24px;
+            border-radius: 48px;
+            color: #0c4a6e;
+            letter-spacing: 1px;
+            border: 1px solid #cbd5e1;
+            max-width: 90%;
+            word-break: break-word;
+          }
+          .stats-vertical {
             display: flex;
             flex-direction: column;
+            gap: 20px;
+            margin-bottom: 28px;
+          }
+          .stat-item {
+            background: #fef9e3;
+            border-radius: 28px;
+            border-left: 6px solid #0f172a;
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            border-radius: 18px;
-            border: 2px solid #cbd5e1;
-            padding: 12px 20px;
-            margin-bottom: 16px;
-            z-index: 1;
-            background: #fafafa;
+            padding: 14px 28px;
           }
-
-          .center-number {
-            font-size: 32px;
-            font-weight: 900;
-            color: #0f172a;
-            margin-bottom: 4px;
-          }
-
-          .center-name {
-            font-size: 18px;
+          .stat-label {
+            font-size: 24px;
             font-weight: 800;
-            color: #334155;
             text-transform: uppercase;
-            text-align: center;
-            margin-bottom: 12px;
+            color: #1e293b;
           }
-
-          .contents-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 4px;
-          }
-
-          .contents-table td {
-            padding: 6px 0;
-            font-size: 16px;
-            color: #0f172a;
-            border-bottom: 1px dashed #cbd5e1;
-          }
-
-          .contents-table tr:last-child td {
-            border-bottom: none;
-          }
-
-          .item-name {
-            text-align: left;
-            font-weight: 800;
-          }
-
-          .item-qty {
-            text-align: right;
+          .stat-value {
+            font-size: 44px;
             font-weight: 900;
-            font-size: 18px;
+            font-family: monospace;
+            color: #0f172a;
+            background: white;
+            padding: 4px 20px;
+            border-radius: 44px;
+            min-width: 100px;
+            text-align: center;
+            border: 1px solid #cbd5e1;
           }
-
           .bottom-row {
             display: flex;
-            flex-direction: row;
             align-items: center;
             justify-content: space-between;
-            gap: 20px;
+            gap: 24px;
             margin-top: auto;
-            z-index: 1;
           }
-
           .box-number {
             flex: 1;
-            background: transparent;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 18px;
-            padding: 10px 14px;
+            border: 2px solid #cbd5e1;
+            border-radius: 32px;
+            padding: 12px 10px;
             text-align: center;
+            background: #ffffffcc;
           }
-
           .box-value {
             font-size: 72px;
             font-weight: 900;
             letter-spacing: -2px;
             line-height: 0.95;
             color: #0f172a;
-            font-variant-numeric: tabular-nums;
           }
-
           .qr-wrapper {
             background: white;
-            border: 1.5px solid #cbd5e1;
-            box-shadow:
-              0 1px 3px rgba(0,0,0,.05),
-              inset 0 1px 0 rgba(255,255,255,.8);
-            padding: 10px;
-            border-radius: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border: 2px solid #cbd5e1;
+            padding: 8px;
+            border-radius: 28px;
           }
-
           .qr-wrapper img {
-            width: 80px;
+            width: 86px;
             height: auto;
             display: block;
           }
-
           .cut-line {
             border-top: 2px dashed #475569;
             width: 100%;
-            margin: 10px 0;
             position: relative;
             text-align: center;
+            margin: 4px 0;
           }
-
           .cut-line span {
             position: absolute;
             top: -12px;
@@ -354,17 +341,7 @@ export const renderBrailleStationeriesLabels = (
         </style>
       </head>
       <body>
-        ${labels
-          .map((label) => {
-            return `
-              <div class="page-container">
-                ${singleLabel(label)}
-                <div class="cut-line"><span>CUT HERE</span></div>
-                ${singleLabel(label)}
-              </div>
-            `;
-          })
-          .join("")}
+        ${pages.join("")}
       </body>
     </html>
   `;
