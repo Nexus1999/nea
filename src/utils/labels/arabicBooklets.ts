@@ -1,3 +1,5 @@
+import { abbreviateSchoolName } from "./abbreviate";
+
 export const renderArabicBookletsLabels = (
   labels: any[],
   examCode: string,
@@ -18,39 +20,52 @@ export const renderArabicBookletsLabels = (
 
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
+    const regionName = (label.region || "N/A").toUpperCase();
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "36px" : "42px";
+    const districtName = (label.district || "N/A").toUpperCase();
+    const centerNumberRaw = label.center_number || "N/A";
+    const abbreviatedCenter = abbreviateSchoolName(label.center_name).toUpperCase();
+    const qty = label.quantity || 0;
+    const containerNum = label.container_number || "?";
+    const totalContainers = label.total_containers || "?";
 
     return `
       <div class="label-card">
-        <!-- Corner Marks -->
+        <!-- Classic Corner Accents -->
         <div class="corner-tl"></div>
         <div class="corner-tr"></div>
         <div class="corner-bl"></div>
         <div class="corner-br"></div>
-
-        <!-- Watermark -->
         <div class="watermark">${examCode}</div>
 
-        <!-- Top badge: exam code + year -->
-        <div class="exam-badge">
-           <span>${examCode}</span>
-           <span>${examYear}</span>
+        <!-- Top Header Row -->
+        <div class="top-row">
+          <div class="exam-badge-left">
+            <span>${examCode} — ${examYear}</span>
+          </div>
+          <div class="center-badge-right">
+            <span>${centerNumberRaw}</span>
+          </div>
         </div>
 
         <!-- Region & District -->
-        <div class="region">${label.region || "N/A"}</div>
-        <div class="district">${label.district || "N/A"}</div>
+        <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
+        <div class="district">${districtName}</div>
+        <div class="center-abbr">${abbreviatedCenter}</div>
 
-        <!-- Center Info & Item Details -->
-        <div class="center-info">
-          <div class="center-number">${label.center_number || "N/A"}</div>
-          <div class="center-name">${label.center_name || "N/A"}</div>
-          <div class="item-badge">ARABIC BOOKLETS: ${label.quantity || 0}</div>
+        <!-- Enlarged & Beautiful Classic Stats Block (Single Item) -->
+        <div class="stats-grid">
+          <div class="stat-block arabic-block">
+            <div class="stat-header">ARABIC BOOKLETS</div>
+            <div class="stat-value">${qty}</div>
+          </div>
         </div>
 
-        <!-- Bottom row: box number + QR -->
+        <!-- Bottom Row: Box Number & QR Code -->
         <div class="bottom-row">
-          <div class="box-number">
-            <div class="box-value">BOX ${label.container_number}/${label.total_containers}</div>
+          <div class="box-number-container">
+            <div class="box-label">CONTAINER</div>
+            <div class="box-value">${containerNum} / ${totalContainers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -60,19 +75,33 @@ export const renderArabicBookletsLabels = (
     `;
   };
 
+  // Group labels into pages of 2
+  const pages: string[] = [];
+  for (let i = 0; i < labels.length; i += 2) {
+    const firstLabel = singleLabel(labels[i]);
+    const secondLabel = i + 1 < labels.length ? singleLabel(labels[i + 1]) : null;
+    const cutLine = secondLabel ? `<div class="cut-line"><span></span></div>` : '';
+    pages.push(`
+      <div class="page-container">
+        ${firstLabel}
+        ${cutLine}
+        ${secondLabel || ''}
+      </div>
+    `);
+  }
+
   return `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="UTF-8" />
-        <title>Arabic Booklets Labels</title>
+        <title>Arabic Booklets Labels (2 per page)</title>
         <style>
           * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
           }
-
           @media print {
             @page {
               margin: 0;
@@ -84,6 +113,7 @@ export const renderArabicBookletsLabels = (
               background: white;
             }
             .page-container {
+              page-break-after: always;
               page-break-inside: avoid;
             }
             .page-container:last-child {
@@ -94,216 +124,224 @@ export const renderArabicBookletsLabels = (
               print-color-adjust: exact;
             }
           }
-
           body {
-            background: #e5e7eb;
-            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+            background: #e2e8f0;
+            font-family: 'Inter', 'Segoe UI', system-ui, Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 0;
             margin: 0;
-            text-rendering: geometricPrecision;
             font-variant-numeric: tabular-nums;
           }
-
           .page-container {
             width: 210mm;
             height: 297mm;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            page-break-after: always;
-            page-break-inside: avoid;
             background: white;
             padding: 10mm 12mm;
             box-sizing: border-box;
+            overflow: hidden;
           }
-
-          .page-container:last-child {
-            page-break-after: avoid;
-          }
-
           .label-card {
-            border: 2px solid #0f172a;
+            border: 3px double #0f172a;
             border-radius: 24px;
-            background: white;
-            padding: 18px 24px 22px 24px;
+            background: #fffdf9; /* Classic warm cream background */
+            padding: 18px 24px;
             height: 122mm;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             position: relative;
             box-sizing: border-box;
             overflow: hidden;
+            box-shadow: inset 0 0 40px rgba(15, 23, 42, 0.02);
           }
-
-          .label-card::before {
-            content: '';
-            position: absolute;
-            top: 24px;
-            bottom: 24px;
-            left: 0;
-            width: 5px;
-            background: #0f172a;
-            border-radius: 0 4px 4px 0;
-          }
-
-          .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-
+          
+          /* Classic Corner Accents */
+          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          
           .watermark {
             position: absolute;
             right: 20px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 140px;
+            font-size: 130px;
             font-weight: 900;
-            color: rgba(15, 23, 42, 0.03);
+            color: rgba(15, 23, 42, 0.02);
             pointer-events: none;
-            z-index: 0;
             user-select: none;
+            z-index: 0;
           }
-
-          .exam-badge {
+          .top-row {
             display: flex;
-            gap: 14px;
-            align-self: center;
-            margin-bottom: 12px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            z-index: 2;
           }
-
-          .exam-badge span {
-            padding: 6px 14px;
-            border-radius: 999px;
-            background: transparent;
-            border: 1.5px solid #cbd5e1;
-            font-size: 16px;
+          .exam-badge-left {
+            border: 1.5px solid #0f172a;
+            border-radius: 60px;
+            padding: 3px 12px;
+            background: white;
+          }
+          .exam-badge-left span {
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #0f172a;
+          }
+          .center-badge-right {
+            background: #0f172a;
+            border-radius: 48px;
+            padding: 4px 18px;
+          }
+          .center-badge-right span {
+            font-size: 15px;
+            font-weight: 900;
+            color: white;
+            letter-spacing: 1.5px;
+          }
+          .region {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-weight: 900;
+            text-transform: uppercase;
+            color: #0f172a;
+            text-align: center;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+            line-height: 1.1;
+            z-index: 2;
+          }
+          .district {
+            font-size: 26px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: #0f172a;
-          }
-
-          .region {
-            font-family: 'Elephant', 'Impact', 'Georgia', serif;
-            font-size: 56px;
-            font-weight: 900;
-            text-transform: uppercase;
-            color: #0f172a;
+            color: #334155;
             text-align: center;
-            letter-spacing: -0.5px;
-            margin-bottom: 4px;
-            line-height: 1.1;
-            z-index: 1;
-          }
-
-          .district {
-            font-size: 36px;
-            font-weight: 900;
-            text-transform: uppercase;
-            color: #1e293b;
-            text-align: center;
-            margin-bottom: 12px;
+            margin-bottom: 6px;
             line-height: 1.2;
             word-break: break-word;
             letter-spacing: 0.5px;
-            z-index: 1;
+            z-index: 2;
           }
-
-          .center-info {
+          .center-abbr {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 800;
+            text-transform: uppercase;
+            background: #f1f5f9;
+            display: inline-block;
+            margin: 0 auto 10px auto;
+            padding: 4px 14px;
+            border-radius: 48px;
+            color: #0f172a;
+            letter-spacing: 1px;
+            border: 1.5px solid #0f172a;
+            max-width: 90%;
+            word-break: break-word;
+            z-index: 2;
+          }
+          
+          /* Enlarged & Classic Stats Grid (Single Column) */
+          .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+            margin-bottom: 10px;
+            z-index: 2;
+          }
+          .stat-block {
+            background: white;
+            border: 2px solid #0f172a;
+            border-radius: 16px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            border-radius: 18px;
-            border: 2px solid #cbd5e1;
-            padding: 12px;
-            margin-bottom: 16px;
-            z-index: 1;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
           }
-
-          .center-number {
-            font-size: 32px;
-            font-weight: 900;
-            color: #0f172a;
-            margin-bottom: 4px;
+          .arabic-block {
+            border-top: 6px solid #059669; /* Emerald Accent */
           }
-
-          .center-name {
-            font-size: 20px;
+          .stat-header {
+            font-size: 11px;
             font-weight: 800;
-            color: #334155;
-            text-transform: uppercase;
+            color: #64748b;
+            letter-spacing: 1.5px;
+            margin-bottom: 4px;
             text-align: center;
-            margin-bottom: 8px;
           }
-
-          .item-badge {
-            font-size: 16px;
+          .stat-value {
+            font-size: 46px;
             font-weight: 900;
+            font-family: 'Georgia', serif;
             color: #0f172a;
-            background: #f1f5f9;
-            padding: 4px 12px;
-            border-radius: 8px;
-            border: 1px solid #cbd5e1;
+            line-height: 1;
           }
-
+          
           .bottom-row {
             display: flex;
-            flex-direction: row;
             align-items: center;
             justify-content: space-between;
             gap: 20px;
             margin-top: auto;
-            z-index: 1;
+            z-index: 2;
           }
-
-          .box-number {
+          .box-number-container {
             flex: 1;
-            background: transparent;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 18px;
-            padding: 10px 14px;
+            border: 2px solid #0f172a;
+            border-radius: 16px;
+            padding: 8px 12px;
             text-align: center;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
           }
-
+          .box-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: #64748b;
+            letter-spacing: 2px;
+            margin-bottom: 2px;
+          }
           .box-value {
-            font-size: 72px;
+            font-size: 36px;
             font-weight: 900;
-            letter-spacing: -2px;
-            line-height: 0.95;
             color: #0f172a;
-            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            font-family: 'Georgia', serif;
           }
-
           .qr-wrapper {
             background: white;
-            border: 1.5px solid #cbd5e1;
-            box-shadow:
-              0 1px 3px rgba(0,0,0,.05),
-              inset 0 1px 0 rgba(255,255,255,.8);
-            padding: 10px;
-            border-radius: 18px;
+            border: 2px solid #0f172a;
+            padding: 6px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
           }
-
           .qr-wrapper img {
-            width: 80px;
-            height: auto;
+            width: 68px;
+            height: 68px;
             display: block;
           }
-
           .cut-line {
             border-top: 2px dashed #475569;
             width: 100%;
-            margin: 10px 0;
             position: relative;
             text-align: center;
+            margin: 4px 0;
           }
-
           .cut-line span {
             position: absolute;
             top: -12px;
@@ -321,17 +359,7 @@ export const renderArabicBookletsLabels = (
         </style>
       </head>
       <body>
-        ${labels
-          .map((label) => {
-            return `
-              <div class="page-container">
-                ${singleLabel(label)}
-                <div class="cut-line"><span>CUT HERE</span></div>
-                ${singleLabel(label)}
-              </div>
-            `;
-          })
-          .join("")}
+        ${pages.join("")}
       </body>
     </html>
   `;

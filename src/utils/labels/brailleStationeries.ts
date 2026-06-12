@@ -86,7 +86,7 @@ export const renderBrailleStationeriesLabels = (
   for (let i = 0; i < labels.length; i += 2) {
     const firstLabel = singleLabel(labels[i]);
     const secondLabel = i + 1 < labels.length ? singleLabel(labels[i + 1]) : null;
-    const cutLine = secondLabel ? `<div class="cut-line"><span>CUT HERE</span></div>` : '';
+    const cutLine = secondLabel ? `<div class="cut-line"><span></span></div>` : '';
     pages.push(`
       <div class="page-container">
         ${firstLabel}
