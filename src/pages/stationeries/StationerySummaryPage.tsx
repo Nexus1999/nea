@@ -984,35 +984,27 @@ const StationerySummaryPage: React.FC = () => {
                 </div>
               </AccordionTrigger>
               
-              <AccordionContent className="px-6 pb-6 pt-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                  {region.districts.map((district, dIdx) => (
-                    <div 
-                      key={dIdx} 
-                      className={cn(
-                        "p-4 rounded-xl border transition-all cursor-default",
-                        district.districtName === "NECTA EXTRA" 
-                          ? "border-blue-100 bg-blue-50/30" 
-                          : "border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-md"
-                      )}
-                    >
-                      <div className="flex justify-between items-center mb-3 border-b pb-2">
-                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-tight truncate">
-                          {district.districtName}
-                        </h4>
-                        {district.districtName === "NECTA EXTRA" && (
-                          <Badge className="bg-blue-100 text-blue-700 border-none text-[9px] font-bold">EXTRA</Badge>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(district.totals)
-                          .filter(([field]) => {
-                            const allowedFields = getExamFields(stationery.examination_code);
-                            return allowedFields.includes(field);
-                          })
-                          .map(([field, value]) => (
-                            <div key={field} className="flex flex-col p-2 bg-white rounded-lg border border-slate-100/80">
+              <AccordionContent className="px-6 pb-6 pt-4 space-y-6">
+                {/* Region Totals Section */}
+                <div className="bg-slate-50/50 rounded-2xl p-5 border border-slate-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">Region Totals Summary</h4>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {Object.entries(region.totals)
+                      .filter(([field]) => {
+                        const allowedFields = getExamFields(stationery.examination_code);
+                        return allowedFields.includes(field);
+                      })
+                      .map(([field, value]) => {
+                        const visual = getFieldVisual(field);
+                        return (
+                          <div key={field} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+                            <div className={cn("p-2 rounded-lg", visual.bg, visual.color)}>
+                              <visual.icon className="h-4 w-4" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
                               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">
                                 {getFieldLabels(field)}
                               </span>
@@ -1020,10 +1012,58 @@ const StationerySummaryPage: React.FC = () => {
                                 {formatNumber(value)}
                               </span>
                             </div>
-                          ))}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* Districts Breakdown Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-slate-500" />
+                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">Districts Breakdown</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {region.districts.map((district, dIdx) => (
+                      <div 
+                        key={dIdx} 
+                        className={cn(
+                          "p-4 rounded-xl border transition-all cursor-default",
+                          district.districtName === "NECTA EXTRA" 
+                            ? "border-blue-100 bg-blue-50/30" 
+                            : "border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-md"
+                        )}
+                      >
+                        <div className="flex justify-between items-center mb-3 border-b pb-2">
+                          <h4 className="text-xs font-black text-slate-600 uppercase tracking-tight truncate">
+                            {district.districtName}
+                          </h4>
+                          {district.districtName === "NECTA EXTRA" && (
+                            <Badge className="bg-blue-100 text-blue-700 border-none text-[9px] font-bold">EXTRA</Badge>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                          {Object.entries(district.totals)
+                            .filter(([field]) => {
+                              const allowedFields = getExamFields(stationery.examination_code);
+                              return allowedFields.includes(field);
+                            })
+                            .map(([field, value]) => (
+                              <div key={field} className="flex flex-col p-2 bg-white rounded-lg border border-slate-100/80">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">
+                                  {getFieldLabels(field)}
+                                </span>
+                                <span className="text-sm font-black text-slate-800 mt-0.5">
+                                  {formatNumber(value)}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
