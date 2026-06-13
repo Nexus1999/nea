@@ -297,13 +297,17 @@ const StationerySummaryPage: React.FC = () => {
       fields.forEach(field => { grandTotals[field] = 0; });
 
       // Center multipliers (defaults as needed)
-      const studentsPerStream = centerMultipliers.students_in_a_stream || 30;
+      const defaultStudentsPerStream = isPrimary ? 25 : 30;
+      const studentsPerStream = centerMultipliers.students_in_a_stream && centerMultipliers.students_in_a_stream > 0
+        ? centerMultipliers.students_in_a_stream
+        : defaultStudentsPerStream;
+
       const bkmPct = centerMultipliers.bkm_percentage || 0;
       const nPct = centerMultipliers.bookletsnormal_center_percentage || 0;
       const gPct = centerMultipliers.bookletsgraph_center_percentage || 0;
       const lsnPct = centerMultipliers.loose_sheet_normal_percentage || 0;
       const lsgPct = centerMultipliers.loose_sheets_graph_percentage || 0;
-      const brailleMultiplier = Number(centerMultipliers.braillesheets) > 0 ? Number(centerMultipliers.braillesheets) : 2; // default 2 if missing
+      const brailleMultiplier = Number(centerMultipliers.braillesheets) > 0 ? Number(centerMultipliers.braillesheets) : 10; 
       const timetableMultiplier = Number(centerMultipliers.timetables) > 0 ? Number(centerMultipliers.timetables) : 1;
 
       const arabicPct = centerMultipliers.arabic_booklets_percentage || 0;
@@ -448,7 +452,10 @@ const StationerySummaryPage: React.FC = () => {
           const supervisors = maxRegisteredForTRTWM > 0 ? Math.ceil(maxRegisteredForTRTWM / 30) + 2 : 0;
           
           // BKM calculation matching edge function
-          const centerBkm = Math.ceil(totalWeightedStreamsForBKM);
+          const centerBkm = !isPrimary && bkmPct > 0
+            ? Math.ceil(totalWeightedStreamsForBKM * (1 + bkmPct / 100))
+            : Math.ceil(totalWeightedStreamsForBKM);
+
           const normalWithPct = nPct > 0 ? Math.ceil(totalNormal + totalNormal * (nPct / 100)) : Math.ceil(totalNormal);
           const graphWithPct = gPct > 0 ? Math.ceil(totalGraph + totalGraph * (gPct / 100)) : Math.ceil(totalGraph);
           const lsNorm = lsnPct > 0 ? Math.ceil((normalWithPct + graphWithPct) * (lsnPct / 100)) : 0;
