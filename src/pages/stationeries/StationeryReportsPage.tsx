@@ -37,12 +37,12 @@ interface MasterSummary {
 
 // --- Category Definitions and Scope Rules ---
 const CATEGORY_MAP: Record<string, string[]> = {
-  'SFNA': ['Stationeries', 'Bkm Description', 'Braille Stationeries'],
-  'SSNA': ['Stationeries', 'Bkm Description', 'Braille Stationeries'],
-  'PSLE': ['Stationeries', 'Bkm Description', 'Braille Stationeries'],
-  'FTNA': ['Stationeries', 'Bkm Description', 'Braille Stationeries', 'ICT Covers', 'Fine Arts Booklets'],
-  'ACSEE': ['Supervisors Forms', 'Stationeries Description', 'Braille Stationeries', 'ICT Covers', 'Fine Arts Booklets', 'Arabic Booklets'],
-  'CSEE': ['Supervisors Forms', 'Stationeries Description', 'Braille Stationeries', 'ICT Covers', 'Fine Arts Booklets', 'Arabic Booklets'],
+  'SFNA': ['Stationeries', 'Bkm Description', 'Braille Stationeries','Timetables'],
+  'SSNA': ['Stationeries', 'Bkm Description', 'Braille Stationeries','Timetables'],
+  'PSLE': ['Stationeries', 'Bkm Description', 'Braille Stationeries','Timetables'],
+  'FTNA': ['Stationeries', 'Bkm Description', 'Braille Stationeries', 'ICT Covers', 'Fine Arts Booklets','Timetables'],
+  'ACSEE': ['Supervisors Forms', 'Stationeries Description', 'Braille Stationeries', 'ICT Covers', 'Fine Arts Booklets', 'Arabic Booklets', 'Timetables'],
+  'CSEE': ['Supervisors Forms', 'Stationeries Description', 'Braille Stationeries', 'ICT Covers', 'Fine Arts Booklets', 'Arabic Booklets', 'Timetables'],
 };
 
 const DISTRICT_ALLOWED_CATEGORIES: Record<string, string[]> = {
@@ -57,7 +57,7 @@ const DISTRICT_ALLOWED_CATEGORIES: Record<string, string[]> = {
 const CATEGORIES_REQUIRING_DISTRICTS = ['Bkm Description', 'Stationeries Description'];
 
 // Categories that MUST be generated per region (single region only)
-const SINGLE_REGION_CATEGORIES = ['Stationeries Description', 'Bkm Description'];
+const SINGLE_REGION_CATEGORIES = ['Stationeries Description', 'Bkm Description',];
 
 // Categories that require subject registration filtering for regions
 const SUBJECT_AWARE_REGION_CATEGORIES = ['ICT Covers', 'Arabic Booklets', 'Fine Arts Booklets', 'Braille Stationeries'];
@@ -116,6 +116,20 @@ const getReportHeader = (code: string, year: string, category: string): { title:
     case 'Arabic Booklets':
       const arabicSubject = code === 'ACSEE' ? '125-ARABIC LANGUAGE' : '025-ARABIC LANGUAGE';
       return { title: baseTitle, subtitle: `SOMO LA ${arabicSubject}` };
+    case 'Timetables':
+      const timetableTitles: Record<string, string> = {
+            PSLE: `RATIBA ZA MTIHANI WA KUMALIZA ELIMU YA MSINGI ${yearStr}`,
+            SSNA: `RATIBA ZA UPIMAJI WA KITAIFA WA DARASA LA SITA ${yearStr}`,
+            SFNA: `RATIBA ZA UPIMAJI WA KITAIFA WA DARASA LA NNE ${yearStr}`,
+            FTNA: `RATIBA ZA UPIMAJI WA KITAIFA WA KIDATO CHA PILI ${yearStr}`,
+            CSEE: `RATIBA ZA MTIHANI WA KIDATO CHA NNE ${yearStr}`,
+            ACSEE: `RATIBA ZA MTIHANI WA KIDATO CHA SITA ${yearStr}`,
+  };
+
+  return {
+    title: timetableTitles[code] || baseTitle,
+    subtitle: null
+  };
     default:
       return { title: 'RIPOTI YA VIFAA VYA MTIHANI', subtitle: null };
   }
@@ -517,11 +531,10 @@ const StationeryReportsPage = () => {
       const isStationeryDescriptionReport = selectedCategory === 'Stationeries Description';
       const isBkmDescriptionReport = selectedCategory === 'Bkm Description';
       const isStationeriesReport = selectedCategory === 'Stationeries';
+      const isTimetablesReport = selectedCategory === 'Timetables';
       
       if (isBkmDescriptionReport) {
-          const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-bkm-description-report`;
           const regionName = selectedRegions[0];
-
           const payload = {
               mid: masterSummaryId,
               code,
@@ -532,24 +545,22 @@ const StationeryReportsPage = () => {
               reportSubtitle: subtitle,
           };
 
-          const response = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
+          const { data: blob, error: invokeErr } = await supabase.functions.invoke('generate-bkm-description-report', {
+              body: payload,
           });
 
-          if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(`Failed to generate BKM Description report: ${errorData.error || response.statusText}`);
+          if (invokeErr) {
+              throw new Error(`Failed to generate BKM Description report: ${invokeErr.message}`);
+          }
+          if (!blob) {
+              throw new Error("Failed to generate BKM Description report: No data returned");
           }
 
-          const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
           const downloadedFileName = `BKM ${regionName} ${code}-${year}.pdf`;
           generatedReports.push({ region: regionName, url, fileName: downloadedFileName });
 
       } else if (isSubjectPercentageReport) {
-        const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-subject-percentage-report`;
         const subjectCode = getSubjectCodeForCategory(code, selectedCategory);
         const payload: any = {
           mid: masterSummaryId,
@@ -561,24 +572,22 @@ const StationeryReportsPage = () => {
           subjectCodeFilter: subjectCode,
         };
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+        const { data: blob, error: invokeErr } = await supabase.functions.invoke('generate-subject-percentage-report', {
+          body: payload,
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Failed to generate document: ${errorData.error || 'Unknown error'}`);
+        if (invokeErr) {
+          throw new Error(`Failed to generate document: ${invokeErr.message}`);
+        }
+        if (!blob) {
+          throw new Error("Failed to generate document: No data returned");
         }
 
-        const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const downloadedFileName = `${selectedCategory.replace(/\s/g, '_')}_${code}_${year}_AllRegions_${new Date().toISOString().slice(0, 10)}.pdf`;
         generatedReports.push({ region: 'All Eligible Regions', url, fileName: downloadedFileName });
 
       } else if (isSpecialNeedsReport) {
-        const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-special-needs-report`;
         const payload: any = {
           mid: masterSummaryId,
           code,
@@ -589,24 +598,22 @@ const StationeryReportsPage = () => {
           specialNeedType: 'BR',
         };
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+        const { data: blob, error: invokeErr } = await supabase.functions.invoke('generate-special-needs-report', {
+          body: payload,
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Failed to generate document: ${errorData.error || 'Unknown error'}`);
+        if (invokeErr) {
+          throw new Error(`Failed to generate document: ${invokeErr.message}`);
+        }
+        if (!blob) {
+          throw new Error("Failed to generate document: No data returned");
         }
 
-        const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const downloadedFileName = `${selectedCategory.replace(/\s/g, '_')}_${code}_${year}_AllRegions_${new Date().toISOString().slice(0, 10)}.pdf`;
         generatedReports.push({ region: 'All Eligible Regions', url, fileName: downloadedFileName });
 
       } else if (isStationeriesReport) {
-        const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-stationeries-report`;
         const payload = {
           mid: masterSummaryId,
           code,
@@ -616,23 +623,21 @@ const StationeryReportsPage = () => {
           reportSubtitle: subtitle,
         };
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+        const { data: blob, error: invokeErr } = await supabase.functions.invoke('generate-stationeries-report', {
+          body: payload,
         });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(`Failed to generate stationeries report: ${errorData.error || response.statusText}`);
+        if (invokeErr) {
+          throw new Error(`Failed to generate stationeries report: ${invokeErr.message}`);
+        }
+        if (!blob) {
+          throw new Error("Failed to generate stationeries report: No data returned");
         }
 
-        const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const downloadedFileName = `Stationeries ${code} ${year} ${selectedRegions.length > 1 ? 'MultiRegion' : (selectedRegions[0] || 'Region')}.pdf`;
         generatedReports.push({ region: selectedRegions.join(', '), url, fileName: downloadedFileName });
       } else if (isSupervisorReport) {
-          const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-multi-region-supervisor-report`;
           const payload = {
             mid: masterSummaryId,
             code,
@@ -642,24 +647,22 @@ const StationeryReportsPage = () => {
             reportSubtitle: subtitle,
           };
 
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+          const { data: blob, error: invokeErr } = await supabase.functions.invoke('generate-multi-region-supervisor-report', {
+            body: payload,
           });
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`Failed to generate supervisor report: ${errorData.error || response.statusText}`);
+          if (invokeErr) {
+            throw new Error(`Failed to generate supervisor report: ${invokeErr.message}`);
+          }
+          if (!blob) {
+            throw new Error("Failed to generate supervisor report: No data returned");
           }
 
-          const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
           const downloadedFileName = `Supervisors Forms ${code}-${year} ${selectedRegions.length > 1 ? 'MultiRegion' : (selectedRegions[0] || 'Region')}.pdf`;
           generatedReports.push({ region: selectedRegions.join(', '), url, fileName: downloadedFileName });
       } else if (isStationeryDescriptionReport) {
           for (const regionName of selectedRegions) {
-            const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-stationery-description-report`;
             const regionObj = regions.find(r => r.region_name === regionName);
             const regionCode = regionObj?.region_code;
             const regionDistrictNames = districts
@@ -680,22 +683,45 @@ const StationeryReportsPage = () => {
               payload.districts = selectedForRegion;
             }
 
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
+            const { data: blob, error: invokeErr } = await supabase.functions.invoke('generate-stationery-description-report', {
+              body: payload,
             });
 
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(`Failed to generate stationery description for ${regionName}: ${errorData.error || response.statusText}`);
+            if (invokeErr) {
+              throw new Error(`Failed to generate stationery description for ${regionName}: ${invokeErr.message}`);
+            }
+            if (!blob) {
+              throw new Error(`Failed to generate stationery description for ${regionName}: No data returned`);
             }
 
-            const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const downloadedFileName = `Stationeries ${regionName} ${code}-${year}.pdf`;
             generatedReports.push({ region: regionName, url, fileName: downloadedFileName });
           }
+      } else if (isTimetablesReport) {
+        const payload = {
+          mid: masterSummaryId,
+          code,
+          year,
+          regions: selectedRegions,
+          reportTitle: title,
+          reportSubtitle: subtitle,
+        };
+
+        const { data: blob, error: invokeErr } = await supabase.functions.invoke('generate-timetables-report', {
+          body: payload,
+        });
+
+        if (invokeErr) {
+          throw new Error(`Failed to generate timetables report: ${invokeErr.message}`);
+        }
+        if (!blob) {
+          throw new Error("Failed to generate timetables report: No data returned");
+        }
+
+        const url = window.URL.createObjectURL(blob);
+        const downloadedFileName = `Timetables ${code} ${year} ${selectedRegions.length > 1 ? 'MultiRegion' : (selectedRegions[0] || 'Region')}.pdf`;
+        generatedReports.push({ region: selectedRegions.join(', '), url, fileName: downloadedFileName });
       } else {
           throw new Error('Unsupported category selected.');
       }

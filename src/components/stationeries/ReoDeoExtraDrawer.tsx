@@ -31,6 +31,7 @@ const ALL_EXTRA_ITEMS = [
   { name: 'TWM', key: 'twm' },
   { name: 'FBM1', key: 'fbm1' },
   { name: 'FBM2', key: 'fbm2' },
+  { name: 'Timetables', key: 'timetables' },
 ];
 
 interface ReoDeoExtraDrawerProps {
@@ -55,16 +56,16 @@ const ReoDeoExtraDrawer: React.FC<ReoDeoExtraDrawerProps> = ({ open, onOpenChang
   const filteredItems = useMemo(() => {
     if (!examCode) return ALL_EXTRA_ITEMS;
     if (['PSLE', 'SSNA', 'SFNA'].includes(examCode)) {
-      return ALL_EXTRA_ITEMS.filter(i => ['fbm1', 'fbm2', 'tr', 'twm', 'bkm', 'brsheets', 'brbkm'].includes(i.key));
+      return ALL_EXTRA_ITEMS.filter(i => ['fbm1', 'fbm2', 'tr', 'twm', 'bkm', 'brsheets', 'brbkm', 'timetables'].includes(i.key));
     }
     if (['ACSEE', 'CSEE'].includes(examCode)) {
       return ALL_EXTRA_ITEMS.filter(i => [
         'normalbooklets','graphbooklets','normalloosesheets','graphloosesheets',
-        'tr','twm','bkm','brsheets','brbkm','arabicbooklets','ictcovers','finearts'
+        'tr','twm','bkm','brsheets','brbkm','arabicbooklets','ictcovers','finearts','timetables'
       ].includes(i.key));
     }
     if (examCode === 'FTNA') {
-      return ALL_EXTRA_ITEMS.filter(i => ['tr','twm','bkm','brsheets','brbkm','ictcovers','finearts'].includes(i.key));
+      return ALL_EXTRA_ITEMS.filter(i => ['tr','twm','bkm','brsheets','brbkm','ictcovers','finearts','timetables'].includes(i.key));
     }
     return ALL_EXTRA_ITEMS;
   }, [examCode]);

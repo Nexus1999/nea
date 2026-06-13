@@ -39,6 +39,7 @@ const buildSchema = (group: ExamGroup) => {
       bkm_percentage: numberField,
       braillesheets: numberField,
       students_in_a_stream: intField,
+      timetables: numberField,
     });
   }
 
@@ -47,6 +48,7 @@ const buildSchema = (group: ExamGroup) => {
       bkm_percentage: numberField,
       students_in_a_stream: intField,
       braillesheets: numberField,
+      timetables: numberField,
     });
   }
 
@@ -57,6 +59,7 @@ const buildSchema = (group: ExamGroup) => {
       ict_covers_percentage: numberField,
       fine_arts_booklets_percentage: numberField,
       bkm_percentage: numberField,
+      timetables: numberField,
     });
   }
 
@@ -71,6 +74,7 @@ const buildSchema = (group: ExamGroup) => {
     bkm_percentage: numberField.optional(),
     braillesheets: numberField.optional(),
     students_in_a_stream: intField.optional(),
+    timetables: numberField.optional(),
   });
 };
 
@@ -124,6 +128,7 @@ const CenterMultipliersDrawer: React.FC<CenterMultipliersDrawerProps> = ({
             bkm_percentage: row?.bkm_percentage ?? 0,
             braillesheets: row?.braillesheets ?? 0,
             students_in_a_stream: row?.students_in_a_stream ?? 30,
+            timetables: row?.timetables ?? 0,
           };
           form.reset(defaults);
         })
