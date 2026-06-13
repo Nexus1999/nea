@@ -40,15 +40,11 @@ export const renderTimetablesLabels = (
           <div class="exam-badge-left">
             <span>${examCode}-${examYear}</span>
           </div>
-          <div class="center-badge-right">
-            <span>TIMETABLES</span>
-          </div>
         </div>
 
         <!-- Region & District -->
         <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
         <div class="district">${districtName}</div>
-        <div class="center-abbr">DISTRICT DISTRIBUTION</div>
 
         <!-- Enlarged & Beautiful Classic Stats Block (Single Item) -->
         <div class="stats-grid">
@@ -175,9 +171,9 @@ export const renderTimetablesLabels = (
           }
           .top-row {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
             z-index: 2;
           }
           .exam-badge-left {
@@ -192,17 +188,6 @@ export const renderTimetablesLabels = (
             letter-spacing: 1.5px;
             text-transform: uppercase;
             color: #0f172a;
-          }
-          .center-badge-right {
-            background: #16a34a; /* Green Accent */
-            border-radius: 48px;
-            padding: 5px 20px;
-          }
-          .center-badge-right span {
-            font-size: 22px;
-            font-weight: 900;
-            color: white;
-            letter-spacing: 1.5px;
           }
           .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
@@ -221,27 +206,10 @@ export const renderTimetablesLabels = (
             text-transform: uppercase;
             color: #1e293b;
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 16px;
             line-height: 1.2;
             word-break: break-word;
             letter-spacing: 0.5px;
-            z-index: 2;
-          }
-          .center-abbr {
-            text-align: center;
-            font-size: 25px;
-            font-weight: 800;
-            text-transform: uppercase;
-            background: #f1f5f9;
-            display: inline-block;
-            margin: 0 auto 12px auto;
-            padding: 6px 16px;
-            border-radius: 48px;
-            color: #0f172a;
-            letter-spacing: 1px;
-            border: 1.5px solid #0f172a;
-            max-width: 90%;
-            word-break: break-word;
             z-index: 2;
           }
           
@@ -301,13 +269,6 @@ export const renderTimetablesLabels = (
             display: flex;
             flex-direction: column;
             justify-content: center;
-          }
-          .box-label {
-            font-size: 50px;
-            font-weight: 800;
-            color: #64748b;
-            letter-spacing: 2px;
-            margin-bottom: 2px;
           }
           .box-value {
             font-size: 50px;

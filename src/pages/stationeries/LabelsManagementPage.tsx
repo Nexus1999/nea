@@ -136,8 +136,7 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
       ];
     case "PSLE":
-    case "SSNA":
-    case "SFNA":
+    case "SSNA", "SFNA":
       return [
         { id: "district_stationeries", name: "Stationeries", icon: Package, color: "text-blue-600", bgColor: "bg-blue-50" },
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
@@ -470,8 +469,7 @@ const LabelsManagementPage: React.FC = () => {
        return [
         { header: "Region", accessor: "region", width: "w-[15%]" },
         { header: "District", accessor: "district", width: "w-[15%]" },
-        { header: "Timetables", accessor: "item", width: "w-[15%]" },
-        { header: "Quantity", accessor: "quantity", width: "w-[15%]" },
+        { header: "Timetables", accessor: "quantity", width: "w-[15%]" },
         { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
         { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
        ];
