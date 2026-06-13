@@ -1050,16 +1050,25 @@ const StationerySummaryPage: React.FC = () => {
                               const allowedFields = getExamFields(stationery.examination_code);
                               return allowedFields.includes(field);
                             })
-                            .map(([field, value]) => (
-                              <div key={field} className="flex flex-col p-2 bg-white rounded-lg border border-slate-100/80">
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">
-                                  {getFieldLabels(field)}
-                                </span>
-                                <span className="text-sm font-black text-slate-800 mt-0.5">
-                                  {formatNumber(value)}
-                                </span>
-                              </div>
-                            ))}
+                            .map(([field, value]) => {
+                              const visual = getFieldVisual(field);
+                              const Icon = visual.icon;
+                              return (
+                                <div key={field} className="flex items-center gap-2.5 p-2 bg-white rounded-lg border border-slate-100/80">
+                                  <div className={cn("p-1.5 rounded-md", visual.bg, visual.color)}>
+                                    <Icon className="h-3.5 w-3.5" />
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">
+                                      {getFieldLabels(field)}
+                                    </span>
+                                    <span className="text-xs font-black text-slate-800 mt-0.5">
+                                      {formatNumber(value)}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                         </div>
                       </div>
                     ))}
