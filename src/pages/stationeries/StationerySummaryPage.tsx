@@ -25,7 +25,8 @@ import {
   ShieldAlert,
   Printer,
   Download,
-  ChevronRight
+  ChevronRight,
+  Calendar
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
@@ -74,7 +75,10 @@ interface SummaryCard {
 const CSEE_FTNA_SUBJECT_CODES = [
   '011','012','013','014','015','016','017','018','019','021','022','023','024','025','026',
   '031','032','033','034','035','036','041','042','050','051','052','061','062','071','072',
-  '073','074','080','081','082','083','087','088','090','091'
+  '073','074','080','081','082','083','087','088','090','091',
+  '043','060','065','201','204','205','241','242','243','396','397','398',
+  '403','404','405','406','412','463','464','465','481','483','485','801',
+  '804','805','806','824','827','841','842','843','861','862','881','882'
 ];
 const ACSEE_SUBJECT_CODES = [
   '111','112','113','114','115','116','118','121','122','123','125','126','131','132','133',
@@ -83,13 +87,37 @@ const ACSEE_SUBJECT_CODES = [
 
 // Compulsory subjects for TR/TWM logic (from supervisor report)
 const SECONDARY_COMPULSORY_SUBJECTS: Record<string, string[]> = {
-  FTNA: ['011'],
-  CSEE: ['011'],
-  ACSEE: ['111'],
+  FTNA: [
+    "011","012","013","014","015","016","017","018","019","021","022","023","024","025","026",
+    "031","032","033","034","035","036","041","042","050","051","052","061","062","071","072",
+    "073","074","080","081","082","083","087","088","090","091",
+    "043","060","065","201","204","205","241","242","243","396","397","398",
+    "403","404","405","406","412","463","464","465","481","483","485","801",
+    "804","805","806","824","827","841","842","843","861","862","881","882"
+  ],
+  CSEE: [
+    "011","012","013","014","015","016","017","018","019","021","022","023","024","025","026",
+    "031","032","033","034","035","036","041","042","050","051","052","061","062","071","072",
+    "073","074","080","081","082","083","087","088","090","091",
+    "043","060","065","201","204","205","241","242","243","396","397","398",
+    "403","404","405","406","412","463","464","465","481","483","485","801",
+    "804","805","806","824","827","841","842","843","861","862","881","882"
+  ],
+  ACSEE: [
+    "111", "112", "113", "114", "115", "116", "118", "121", "122", "123", "125", "126",
+    "131", "132", "133", "134", "136", "137", "141", "142", "151", "152", "153", "155", "161"
+  ],
 };
 
-// Double paper subjects (CSEE)
-const CSEE_DOUBLE_PAPER_SUBJECTS = ['033', '032', '031', '034', '017'];
+// Double paper subjects (CSEE & FTNA)
+const CSEE_DOUBLE_PAPER_SUBJECTS = [
+  "016", "017", "031", "032", "033", "034", "036", "051", "052"
+];
+const FTNA_DOUBLE_PAPER_SUBJECTS = [
+  "016", "017", "201", "204", "205", "398", "403", "404", "405", "406", 
+  "463", "464", "465", "481", "483", "485", "801", "804", "805", "806", 
+  "824", "827", "841", "842", "843", "861", "862", "881", "882"
+];
 
 // BKM weights for ACSEE
 const ACSEE_BKM_WEIGHTS: Record<string, number> = {
@@ -98,12 +126,21 @@ const ACSEE_BKM_WEIGHTS: Record<string, number> = {
 };
 
 // Subject-aware mapping for ICT/Arabic/Fine Arts
-const getSubjectCodeForCategory = (code: string, category: "ICT Covers" | "Arabic Booklets" | "Fine Arts Booklets"): string | null => {
-  if (category === "ICT Covers") return code === "ACSEE" ? "136" : "036";
-  if (category === "Arabic Booklets") return code === "ACSEE" ? "125" : "025";
+const getSubjectCodeForCategory = (code: string, category: "ICT Covers" | "Arabic Booklets" | "Fine Arts Booklets"): string | string[] | null => {
+  if (category === "ICT Covers") {
+    if (code === "ACSEE") return "136";
+    if (code === "CSEE") return "036";
+    if (code === "FTNA") return ["398", "841"];
+  }
+  if (category === "Arabic Booklets") {
+    if (code === "ACSEE") return "125";
+    if (code === "CSEE") return "025";
+    if (code === "FTNA") return "025";
+  }
   if (category === "Fine Arts Booklets") {
     if (code === "ACSEE") return "116";
-    if (code === "CSEE" || code === "FTNA") return "016";
+    if (code === "CSEE") return "016";
+    if (code === "FTNA") return "016";
   }
   return null;
 };
@@ -139,6 +176,8 @@ const getFieldVisual = (field: string) => {
       return { icon: Package, color: 'text-lime-600', bg: 'bg-lime-50/60', border: 'border-lime-100' };
     case 'fbm2':
       return { icon: Package, color: 'text-green-600', bg: 'bg-green-50/60', border: 'border-green-100' };
+    case 'timetables':
+      return { icon: Calendar, color: 'text-green-600', bg: 'bg-green-50/60', border: 'border-green-100' };
     default:
       return { icon: TrendingUp, color: 'text-slate-600', bg: 'bg-slate-50/60', border: 'border-slate-100' };
   }
@@ -163,14 +202,14 @@ const StationerySummaryPage: React.FC = () => {
       case 'CSEE':
         return [
           'normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets',
-          'bkm', 'tr', 'twm', 'brsheets', 'brbkm', 'arabicbooklets', 'ictcovers', 'finearts'
+          'bkm', 'tr', 'twm', 'brsheets', 'brbkm', 'arabicbooklets', 'ictcovers', 'finearts', 'timetables'
         ];
       case 'FTNA':
-        return ['bkm', 'ictcovers', 'finearts', 'tr', 'twm', 'brsheets', 'brbkm'];
+        return ['bkm', 'ictcovers', 'finearts', 'tr', 'twm', 'brsheets', 'brbkm', 'timetables'];
       case 'PSLE':
       case 'SSNA':
       case 'SFNA':
-        return ['fbm1', 'fbm2', 'tr', 'twm', 'bkm', 'brsheets', 'brbkm'];
+        return ['fbm1', 'fbm2', 'tr', 'twm', 'bkm', 'brsheets', 'brbkm', 'timetables'];
       default:
         return [];
     }
@@ -205,7 +244,8 @@ const StationerySummaryPage: React.FC = () => {
       'ictcovers': 'ICT Covers',
       'finearts': 'Fine Arts Booklets',
       'fbm1': 'FBM1 Envelopes',
-      'fbm2': 'FBM2 Envelopes'
+      'fbm2': 'FBM2 Envelopes',
+      'timetables': 'Timetables'
     };
     return labels[field] || field;
   };
@@ -264,6 +304,7 @@ const StationerySummaryPage: React.FC = () => {
       const lsnPct = centerMultipliers.loose_sheet_normal_percentage || 0;
       const lsgPct = centerMultipliers.loose_sheets_graph_percentage || 0;
       const brailleMultiplier = Number(centerMultipliers.braillesheets) > 0 ? Number(centerMultipliers.braillesheets) : 2; // default 2 if missing
+      const timetableMultiplier = Number(centerMultipliers.timetables) > 0 ? Number(centerMultipliers.timetables) : 1;
 
       const arabicPct = centerMultipliers.arabic_booklets_percentage || 0;
       const ictPct = centerMultipliers.ict_covers_percentage || 0;
@@ -309,12 +350,16 @@ const StationerySummaryPage: React.FC = () => {
           arabicbooklets?: number;
           ictcovers?: number;
           finearts?: number;
+          timetables?: number;
         }>();
 
         let regionTotalTRTWM = 0;
         let regionBaseArabicQty = 0;
         let regionBaseIctQty = 0;
         let regionBaseFineArtsQty = 0;
+        let regionBaseTotalBkm = 0;
+        let regionBaseTotalFBM1 = 0;
+        let regionBaseTotalFBM2 = 0;
 
         for (const school of (detailedData || [])) {
           const district = String(school.district || 'UNKNOWN');
@@ -341,11 +386,34 @@ const StationerySummaryPage: React.FC = () => {
           if (isPrimary) {
             const registered = Number(school.registered || 0);
             const subjects = Number(school.subjects || 0);
-            const streams = Math.ceil(registered / studentsPerStream);
-            totalWeightedStreamsForBKM = streams * subjects;
-            totalWeightedStreamsForFBM1 = Math.ceil(registered / 25) * subjects;
-            totalWeightedStreamsForFBM2 = Math.ceil(registered / 25) * subjects;
+            
+            let bkmStreams = 0;
+            if (registered > 0) {
+              const baseStreams = Math.floor(registered / studentsPerStream);
+              const remainder = registered % studentsPerStream;
+              if (baseStreams === 0) {
+                bkmStreams = 1;
+              } else {
+                bkmStreams = remainder >= 5 ? baseStreams + 1 : baseStreams;
+              }
+            }
+
+            let fbmStreams = 0;
+            if (registered > 0) {
+              const baseStreams = Math.floor(registered / 25);
+              const remainder = registered % 25;
+              if (baseStreams === 0) {
+                fbmStreams = 1;
+              } else {
+                fbmStreams = remainder >= 5 ? baseStreams + 1 : baseStreams;
+              }
+            }
+            
+            totalWeightedStreamsForBKM = bkmStreams * subjects;
+            totalWeightedStreamsForFBM1 = fbmStreams * subjects;
+            totalWeightedStreamsForFBM2 = fbmStreams * subjects;
           } else if (examCode === 'CSEE' || examCode === 'FTNA') {
+            const activeDoubleList = (examCode === 'CSEE') ? CSEE_DOUBLE_PAPER_SUBJECTS : FTNA_DOUBLE_PAPER_SUBJECTS;
             for (const subCode of CSEE_FTNA_SUBJECT_CODES) {
               const registered = Number(school[subCode] || 0);
               if (registered > 0) {
@@ -355,7 +423,7 @@ const StationerySummaryPage: React.FC = () => {
                   totalGraph += registered * sm.gMul;
                 }
                 let streams = Math.ceil(registered / studentsPerStream);
-                if (examCode === 'CSEE' && CSEE_DOUBLE_PAPER_SUBJECTS.includes(subCode)) {
+                if (activeDoubleList.includes(subCode)) {
                   streams *= 2;
                 }
                 totalWeightedStreamsForBKM += streams;
@@ -378,7 +446,9 @@ const StationerySummaryPage: React.FC = () => {
 
           // Final center computations
           const supervisors = maxRegisteredForTRTWM > 0 ? Math.ceil(maxRegisteredForTRTWM / 30) + 2 : 0;
-          const centerBkm = Math.ceil(totalWeightedStreamsForBKM * (1 + bkmPct / 100));
+          
+          // BKM calculation matching edge function
+          const centerBkm = Math.ceil(totalWeightedStreamsForBKM);
           const normalWithPct = nPct > 0 ? Math.ceil(totalNormal + totalNormal * (nPct / 100)) : Math.ceil(totalNormal);
           const graphWithPct = gPct > 0 ? Math.ceil(totalGraph + totalGraph * (gPct / 100)) : Math.ceil(totalGraph);
           const lsNorm = lsnPct > 0 ? Math.ceil((normalWithPct + graphWithPct) * (lsnPct / 100)) : 0;
@@ -394,29 +464,34 @@ const StationerySummaryPage: React.FC = () => {
                 const qtyArabic = Math.ceil(regArabic + regArabic * (arabicPct / 100));
                 regionBaseArabicQty += qtyArabic;
                 if (!districtAggregates.has(district)) {
-                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0 });
+                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0, timetables: 0 });
                 }
                 districtAggregates.get(district)!.arabicbooklets = (districtAggregates.get(district)!.arabicbooklets || 0) + qtyArabic;
               }
             }
             if (ictCode) {
-              const regIct = Number(school[ictCode] || 0);
+              let regIct = 0;
+              if (examCode === 'FTNA') {
+                regIct = Number(school["398"] || 0) + Number(school["841"] || 0);
+              } else {
+                regIct = Number(school[ictCode as string] || 0);
+              }
               if (regIct > 0) {
                 const qtyIct = Math.ceil(regIct + regIct * (ictPct / 100));
                 regionBaseIctQty += qtyIct;
                 if (!districtAggregates.has(district)) {
-                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0 });
+                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0, timetables: 0 });
                 }
                 districtAggregates.get(district)!.ictcovers = (districtAggregates.get(district)!.ictcovers || 0) + qtyIct;
               }
             }
             if (fineArtsCode) {
-              const regFine = Number(school[fineArtsCode] || 0);
+              const regFine = Number(school[fineArtsCode as string] || 0);
               if (regFine > 0) {
                 const qtyFine = Math.ceil(regFine + regFine * (fineArtsPct / 100));
                 regionBaseFineArtsQty += qtyFine;
                 if (!districtAggregates.has(district)) {
-                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0 });
+                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0, timetables: 0 });
                 }
                 districtAggregates.get(district)!.finearts = (districtAggregates.get(district)!.finearts || 0) + qtyFine;
               }
@@ -438,6 +513,7 @@ const StationerySummaryPage: React.FC = () => {
               arabicbooklets: districtAggregates.get(district)?.arabicbooklets || 0,
               ictcovers: districtAggregates.get(district)?.ictcovers || 0,
               finearts: districtAggregates.get(district)?.finearts || 0,
+              timetables: 0
             });
           }
 
@@ -454,33 +530,54 @@ const StationerySummaryPage: React.FC = () => {
             current.fbm2 = (current.fbm2 || 0) + centerFBM2;
           }
 
+          regionBaseTotalBkm += centerBkm;
+          regionBaseTotalFBM1 += centerFBM1;
+          regionBaseTotalFBM2 += centerFBM2;
           regionTotalTRTWM += supervisors * 2;
         }
 
-        // Apply 10% buffer to TR/TWM per district
+        // Apply buffers per district matching edge functions
         const finalDistrictData = Array.from(districtAggregates.values()).map(agg => {
           const tr_buffer = Math.ceil(agg.tr * 0.10);
           const twm_buffer = Math.ceil(agg.twm * 0.10);
-          return { ...agg, tr: agg.tr + tr_buffer, twm: agg.twm + twm_buffer };
+          const bkm_buffer = isPrimary ? Math.ceil(agg.bkm * 0.05) : 0;
+          const fbm1_buffer = isPrimary ? Math.ceil(agg.fbm1! * 0.10) : 0;
+          const fbm2_buffer = isPrimary ? Math.ceil(agg.fbm2! * 0.10) : 0;
+
+          // Timetables calculation: centerCount * multiplier + 5
+          const centerCount = detailedData.filter(school => school.district === agg.district).length;
+          const timetablesVal = centerCount * timetableMultiplier + 5;
+
+          return { 
+            ...agg, 
+            tr: agg.tr + tr_buffer, 
+            twm: agg.twm + twm_buffer,
+            bkm: agg.bkm + bkm_buffer,
+            fbm1: isPrimary ? agg.fbm1! + fbm1_buffer : 0,
+            fbm2: isPrimary ? agg.fbm2! + fbm2_buffer : 0,
+            timetables: timetablesVal
+          };
         });
 
         // Base region totals (non-braille)
-        let regionBaseTotalBkm = 0;
-        let regionBaseFBM1 = 0;
-        let regionBaseFBM2 = 0;
+        let regionBaseTotalBkmBuffered = 0;
+        let regionBaseFBM1Buffered = 0;
+        let regionBaseFBM2Buffered = 0;
         let regionBaseNormalBooklets = 0;
         let regionBaseGraphBooklets = 0;
         let regionBaseNormalLooseSheets = 0;
         let regionBaseGraphLooseSheets = 0;
+        let regionBaseTimetables = 0;
 
         finalDistrictData.forEach(d => {
-          regionBaseTotalBkm += d.bkm;
-          regionBaseFBM1 += d.fbm1 || 0;
-          regionBaseFBM2 += d.fbm2 || 0;
+          regionBaseTotalBkmBuffered += d.bkm;
+          regionBaseFBM1Buffered += d.fbm1 || 0;
+          regionBaseFBM2Buffered += d.fbm2 || 0;
           regionBaseNormalBooklets += d.normalbooklets;
           regionBaseGraphBooklets += d.graphbooklets;
           regionBaseNormalLooseSheets += d.normalloosesheets;
           regionBaseGraphLooseSheets += d.graphloosesheets;
+          regionBaseTimetables += d.timetables || 0;
         });
 
         // Region-level REO extras for non-braille and subject-aware categories
@@ -493,10 +590,17 @@ const StationerySummaryPage: React.FC = () => {
         const reoExtraNormalLooseSheets = Math.ceil(regionBaseNormalLooseSheets * (Number(reoDeoExtra?.normalloosesheets || 0) / 100));
         const reoExtraGraphLooseSheets = Math.ceil(regionBaseGraphLooseSheets * (Number(reoDeoExtra?.graphloosesheets || 0) / 100));
 
+        // FBM extras (primary only)
+        const reoExtraFBM1 = isPrimary ? Math.ceil(regionBaseTotalFBM1 * (Number(reoDeoExtra?.fbm1 || 0) / 100)) : 0;
+        const reoExtraFBM2 = isPrimary ? Math.ceil(regionBaseTotalFBM2 * (Number(reoDeoExtra?.fbm2 || 0) / 100)) : 0;
+
         // Subject-aware NECTA EXTRAs (Arabic/ICT/Fine Arts)
         const extraArabicQty = Math.ceil(regionBaseArabicQty * extraArabicPct);
         const extraIctQty = Math.ceil(regionBaseIctQty * extraIctPct);
         const extraFineArtsQty = Math.ceil(regionBaseFineArtsQty * extraFineArtsPct);
+
+        // Timetables NECTA EXTRA constant
+        const nectaExtraTimetablesConstant = 4;
 
         // Braille special needs (from special needs tables)
         const brailleTable = isPrimary ? 'primarymastersummary_specialneeds' : 'secondarymastersummaries_specialneeds';
@@ -524,17 +628,16 @@ const StationerySummaryPage: React.FC = () => {
 
           if (isPrimary) {
             const registered = Number(r.registered || 0);
-            const subjectsString = String(r.subjects || '');
-            const numSubjects = subjectsString ? subjectsString.split(',').filter(s => s.trim()).length : 1;
+            const numSubjects = Number(r.subjects || 6);
             const baseBrSheets = Math.ceil(registered * numSubjects * brailleMultiplier);
             brSheets = Math.ceil(baseBrSheets * 1.1);
-            bkm = Math.ceil((registered * brailleMultiplier) / 25);
+            bkm = Math.ceil((registered * brailleMultiplier) / 25) * numSubjects;
           } else {
             const relevantCodes = (examCode === 'CSEE' || examCode === 'FTNA') ? CSEE_FTNA_SUBJECT_CODES : ACSEE_SUBJECT_CODES;
             let totalBrSheetsBase = 0;
             let totalBkmBase = 0;
             for (const key of relevantCodes) {
-              const registered = Number((r as any)[key] || 0);
+              const registered = Number(r[key] || 0);
               if (registered > 0) {
                 const subBrSheets = Math.ceil(registered * brailleMultiplier);
                 const subBkm = Math.ceil(subBrSheets / 25);
@@ -567,7 +670,7 @@ const StationerySummaryPage: React.FC = () => {
         // TR/TWM/BKM
         regionTotals.tr = baseRegionSupervisors + reoExtraTR;
         regionTotals.twm = baseRegionSupervisors + reoExtraTWM;
-        regionTotals.bkm = regionBaseTotalBkm + reoExtraBKM;
+        regionTotals.bkm = regionBaseTotalBkmBuffered + reoExtraBKM;
 
         // Booklets & Loose sheets
         if (!isPrimary) {
@@ -579,10 +682,8 @@ const StationerySummaryPage: React.FC = () => {
 
         // FBM (primary only)
         if (isPrimary) {
-          const fbm1Pct = Number(reoDeoExtra?.fbm1 || 0) / 100;
-          const fbm2Pct = Number(reoDeoExtra?.fbm2 || 0) / 100;
-          regionTotals.fbm1 = regionBaseFBM1 + Math.ceil(regionBaseFBM1 * fbm1Pct);
-          regionTotals.fbm2 = regionBaseFBM2 + Math.ceil(regionBaseFBM2 * fbm2Pct);
+          regionTotals.fbm1 = regionBaseFBM1Buffered + reoExtraFBM1;
+          regionTotals.fbm2 = regionBaseFBM2Buffered + reoExtraFBM2;
         }
 
         // Subject-aware totals (Arabic / ICT / Fine Arts)
@@ -595,6 +696,9 @@ const StationerySummaryPage: React.FC = () => {
         // Braille totals (include region NECTA EXTRA)
         regionTotals.brsheets = regionBaseBrailleSheets + extraBrSheets;
         regionTotals.brbkm = regionBaseBrailleBkm + extraBkmBraille;
+
+        // Timetables totals
+        regionTotals.timetables = regionBaseTimetables + nectaExtraTimetablesConstant;
 
         // District results with base values (extras applied region-level only)
         const districtResults: DistrictData[] = finalDistrictData.map(d => {
@@ -622,7 +726,34 @@ const StationerySummaryPage: React.FC = () => {
           totals.brsheets = brAgg ? brAgg.brsheets : 0;
           totals.brbkm = brAgg ? brAgg.brbkm : 0;
 
+          totals.timetables = d.timetables || 0;
+
           return { districtName: d.district, totals };
+        });
+
+        // Append NECTA EXTRA as a district card in the breakdown
+        const nectaExtraTotals: Record<string, number> = {};
+        fields.forEach(f => { nectaExtraTotals[f] = 0; });
+
+        nectaExtraTotals.tr = reoExtraTR;
+        nectaExtraTotals.twm = reoExtraTWM;
+        nectaExtraTotals.bkm = reoExtraBKM;
+        nectaExtraTotals.normalbooklets = reoExtraNormalBooklets;
+        nectaExtraTotals.graphbooklets = reoExtraGraphBooklets;
+        nectaExtraTotals.normalloosesheets = reoExtraNormalLooseSheets;
+        nectaExtraTotals.graphloosesheets = reoExtraGraphLooseSheets;
+        nectaExtraTotals.fbm1 = reoExtraFBM1;
+        nectaExtraTotals.fbm2 = reoExtraFBM2;
+        nectaExtraTotals.arabicbooklets = extraArabicQty;
+        nectaExtraTotals.ictcovers = extraIctQty;
+        nectaExtraTotals.finearts = extraFineArtsQty;
+        nectaExtraTotals.brsheets = extraBrSheets;
+        nectaExtraTotals.brbkm = extraBkmBraille;
+        nectaExtraTotals.timetables = nectaExtraTimetablesConstant;
+
+        districtResults.push({
+          districtName: "NECTA EXTRA",
+          totals: nectaExtraTotals
         });
 
         // Update grand totals
@@ -925,7 +1056,7 @@ const StationerySummaryPage: React.FC = () => {
                         <div className="text-left">
                           <span className="font-bold text-slate-800 text-sm sm:text-base">{region.regionName}</span>
                           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-                            {region.districts.length} districts allocated
+                            {region.districts.filter(d => d.districtName !== "NECTA EXTRA").length} districts allocated
                           </div>
                         </div>
                       </div>
@@ -972,9 +1103,16 @@ const StationerySummaryPage: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {region.districts.map((district, districtIndex) => (
-                          <div key={districtIndex} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                          <div 
+                            key={districtIndex} 
+                            className={`rounded-2xl border p-4 shadow-sm space-y-3 ${
+                              district.districtName === "NECTA EXTRA" 
+                                ? "border-blue-200 bg-blue-50/30" 
+                                : "border-slate-200 bg-white"
+                            }`}
+                          >
                             <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                              <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                              <div className={`h-2 w-2 rounded-full ${district.districtName === "NECTA EXTRA" ? "bg-blue-500" : "bg-emerald-500"}`} />
                               <h5 className="font-bold text-slate-800 text-xs truncate uppercase tracking-wider">{district.districtName}</h5>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
