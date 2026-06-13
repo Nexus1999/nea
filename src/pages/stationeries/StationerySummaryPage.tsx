@@ -235,16 +235,16 @@ const StationerySummaryPage: React.FC = () => {
       'graphbooklets': 'Graph Booklets',
       'normalloosesheets': 'Normal Loose Sheets',
       'graphloosesheets': 'Graph Loose Sheets',
-      'bkm': 'BKM Envelopes',
-      'tr': 'TR (Supervisor)',
-      'twm': 'TWM (Invigilator)',
+      'bkm': 'BKM',
+      'tr': 'TR',
+      'twm': 'TWM',
       'brsheets': 'Braille Sheets',
       'brbkm': 'Braille BKM',
       'arabicbooklets': 'Arabic Booklets',
       'ictcovers': 'ICT Covers',
       'finearts': 'Fine Arts Booklets',
-      'fbm1': 'FBM1 Envelopes',
-      'fbm2': 'FBM2 Envelopes',
+      'fbm1': 'FBM1',
+      'fbm2': 'FBM2',
       'timetables': 'Timetables'
     };
     return labels[field] || field;
@@ -1073,9 +1073,8 @@ const StationerySummaryPage: React.FC = () => {
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         {Object.entries(region.totals)
                           .filter(([field]) => {
-                            const hideFields = ['normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets'];
-                            const primaryExams = ['PSLE', 'SSNA', 'SFNA', 'FTNA'];
-                            return !(primaryExams.includes(stationery.examination_code) && hideFields.includes(field));
+                            const allowedFields = getExamFields(stationery.examination_code);
+                            return allowedFields.includes(field);
                           })
                           .map(([field, value]) => {
                             const visual = getFieldVisual(field);
@@ -1118,9 +1117,8 @@ const StationerySummaryPage: React.FC = () => {
                             <div className="grid grid-cols-2 gap-2">
                               {Object.entries(district.totals)
                                 .filter(([field]) => {
-                                  const hideFields = ['normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets'];
-                                  const primaryExams = ['PSLE', 'SSNA', 'SFNA', 'FTNA'];
-                                  return !(primaryExams.includes(stationery.examination_code) && hideFields.includes(field));
+                                  const allowedFields = getExamFields(stationery.examination_code);
+                                  return allowedFields.includes(field);
                                 })
                                 .map(([field, value]) => {
                                   const visual = getFieldVisual(field);
