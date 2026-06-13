@@ -22,6 +22,7 @@ import {
   X,
   Maximize2,
   Minimize2,
+  Calendar,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ import { renderFineArtsBookletsLabels } from "@/utils/labels/fineArtsBooklets";
 import { renderBrailleStationeriesLabels } from "@/utils/labels/brailleStationeries";
 import { renderBkmLabels } from "@/utils/labels/bkm";
 import { renderKitbagsLabels } from "@/utils/labels/kitbags";
+import { renderTimetablesLabels } from "@/utils/labels/timetables";
 
 // ---------- Helper Functions ----------
 function abbreviateSchoolName(name: string): string {
@@ -122,6 +124,7 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
         { id: "bkm", name: "BKM", icon: Boxes, color: "text-teal-600", bgColor: "bg-teal-50" },
         { id: "kitbags", name: "Kitbags", icon: Briefcase, color: "text-indigo-600", bgColor: "bg-indigo-50" },
+        { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
       ];
     case "FTNA":
       return [
@@ -130,6 +133,7 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "fine_arts_booklets", name: "Fine Arts Booklets", icon: Palette, color: "text-orange-600", bgColor: "bg-orange-50" },
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
         { id: "bkm", name: "BKM", icon: Boxes, color: "text-teal-600", bgColor: "bg-teal-50" },
+        { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
       ];
     case "PSLE":
     case "SSNA":
@@ -138,6 +142,7 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "district_stationeries", name: "Stationeries", icon: Package, color: "text-blue-600", bgColor: "bg-blue-50" },
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
         { id: "kitbags", name: "Kitbags", icon: Briefcase, color: "text-indigo-600", bgColor: "bg-indigo-50" },
+        { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
       ];
     default:
       return [];
@@ -154,6 +159,7 @@ const categoryQueryMap: Record<string, string[]> = {
   braille_stationeries: ["Braille Stationeries", "braille_stationeries", "braille-stationeries"],
   kitbags: ["kitbags", "Kitbags"],
   bkm: ["bkm", "BKM"],
+  timetables: ["timetables", "Timetables"],
 };
 
 // ---------- React Query Hook for Labels ----------
@@ -277,9 +283,9 @@ const LabelsManagementPage: React.FC = () => {
       const term = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(
         (label) =>
-          label.center_name.toLowerCase().includes(term) ||
-          label.center_number.toLowerCase().includes(term) ||
-          label.district.toLowerCase().includes(term)
+          (label.center_name && label.center_name.toLowerCase().includes(term)) ||
+          (label.center_number && label.center_number.toLowerCase().includes(term)) ||
+          (label.district && label.district.toLowerCase().includes(term))
       );
     }
 
@@ -460,6 +466,16 @@ const LabelsManagementPage: React.FC = () => {
         { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
       ];
     }
+    if (selectedCategoryId === "timetables") {
+       return [
+        { header: "Region", accessor: "region", width: "w-[15%]" },
+        { header: "District", accessor: "district", width: "w-[15%]" },
+        { header: "Timetables", accessor: "item", width: "w-[15%]" },
+        { header: "Quantity", accessor: "quantity", width: "w-[15%]" },
+        { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
+        { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
+       ];
+    }
 
     return [
       { header: "Region", accessor: "region", width: "w-[12%]" },
@@ -514,6 +530,9 @@ const LabelsManagementPage: React.FC = () => {
         break;
       case "kitbags":
         htmlContent = renderKitbagsLabels(labelsToProcess, examCode, examYear);
+        break;
+      case "timetables":
+        htmlContent = renderTimetablesLabels(labelsToProcess, examCode, examYear);
         break;
       default:
         showError("Printing is not supported for this category yet.");
@@ -574,6 +593,8 @@ const LabelsManagementPage: React.FC = () => {
         invokeFunction = "pack-kitbag-labels";
       } else if (selectedCategoryId === "bkm") {
         invokeFunction = "pack-bkm-into-center_envelopes";
+      } else if (selectedCategoryId === "timetables") {
+        invokeFunction = "pack-timetables-into-envelopes";
       }
 
       if (selectedCategoryId === "bkm") {
@@ -895,7 +916,9 @@ const LabelsManagementPage: React.FC = () => {
                         {col.render ? (
                           col.render(label)
                         ) : col.accessor === "center_number" ? (
-                          <span className="font-bold text-slate-700">{label.center_number}</span>
+                          <span className="font-bold text-slate-700">{label.center_number || "-"}</span>
+                        ) : col.accessor === "center_name" ? (
+                          <span className="text-slate-600">{label.center_name ? abbreviateSchoolName(label.center_name) : "-"}</span>
                         ) : col.accessor === "region" || col.accessor === "district" ? (
                           <span className="text-slate-500">{label[col.accessor as keyof LabelItem]}</span>
                         ) : (
