@@ -1,18 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { 
   ArrowLeft, 
   FileText, 
-  Loader2, 
   Package, 
   Calculator, 
   TrendingUp, 
-  Eye, 
   Globe, 
   MapPin, 
   BookOpen, 
@@ -22,11 +20,11 @@ import {
   Cpu, 
   Palette,
   Sparkles,
-  ShieldAlert,
-  Printer,
-  Download,
-  ChevronRight,
-  Calendar
+  Calendar,
+  Search,
+  CheckCircle2,
+  Info,
+  ChevronRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
@@ -48,7 +46,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Input } from "@/components/ui/input";
 import Spinner from "@/components/Spinner";
+import { cn } from "@/lib/utils";
 
 interface RegionData {
   regionName: string;
@@ -61,14 +61,12 @@ interface DistrictData {
   totals: Record<string, number>;
 }
 
-interface SummaryCard {
-  field: string;
+interface SummaryCardProps {
   title: string;
   value: number;
-  icon: React.ReactNode;
-  color: string;
-  bgColor: string;
-  borderColor: string;
+  icon: React.ElementType;
+  colorClass: string;
+  gradient: string;
 }
 
 // Subject code lists for braille calculations in secondary exams
@@ -149,38 +147,68 @@ const getSubjectCodeForCategory = (code: string, category: "ICT Covers" | "Arabi
 const getFieldVisual = (field: string) => {
   switch (field) {
     case 'normalbooklets':
-      return { icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50/60', border: 'border-blue-100' };
+      return { icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50/60', border: 'border-blue-100', gradient: 'from-blue-400 to-indigo-500' };
     case 'graphbooklets':
-      return { icon: BookOpen, color: 'text-indigo-600', bg: 'bg-indigo-50/60', border: 'border-indigo-100' };
+      return { icon: BookOpen, color: 'text-indigo-600', bg: 'bg-indigo-50/60', border: 'border-indigo-100', gradient: 'from-indigo-400 to-purple-500' };
     case 'normalloosesheets':
-      return { icon: Layers, color: 'text-amber-600', bg: 'bg-amber-50/60', border: 'border-amber-100' };
+      return { icon: Layers, color: 'text-amber-600', bg: 'bg-amber-50/60', border: 'border-amber-100', gradient: 'from-amber-400 to-orange-500' };
     case 'graphloosesheets':
-      return { icon: Layers, color: 'text-violet-600', bg: 'bg-violet-50/60', border: 'border-violet-100' };
+      return { icon: Layers, color: 'text-violet-600', bg: 'bg-violet-50/60', border: 'border-violet-100', gradient: 'from-violet-400 to-fuchsia-500' };
     case 'bkm':
-      return { icon: Boxes, color: 'text-emerald-600', bg: 'bg-emerald-50/60', border: 'border-emerald-100' };
+      return { icon: Boxes, color: 'text-emerald-600', bg: 'bg-emerald-50/60', border: 'border-emerald-100', gradient: 'from-emerald-400 to-teal-500' };
     case 'tr':
-      return { icon: ClipboardList, color: 'text-rose-600', bg: 'bg-rose-50/60', border: 'border-rose-100' };
+      return { icon: ClipboardList, color: 'text-rose-600', bg: 'bg-rose-50/60', border: 'border-rose-100', gradient: 'from-rose-400 to-red-500' };
     case 'twm':
-      return { icon: ClipboardList, color: 'text-pink-600', bg: 'bg-pink-50/60', border: 'border-pink-100' };
+      return { icon: ClipboardList, color: 'text-pink-600', bg: 'bg-pink-50/60', border: 'border-pink-100', gradient: 'from-pink-400 to-rose-500' };
     case 'brsheets':
-      return { icon: FileText, color: 'text-purple-700', bg: 'bg-purple-50/60', border: 'border-purple-100' };
+      return { icon: FileText, color: 'text-purple-700', bg: 'bg-purple-50/60', border: 'border-purple-100', gradient: 'from-purple-400 to-indigo-600' };
     case 'brbkm':
-      return { icon: Boxes, color: 'text-fuchsia-600', bg: 'bg-fuchsia-50/60', border: 'border-fuchsia-100' };
+      return { icon: Boxes, color: 'text-fuchsia-600', bg: 'bg-fuchsia-50/60', border: 'border-fuchsia-100', gradient: 'from-fuchsia-400 to-pink-500' };
     case 'arabicbooklets':
-      return { icon: BookOpen, color: 'text-teal-600', bg: 'bg-teal-50/60', border: 'border-teal-100' };
+      return { icon: BookOpen, color: 'text-teal-600', bg: 'bg-teal-50/60', border: 'border-teal-100', gradient: 'from-teal-400 to-emerald-500' };
     case 'ictcovers':
-      return { icon: Cpu, color: 'text-cyan-600', bg: 'bg-cyan-50/60', border: 'border-cyan-100' };
+      return { icon: Cpu, color: 'text-cyan-600', bg: 'bg-cyan-50/60', border: 'border-cyan-100', gradient: 'from-cyan-400 to-blue-500' };
     case 'finearts':
-      return { icon: Palette, color: 'text-orange-600', bg: 'bg-orange-50/60', border: 'border-orange-100' };
+      return { icon: Palette, color: 'text-orange-600', bg: 'bg-orange-50/60', border: 'border-orange-100', gradient: 'from-orange-400 to-amber-500' };
     case 'fbm1':
-      return { icon: Package, color: 'text-lime-600', bg: 'bg-lime-50/60', border: 'border-lime-100' };
+      return { icon: Package, color: 'text-lime-600', bg: 'bg-lime-50/60', border: 'border-lime-100', gradient: 'from-lime-400 to-green-500' };
     case 'fbm2':
-      return { icon: Package, color: 'text-green-600', bg: 'bg-green-50/60', border: 'border-green-100' };
+      return { icon: Package, color: 'text-green-600', bg: 'bg-green-50/60', border: 'border-green-100', gradient: 'from-green-400 to-emerald-500' };
     case 'timetables':
-      return { icon: Calendar, color: 'text-green-600', bg: 'bg-green-50/60', border: 'border-green-100' };
+      return { icon: Calendar, color: 'text-sky-600', bg: 'bg-sky-50/60', border: 'border-sky-100', gradient: 'from-sky-400 to-blue-500' };
     default:
-      return { icon: TrendingUp, color: 'text-slate-600', bg: 'bg-slate-50/60', border: 'border-slate-100' };
+      return { icon: TrendingUp, color: 'text-slate-600', bg: 'bg-slate-50/60', border: 'border-slate-100', gradient: 'from-slate-400 to-slate-600' };
   }
+};
+
+const formatNumber = (num: number) => {
+  return new Intl.NumberFormat('en-US').format(num);
+};
+
+const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, icon: Icon, colorClass, gradient }) => {
+  return (
+    <Card className="relative overflow-hidden border-none shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group bg-white">
+      <div className={`absolute inset-0 opacity-10 bg-gradient-to-br ${gradient}`} />
+      
+      <CardContent className="p-6 relative z-10">
+        <div className="flex justify-between items-center mb-4">
+          <div className="p-3 rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+            <Icon className={`h-6 w-6 ${colorClass}`} />
+          </div>
+          <Badge className={cn("bg-white border-current font-bold text-[10px]", colorClass)}>
+            TOTAL
+          </Badge>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider truncate">{title}</p>
+          <h3 className="text-3xl font-black tracking-tight text-slate-900">
+            {formatNumber(value)}
+          </h3>
+        </div>
+      </CardContent>
+    </Card>
+  );
 };
 
 const StationerySummaryPage: React.FC = () => {
@@ -194,7 +222,8 @@ const StationerySummaryPage: React.FC = () => {
   const [centerMultipliers, setCenterMultipliers] = useState<StationeryCenterMultiplier | null>(null);
   const [subjectMultipliers, setSubjectMultipliers] = useState<StationeryMultiplier[]>([]);
   const [regionData, setRegionData] = useState<RegionData[]>([]);
-  const [summaryCards, setSummaryCards] = useState<SummaryCard[]>([]);
+  const [summaryCards, setSummaryCards] = useState<SummaryCardProps[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const getExamFields = (examCode: string) => {
     switch (examCode) {
@@ -213,20 +242,6 @@ const StationerySummaryPage: React.FC = () => {
       default:
         return [];
     }
-  };
-
-  // Group fields into logical categories for a beautiful, structured layout
-  const getFieldGroup = (field: string): 'core' | 'subject' | 'special' | 'logistics' => {
-    if (['normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets', 'bkm', 'fbm1', 'fbm2'].includes(field)) {
-      return 'core';
-    }
-    if (['arabicbooklets', 'ictcovers', 'finearts'].includes(field)) {
-      return 'subject';
-    }
-    if (['brsheets', 'brbkm'].includes(field)) {
-      return 'special';
-    }
-    return 'logistics';
   };
 
   const getFieldLabels = (field: string): string => {
@@ -779,16 +794,14 @@ const StationerySummaryPage: React.FC = () => {
       const sortedRegions = [...regionResults].sort((a, b) => a.regionName.localeCompare(b.regionName));
       setRegionData(sortedRegions);
 
-      const cards: SummaryCard[] = fields.map((field) => {
+      const cards: SummaryCardProps[] = fields.map((field) => {
         const visual = getFieldVisual(field);
         return {
-          field,
           title: getFieldLabels(field),
           value: grandTotals[field],
-          icon: React.createElement(visual.icon, { className: `h-5 w-5 ${visual.color}` }),
-          color: visual.color,
-          bgColor: visual.bg,
-          borderColor: visual.border
+          icon: visual.icon,
+          colorClass: visual.color,
+          gradient: visual.gradient
         };
       });
       setSummaryCards(cards);
@@ -799,10 +812,6 @@ const StationerySummaryPage: React.FC = () => {
       setCalculating(false);
     }
   };
-
-  useEffect(() => {
-    document.title = "Stationery Summary | NEAS";
-  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -843,10 +852,18 @@ const StationerySummaryPage: React.FC = () => {
     }
   }, [stationery, centerMultipliers, reoDeoExtra]);
 
-  if (loading) {
+  const filteredRegions = useMemo(() => {
+    if (!searchQuery.trim()) return regionData;
+    return regionData.filter(r => r.regionName.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [regionData, searchQuery]);
+
+  if (loading || calculating) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner label="Loading stationery summary..." size="lg" />
+      <div className="h-screen w-full flex flex-col items-center justify-center gap-6 bg-slate-50">
+        <Spinner size="lg" />
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-bold text-slate-800">Syncing Stationery Summary...</h2>
+        </div>
       </div>
     );
   }
@@ -854,9 +871,6 @@ const StationerySummaryPage: React.FC = () => {
   if (!stationery) {
     return (
       <Card className="w-full max-w-4xl mx-auto mt-8 border-slate-200 shadow-xl rounded-2xl">
-        <CardHeader className="border-b bg-slate-50/50">
-          <CardTitle className="text-2xl font-bold text-slate-800">Stationery Summary</CardTitle>
-        </CardHeader>
         <CardContent className="p-6">
           <p className="text-center text-slate-500">No stationery entry found for ID: {stationeryId}.</p>
           <div className="text-center mt-6">
@@ -869,285 +883,152 @@ const StationerySummaryPage: React.FC = () => {
     );
   }
 
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('en-US').format(num);
-  };
-
-  // Group summary cards for beautiful sectioning
-  const coreCards = summaryCards.filter(c => getFieldGroup(c.field) === 'core');
-  const subjectCards = summaryCards.filter(c => getFieldGroup(c.field) === 'subject');
-  const specialCards = summaryCards.filter(c => getFieldGroup(c.field) === 'special');
-  const logisticsCards = summaryCards.filter(c => getFieldGroup(c.field) === 'logistics');
-
   return (
-    <div className="container mx-auto py-6 px-4 max-w-7xl space-y-8">
-      {/* Hero Header Section */}
-      <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-6 sm:p-8 text-white shadow-2xl">
-        <div className="absolute top-0 right-0 -mt-4 -mr-4 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold uppercase tracking-wider px-3 py-1 rounded-full text-[10px]">
-                {stationery.examination_code}
-              </Badge>
-              <Badge variant="outline" className="border-white/20 text-white/80 font-semibold px-3 py-1 rounded-full text-[10px]">
-                Year {stationery.examination_year}
-              </Badge>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-              Stationery Summary Dashboard
-            </h1>
-            <p className="text-slate-300 text-sm max-w-2xl font-medium leading-relaxed">
-              Comprehensive distribution and allocation parameters for {stationery.examination_name}. Grouped and calculated dynamically based on center multipliers and REO/DEO extra settings.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-6 space-y-10 max-w-[1600px] mx-auto pb-32">
+      {/* Header Section */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
             <Button 
-              variant="outline" 
+              variant="ghost" 
+              size="sm" 
               onClick={() => navigate('/dashboard/stationeries')} 
-              className="rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white h-11 font-bold text-xs uppercase tracking-wider"
+              className="h-8 px-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
             >
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
             </Button>
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 py-1 px-3 rounded-full">
+              <Info className="h-3 w-3 mr-2" /> {stationery.examination_code} {stationery.examination_year}
+            </Badge>
           </div>
+          <h4 className="text-4xl font-black text-slate-900 tracking-tight">Stationery Summary</h4>
+        </div>
+        
+        <div className="relative w-full lg:w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Search regions..." 
+            className="pl-10 h-12 bg-white border-slate-200 shadow-sm rounded-xl focus:ring-2 focus:ring-blue-500/20"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
       </div>
 
-      {/* Grouped Stationery Parameters */}
-      <div className="space-y-8">
-        {/* 1. Core Stationery Section */}
-        {coreCards.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-              <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                <Package className="h-4 w-4" />
-              </div>
-              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wider text-xs">Core Stationery Parameters</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {coreCards.map((card, index) => (
-                <Card key={index} className={`border ${card.borderColor} shadow-sm hover:shadow-md transition-all duration-200 ${card.bgColor} rounded-2xl overflow-hidden`}>
-                  <CardContent className="p-5 flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</p>
-                      <p className="text-2xl font-black text-slate-900">{formatNumber(card.value)}</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-100">
-                      {card.icon}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 2. Subject-Specific Section */}
-        {subjectCards.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-              <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
-                <BookOpen className="h-4 w-4" />
-              </div>
-              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wider text-xs">Subject-Specific Booklets</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subjectCards.map((card, index) => (
-                <Card key={index} className={`border ${card.borderColor} shadow-sm hover:shadow-md transition-all duration-200 ${card.bgColor} rounded-2xl overflow-hidden`}>
-                  <CardContent className="p-5 flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</p>
-                      <p className="text-2xl font-black text-slate-900">{formatNumber(card.value)}</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-100">
-                      {card.icon}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 3. Special Needs Section */}
-        {specialCards.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-              <div className="p-1.5 bg-fuchsia-50 text-fuchsia-600 rounded-lg">
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wider text-xs">Special Needs (Braille)</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {specialCards.map((card, index) => (
-                <Card key={index} className={`border ${card.borderColor} shadow-sm hover:shadow-md transition-all duration-200 ${card.bgColor} rounded-2xl overflow-hidden`}>
-                  <CardContent className="p-5 flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</p>
-                      <p className="text-2xl font-black text-slate-900">{formatNumber(card.value)}</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-100">
-                      {card.icon}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 4. Logistics & Supervision Section */}
-        {logisticsCards.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-              <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
-                <ClipboardList className="h-4 w-4" />
-              </div>
-              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wider text-xs">Logistics & Supervision</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {logisticsCards.map((card, index) => (
-                <Card key={index} className={`border ${card.borderColor} shadow-sm hover:shadow-md transition-all duration-200 ${card.bgColor} rounded-2xl overflow-hidden`}>
-                  <CardContent className="p-5 flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</p>
-                      <p className="text-2xl font-black text-slate-900">{formatNumber(card.value)}</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-100">
-                      {card.icon}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Summary Cards Grid */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {summaryCards.map((card, index) => (
+          <SummaryCard 
+            key={index}
+            title={card.title}
+            value={card.value}
+            icon={card.icon}
+            colorClass={card.colorClass}
+            gradient={card.gradient}
+          />
+        ))}
       </div>
 
-      {/* Region-wise Data Breakdown */}
-      <Card className="shadow-xl border-slate-200 rounded-3xl overflow-hidden bg-white">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-6">
+      {/* Regional Breakdown Section */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between border-b pb-4 border-slate-200">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+            <div className="bg-slate-900 p-2 rounded-lg text-white">
               <Globe className="h-5 w-5" />
             </div>
-            <div>
-              <CardTitle className="text-lg font-bold text-slate-900">Region-wise Breakdown</CardTitle>
-              <CardDescription className="text-xs text-slate-500 mt-0.5">
-                Detailed stationery totals and district-wise allocations for each region
-              </CardDescription>
-            </div>
+            <h2 className="text-2xl font-black text-slate-900">Regional Breakdown</h2>
           </div>
-        </CardHeader>
-        <CardContent className="p-6">
-          {calculating ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-3">
-              <Spinner label="Calculating region totals..." />
-            </div>
-          ) : (
-            <Accordion type="multiple" className="w-full space-y-4">
-              {regionData.map((region, index) => (
-                <AccordionItem 
-                  key={index} 
-                  value={`region-${index}`} 
-                  className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all duration-200"
-                >
-                  <AccordionTrigger className="hover:bg-slate-50/50 px-5 py-4 transition-colors">
-                    <div className="flex items-center justify-between w-full pr-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-sm">
-                          {index + 1}
-                        </div>
-                        <div className="text-left">
-                          <span className="font-bold text-slate-800 text-sm sm:text-base">{region.regionName}</span>
-                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-                            {region.districts.filter(d => d.districtName !== "NECTA EXTRA").length} districts allocated
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
+          <Badge className="bg-slate-100 text-slate-600 border-none px-4 py-1">
+            {filteredRegions.length} Regions tracked
+          </Badge>
+        </div>
 
-                  <AccordionContent className="px-6 py-5 bg-slate-50/30 border-t border-slate-100 space-y-6">
-                    {/* Region Totals */}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-slate-500" />
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Region Totals</h4>
+        <Accordion type="single" collapsible className="w-full space-y-4">
+          {filteredRegions.map((region, index) => (
+            <AccordionItem 
+              key={index} 
+              value={region.regionName} 
+              className="border-none bg-white rounded-2xl shadow-sm overflow-hidden group"
+            >
+              <AccordionTrigger className="hover:no-underline px-6 py-5 group-data-[state=open]:bg-slate-50 transition-colors">
+                <div className="flex flex-col md:flex-row md:items-center justify-between w-full text-left gap-4 pr-4">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-full flex items-center justify-center font-bold bg-blue-100 text-blue-700">
+                      {region.regionName.charAt(0)}
+                    </div>
+                    <div>
+                      <span className="font-extrabold text-lg text-slate-800">{region.regionName}</span>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> {region.districts.filter(d => d.districtName !== "NECTA EXTRA").length} Districts
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-8">
+                    {Object.entries(region.totals)
+                      .filter(([field]) => {
+                        const allowedFields = getExamFields(stationery.examination_code);
+                        // Show up to 2 key parameters in the header row for quick glance
+                        return allowedFields.slice(0, 2).includes(field);
+                      })
+                      .map(([field, value]) => (
+                        <div key={field} className="text-center">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">{getFieldLabels(field)}</p>
+                          <p className="font-black text-slate-800">
+                            {formatNumber(value)}
+                          </p>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </AccordionTrigger>
+              
+              <AccordionContent className="px-6 pb-6 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                  {region.districts.map((district, dIdx) => (
+                    <div 
+                      key={dIdx} 
+                      className={cn(
+                        "p-4 rounded-xl border transition-all cursor-default",
+                        district.districtName === "NECTA EXTRA" 
+                          ? "border-blue-100 bg-blue-50/30" 
+                          : "border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-md"
+                      )}
+                    >
+                      <div className="flex justify-between items-center mb-3 border-b pb-2">
+                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-tight truncate">
+                          {district.districtName}
+                        </h4>
+                        {district.districtName === "NECTA EXTRA" && (
+                          <Badge className="bg-blue-100 text-blue-700 border-none text-[9px] font-bold">EXTRA</Badge>
+                        )}
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {Object.entries(region.totals)
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(district.totals)
                           .filter(([field]) => {
                             const allowedFields = getExamFields(stationery.examination_code);
                             return allowedFields.includes(field);
                           })
-                          .map(([field, value]) => {
-                            const visual = getFieldVisual(field);
-                            const IconComp = visual.icon;
-                            return (
-                              <div key={field} className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className={`p-1 rounded-lg ${visual.bg} ${visual.color}`}>
-                                    <IconComp className="h-3.5 w-3.5" />
-                                  </div>
-                                  <span className="text-xs font-semibold text-slate-600 truncate">{getFieldLabels(field)}</span>
-                                </div>
-                                <span className="font-bold text-slate-900 text-sm pl-2">{formatNumber(value)}</span>
-                              </div>
-                            );                     
-                          })}
+                          .map(([field, value]) => (
+                            <div key={field} className="flex flex-col p-2 bg-white rounded-lg border border-slate-100/80">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">
+                                {getFieldLabels(field)}
+                              </span>
+                              <span className="text-sm font-black text-slate-800 mt-0.5">
+                                {formatNumber(value)}
+                              </span>
+                            </div>
+                          ))}
                       </div>
                     </div>
-
-                    {/* District-wise Breakdown */}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-slate-500" />
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">District-wise Breakdown</h4>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {region.districts.map((district, districtIndex) => (
-                          <div 
-                            key={districtIndex} 
-                            className={`rounded-2xl border p-4 shadow-sm space-y-3 ${
-                              district.districtName === "NECTA EXTRA" 
-                                ? "border-blue-200 bg-blue-50/30" 
-                                : "border-slate-200 bg-white"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                              <div className={`h-2 w-2 rounded-full ${district.districtName === "NECTA EXTRA" ? "bg-blue-500" : "bg-emerald-500"}`} />
-                              <h5 className="font-bold text-slate-800 text-xs truncate uppercase tracking-wider">{district.districtName}</h5>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              {Object.entries(district.totals)
-                                .filter(([field]) => {
-                                  const allowedFields = getExamFields(stationery.examination_code);
-                                  return allowedFields.includes(field);
-                                })
-                                .map(([field, value]) => {
-                                  const visual = getFieldVisual(field);
-                                  return (
-                                    <div key={field} className="flex items-center justify-between text-[11px] p-2 bg-slate-50/50 rounded-lg border border-slate-100">
-                                      <span className="text-slate-500 font-medium truncate mr-1">{getFieldLabels(field)}</span>
-                                      <span className="font-bold text-slate-800">{formatNumber(value)}</span>
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          )}
-        </CardContent>
-      </Card>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </div>
     </div>
   );
 };
