@@ -4,7 +4,29 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, Loader2, Package, Calculator, TrendingUp, Eye, Globe, MapPin, BookOpen, Layers, Boxes, ClipboardList, Cpu, Palette } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { 
+  ArrowLeft, 
+  FileText, 
+  Loader2, 
+  Package, 
+  Calculator, 
+  TrendingUp, 
+  Eye, 
+  Globe, 
+  MapPin, 
+  BookOpen, 
+  Layers, 
+  Boxes, 
+  ClipboardList, 
+  Cpu, 
+  Palette,
+  Sparkles,
+  ShieldAlert,
+  Printer,
+  Download,
+  ChevronRight
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import {
@@ -25,7 +47,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
 import Spinner from "@/components/Spinner";
 
 interface RegionData {
@@ -40,11 +61,13 @@ interface DistrictData {
 }
 
 interface SummaryCard {
+  field: string;
   title: string;
   value: number;
   icon: React.ReactNode;
   color: string;
   bgColor: string;
+  borderColor: string;
 }
 
 // Subject code lists for braille calculations in secondary exams
@@ -85,39 +108,39 @@ const getSubjectCodeForCategory = (code: string, category: "ICT Covers" | "Arabi
   return null;
 };
 
-// ADD: helper to map field to icon and color classes
+// Helper to map field to icon and color classes
 const getFieldVisual = (field: string) => {
   switch (field) {
     case 'normalbooklets':
-      return { icon: BookOpen, color: 'text-sky-600', bg: 'bg-sky-50' };
+      return { icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50/60', border: 'border-blue-100' };
     case 'graphbooklets':
-      return { icon: BookOpen, color: 'text-indigo-600', bg: 'bg-indigo-50' };
+      return { icon: BookOpen, color: 'text-indigo-600', bg: 'bg-indigo-50/60', border: 'border-indigo-100' };
     case 'normalloosesheets':
-      return { icon: Layers, color: 'text-amber-600', bg: 'bg-amber-50' };
+      return { icon: Layers, color: 'text-amber-600', bg: 'bg-amber-50/60', border: 'border-amber-100' };
     case 'graphloosesheets':
-      return { icon: Layers, color: 'text-violet-600', bg: 'bg-violet-50' };
+      return { icon: Layers, color: 'text-violet-600', bg: 'bg-violet-50/60', border: 'border-violet-100' };
     case 'bkm':
-      return { icon: Boxes, color: 'text-emerald-600', bg: 'bg-emerald-50' };
+      return { icon: Boxes, color: 'text-emerald-600', bg: 'bg-emerald-50/60', border: 'border-emerald-100' };
     case 'tr':
-      return { icon: ClipboardList, color: 'text-rose-600', bg: 'bg-rose-50' };
+      return { icon: ClipboardList, color: 'text-rose-600', bg: 'bg-rose-50/60', border: 'border-rose-100' };
     case 'twm':
-      return { icon: ClipboardList, color: 'text-pink-600', bg: 'bg-pink-50' };
+      return { icon: ClipboardList, color: 'text-pink-600', bg: 'bg-pink-50/60', border: 'border-pink-100' };
     case 'brsheets':
-      return { icon: FileText, color: 'text-indigo-700', bg: 'bg-indigo-50' };
+      return { icon: FileText, color: 'text-purple-700', bg: 'bg-purple-50/60', border: 'border-purple-100' };
     case 'brbkm':
-      return { icon: Boxes, color: 'text-purple-600', bg: 'bg-purple-50' };
+      return { icon: Boxes, color: 'text-fuchsia-600', bg: 'bg-fuchsia-50/60', border: 'border-fuchsia-100' };
     case 'arabicbooklets':
-      return { icon: BookOpen, color: 'text-teal-600', bg: 'bg-teal-50' };
+      return { icon: BookOpen, color: 'text-teal-600', bg: 'bg-teal-50/60', border: 'border-teal-100' };
     case 'ictcovers':
-      return { icon: Cpu, color: 'text-blue-600', bg: 'bg-blue-50' };
+      return { icon: Cpu, color: 'text-cyan-600', bg: 'bg-cyan-50/60', border: 'border-cyan-100' };
     case 'finearts':
-      return { icon: Palette, color: 'text-orange-600', bg: 'bg-orange-50' };
+      return { icon: Palette, color: 'text-orange-600', bg: 'bg-orange-50/60', border: 'border-orange-100' };
     case 'fbm1':
-      return { icon: Package, color: 'text-lime-600', bg: 'bg-lime-50' };
+      return { icon: Package, color: 'text-lime-600', bg: 'bg-lime-50/60', border: 'border-lime-100' };
     case 'fbm2':
-      return { icon: Package, color: 'text-green-600', bg: 'bg-green-50' };
+      return { icon: Package, color: 'text-green-600', bg: 'bg-green-50/60', border: 'border-green-100' };
     default:
-      return { icon: TrendingUp, color: 'text-gray-700', bg: 'bg-gray-50' };
+      return { icon: TrendingUp, color: 'text-slate-600', bg: 'bg-slate-50/60', border: 'border-slate-100' };
   }
 };
 
@@ -153,22 +176,36 @@ const StationerySummaryPage: React.FC = () => {
     }
   };
 
+  // Group fields into logical categories for a beautiful, structured layout
+  const getFieldGroup = (field: string): 'core' | 'subject' | 'special' | 'logistics' => {
+    if (['normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets', 'bkm', 'fbm1', 'fbm2'].includes(field)) {
+      return 'core';
+    }
+    if (['arabicbooklets', 'ictcovers', 'finearts'].includes(field)) {
+      return 'subject';
+    }
+    if (['brsheets', 'brbkm'].includes(field)) {
+      return 'special';
+    }
+    return 'logistics';
+  };
+
   const getFieldLabels = (field: string): string => {
     const labels: Record<string, string> = {
       'normalbooklets': 'Normal Booklets',
       'graphbooklets': 'Graph Booklets',
       'normalloosesheets': 'Normal Loose Sheets',
       'graphloosesheets': 'Graph Loose Sheets',
-      'bkm': 'BKM',
-      'tr': 'TR',
-      'twm': 'TWM',
+      'bkm': 'BKM Envelopes',
+      'tr': 'TR (Supervisor)',
+      'twm': 'TWM (Invigilator)',
       'brsheets': 'Braille Sheets',
       'brbkm': 'Braille BKM',
       'arabicbooklets': 'Arabic Booklets',
       'ictcovers': 'ICT Covers',
       'finearts': 'Fine Arts Booklets',
-      'fbm1': 'FBM1',
-      'fbm2': 'FBM2'
+      'fbm1': 'FBM1 Envelopes',
+      'fbm2': 'FBM2 Envelopes'
     };
     return labels[field] || field;
   };
@@ -377,7 +414,6 @@ const StationerySummaryPage: React.FC = () => {
               const regFine = Number(school[fineArtsCode] || 0);
               if (regFine > 0) {
                 const qtyFine = Math.ceil(regFine + regFine * (fineArtsPct / 100));
-                // Fine Arts BKM exists in report, but summary shows qty only
                 regionBaseFineArtsQty += qtyFine;
                 if (!districtAggregates.has(district)) {
                   districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0 });
@@ -608,11 +644,13 @@ const StationerySummaryPage: React.FC = () => {
       const cards: SummaryCard[] = fields.map((field) => {
         const visual = getFieldVisual(field);
         return {
+          field,
           title: getFieldLabels(field),
           value: grandTotals[field],
-          icon: React.createElement(visual.icon, { className: `h-6 w-6 ${visual.color}` }),
+          icon: React.createElement(visual.icon, { className: `h-5 w-5 ${visual.color}` }),
           color: visual.color,
-          bgColor: visual.bg
+          bgColor: visual.bg,
+          borderColor: visual.border
         };
       });
       setSummaryCards(cards);
@@ -677,14 +715,14 @@ const StationerySummaryPage: React.FC = () => {
 
   if (!stationery) {
     return (
-      <Card className="w-full max-w-4xl mx-auto mt-8">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">Stationery Summary</CardTitle>
+      <Card className="w-full max-w-4xl mx-auto mt-8 border-slate-200 shadow-xl rounded-2xl">
+        <CardHeader className="border-b bg-slate-50/50">
+          <CardTitle className="text-2xl font-bold text-slate-800">Stationery Summary</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-center text-gray-500">No stationery entry found for ID: {stationeryId}.</p>
-          <div className="text-center mt-4">
-            <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')}>
+        <CardContent className="p-6">
+          <p className="text-center text-slate-500">No stationery entry found for ID: {stationeryId}.</p>
+          <div className="text-center mt-6">
+            <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')} className="rounded-xl">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Stationeries
             </Button>
           </div>
@@ -697,143 +735,264 @@ const StationerySummaryPage: React.FC = () => {
     return new Intl.NumberFormat('en-US').format(num);
   };
 
+  // Group summary cards for beautiful sectioning
+  const coreCards = summaryCards.filter(c => getFieldGroup(c.field) === 'core');
+  const subjectCards = summaryCards.filter(c => getFieldGroup(c.field) === 'subject');
+  const specialCards = summaryCards.filter(c => getFieldGroup(c.field) === 'special');
+  const logisticsCards = summaryCards.filter(c => getFieldGroup(c.field) === 'logistics');
+
   return (
-    <div className="container mx-auto py-4 px-4">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">
-            Stationery Summary
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {stationery.examination_code} - {stationery.examination_year}
-          </p>
+    <div className="container mx-auto py-6 px-4 max-w-7xl space-y-8">
+      {/* Hero Header Section */}
+      <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-6 sm:p-8 text-white shadow-2xl">
+        <div className="absolute top-0 right-0 -mt-4 -mr-4 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold uppercase tracking-wider px-3 py-1 rounded-full text-[10px]">
+                {stationery.examination_code}
+              </Badge>
+              <Badge variant="outline" className="border-white/20 text-white/80 font-semibold px-3 py-1 rounded-full text-[10px]">
+                Year {stationery.examination_year}
+              </Badge>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+              Stationery Summary Dashboard
+            </h1>
+            <p className="text-slate-300 text-sm max-w-2xl font-medium leading-relaxed">
+              Comprehensive distribution and allocation parameters for {stationery.examination_name}. Grouped and calculated dynamically based on center multipliers and REO/DEO extra settings.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/dashboard/stationeries')} 
+              className="rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white h-11 font-bold text-xs uppercase tracking-wider"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
+            </Button>
+          </div>
         </div>
-        <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Stationeries
-        </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-        {summaryCards.map((card, index) => (
-          <Card
-            key={index}
-            className={`border-0 shadow-md hover:shadow-lg transition-shadow ${card.bgColor}`}
-          >
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-white/70 flex items-center justify-center ring-1 ring-black/5">
-                    {card.icon}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                      {card.title}
-                    </p>
-                    <p className="text-2xl font-extrabold text-gray-900 mt-1">
-                      {formatNumber(card.value)}
-                    </p>
-                  </div>
-                </div>
+      {/* Grouped Stationery Parameters */}
+      <div className="space-y-8">
+        {/* 1. Core Stationery Section */}
+        {coreCards.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+              <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                <Package className="h-4 w-4" />
               </div>
-            </CardContent>
-          </Card>
-        ))}
+              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wider text-xs">Core Stationery Parameters</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {coreCards.map((card, index) => (
+                <Card key={index} className={`border ${card.borderColor} shadow-sm hover:shadow-md transition-all duration-200 ${card.bgColor} rounded-2xl overflow-hidden`}>
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</p>
+                      <p className="text-2xl font-black text-slate-900">{formatNumber(card.value)}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-100">
+                      {card.icon}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 2. Subject-Specific Section */}
+        {subjectCards.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+              <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
+                <BookOpen className="h-4 w-4" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wider text-xs">Subject-Specific Booklets</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {subjectCards.map((card, index) => (
+                <Card key={index} className={`border ${card.borderColor} shadow-sm hover:shadow-md transition-all duration-200 ${card.bgColor} rounded-2xl overflow-hidden`}>
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</p>
+                      <p className="text-2xl font-black text-slate-900">{formatNumber(card.value)}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-100">
+                      {card.icon}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 3. Special Needs Section */}
+        {specialCards.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+              <div className="p-1.5 bg-fuchsia-50 text-fuchsia-600 rounded-lg">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wider text-xs">Special Needs (Braille)</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {specialCards.map((card, index) => (
+                <Card key={index} className={`border ${card.borderColor} shadow-sm hover:shadow-md transition-all duration-200 ${card.bgColor} rounded-2xl overflow-hidden`}>
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</p>
+                      <p className="text-2xl font-black text-slate-900">{formatNumber(card.value)}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-100">
+                      {card.icon}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4. Logistics & Supervision Section */}
+        {logisticsCards.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+              <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
+                <ClipboardList className="h-4 w-4" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wider text-xs">Logistics & Supervision</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {logisticsCards.map((card, index) => (
+                <Card key={index} className={`border ${card.borderColor} shadow-sm hover:shadow-md transition-all duration-200 ${card.bgColor} rounded-2xl overflow-hidden`}>
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</p>
+                      <p className="text-2xl font-black text-slate-900">{formatNumber(card.value)}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-100">
+                      {card.icon}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Region-wise Data */}
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <Eye className="h-5 w-5 text-neas-green" /> Region-wise Breakdown
-          </CardTitle>
-          <CardDescription>
-            Detailed stationery totals for each region
-          </CardDescription>
+      {/* Region-wise Data Breakdown */}
+      <Card className="shadow-xl border-slate-200 rounded-3xl overflow-hidden bg-white">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+              <Globe className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-bold text-slate-900">Region-wise Breakdown</CardTitle>
+              <CardDescription className="text-xs text-slate-500 mt-0.5">
+                Detailed stationery totals and district-wise allocations for each region
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           {calculating ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex flex-col items-center justify-center py-12 space-y-3">
               <Spinner label="Calculating region totals..." />
             </div>
           ) : (
-            <Accordion type="multiple" className="w-full">
+            <Accordion type="multiple" className="w-full space-y-4">
               {regionData.map((region, index) => (
-                <AccordionItem key={index} value={`region-${index}`} className="border rounded-xl mb-3 overflow-hidden">
-                  <AccordionTrigger className="hover:bg-gray-50 px-4 py-3">
-                    <div className="flex items-center justify-between w-full">
+                <AccordionItem 
+                  key={index} 
+                  value={`region-${index}`} 
+                  className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all duration-200"
+                >
+                  <AccordionTrigger className="hover:bg-slate-50/50 px-5 py-4 transition-colors">
+                    <div className="flex items-center justify-between w-full pr-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-neas-green/10 flex items-center justify-center">
-                          <Globe className="h-5 w-5 text-neas-green" />
+                        <div className="h-9 w-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-sm">
+                          {index + 1}
                         </div>
-                        <div>
-                          <span className="font-semibold text-gray-800">{region.regionName}</span>
-                          <div className="text-xs text-gray-500">
-                            {region.districts.length} districts
+                        <div className="text-left">
+                          <span className="font-bold text-slate-800 text-sm sm:text-base">{region.regionName}</span>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                            {region.districts.length} districts allocated
                           </div>
                         </div>
                       </div>
                     </div>
                   </AccordionTrigger>
 
-                  <AccordionContent className="px-4 py-4 bg-white">
+                  <AccordionContent className="px-6 py-5 bg-slate-50/30 border-t border-slate-100 space-y-6">
                     {/* Region Totals */}
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <FileText className="h-5 w-5 text-gray-700" />
-                        <h4 className="font-semibold text-gray-800">Region Totals</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-slate-500" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Region Totals</h4>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                         {Object.entries(region.totals)
-                        .filter(([field]) => {
-                          const hideFields = ['normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets'];
-                          const primaryExams = ['PSLE', 'SSNA', 'SFNA', 'FTNA'];
-                          return !(primaryExams.includes(stationery.examination_code) && hideFields.includes(field));
-                        })
-                        .map(([field, value]) => {
-                          const visual = getFieldVisual(field);
-                          const IconComp = visual.icon;
-                          return (
-                            <div key={field} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                              <div className="flex items-center gap-2">
-                                <IconComp className={`h-4 w-4 ${visual.color}`} />
-                                <span className="text-sm font-medium text-gray-700">{getFieldLabels(field)}</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {Object.entries(region.totals)
+                          .filter(([field]) => {
+                            const hideFields = ['normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets'];
+                            const primaryExams = ['PSLE', 'SSNA', 'SFNA', 'FTNA'];
+                            return !(primaryExams.includes(stationery.examination_code) && hideFields.includes(field));
+                          })
+                          .map(([field, value]) => {
+                            const visual = getFieldVisual(field);
+                            const IconComp = visual.icon;
+                            return (
+                              <div key={field} className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className={`p-1 rounded-lg ${visual.bg} ${visual.color}`}>
+                                    <IconComp className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="text-xs font-semibold text-slate-600 truncate">{getFieldLabels(field)}</span>
+                                </div>
+                                <span className="font-bold text-slate-900 text-sm pl-2">{formatNumber(value)}</span>
                               </div>
-                              <span className="font-bold text-gray-900">{formatNumber(value)}</span>
-                            </div>
-                          );                     
-
-                        })}
+                            );                     
+                          })}
                       </div>
                     </div>
 
                     {/* District-wise Breakdown */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <MapPin className="h-5 w-5 text-gray-700" />
-                        <h4 className="font-semibold text-gray-800">District-wise Breakdown</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-slate-500" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">District-wise Breakdown</h4>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {region.districts.map((district, districtIndex) => (
-                          <div key={districtIndex} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="h-2 w-2 rounded-full bg-gray-400" />
-                              <h5 className="font-medium text-gray-700 truncate">{district.districtName}</h5>
+                          <div key={districtIndex} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                              <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                              <h5 className="font-bold text-slate-800 text-xs truncate uppercase tracking-wider">{district.districtName}</h5>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              {Object.entries(district.totals).map(([field, value]) => {
-                                const visual = getFieldVisual(field);
-                                const IconComp = visual.icon;
-                                return (
-                                  <div key={field} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded-md">
-                                    <div className="flex items-center gap-2">
-                                      <IconComp className={`h-4 w-4 ${visual.color}`} />
-                                      <span className="text-gray-700">{getFieldLabels(field)}</span>
+                              {Object.entries(district.totals)
+                                .filter(([field]) => {
+                                  const hideFields = ['normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets'];
+                                  const primaryExams = ['PSLE', 'SSNA', 'SFNA', 'FTNA'];
+                                  return !(primaryExams.includes(stationery.examination_code) && hideFields.includes(field));
+                                })
+                                .map(([field, value]) => {
+                                  const visual = getFieldVisual(field);
+                                  return (
+                                    <div key={field} className="flex items-center justify-between text-[11px] p-2 bg-slate-50/50 rounded-lg border border-slate-100">
+                                      <span className="text-slate-500 font-medium truncate mr-1">{getFieldLabels(field)}</span>
+                                      <span className="font-bold text-slate-800">{formatNumber(value)}</span>
                                     </div>
-                                    <span className="font-semibold">{formatNumber(value)}</span>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
                             </div>
                           </div>
                         ))}
