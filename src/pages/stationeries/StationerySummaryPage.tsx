@@ -875,9 +875,9 @@ const StationerySummaryPage: React.FC = () => {
         <CardContent className="p-6">
           <p className="text-center text-slate-500">No stationery entry found for ID: {stationeryId}.</p>
           <div className="text-center mt-6">
-            <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')} className="rounded-xl">
+            {/* <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')} className="rounded-xl">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Stationeries
-            </Button>
+            </Button> */}
           </div>
         </CardContent>
       </Card>
@@ -890,14 +890,14 @@ const StationerySummaryPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Button 
+            {/* <Button 
               variant="ghost" 
               size="sm" 
               onClick={() => navigate('/dashboard/stationeries')} 
               className="h-8 px-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
             >
               <ArrowLeft className="h-4 w-4 mr-1" /> Back
-            </Button>
+            </Button>*/}
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 py-1 px-3 rounded-full">
               <Info className="h-3 w-3 mr-2" /> {stationery.examination_code} {stationery.examination_year}
             </Badge>
