@@ -117,20 +117,62 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
   };
 
   const handleTogglePresetItem = (item: string) => {
-    if (items.includes(item)) {
-      setItems(items.filter((i) => i !== item));
-    } else {
-      if (items.length >= 4) {
-        showError("You can configure a maximum of 4 items.");
-        return;
+    if (item === "BKM") {
+      setItems(["BKM"]);
+      return;
+    }
+    if (item === "BRAILLE SHEETS") {
+      setItems(["BRAILLE SHEETS"]);
+      return;
+    }
+
+    // If selecting TR or TWM
+    if (item === "TR" || item === "TWM") {
+      let newItems = items.filter(i => i === "TR" || i === "TWM");
+      if (newItems.includes(item)) {
+        newItems = newItems.filter(i => i !== item);
+      } else {
+        newItems.push(item);
       }
-      setItems([...items, item]);
+      setItems(newItems);
+      return;
+    }
+
+    // If selecting ICT COVERS, ARABIC BOOKLETS, FINEARTS BOOKLETS
+    if (["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS"].includes(item)) {
+      let newItems = items.filter(i => ["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS"].includes(i));
+      if (newItems.includes(item)) {
+        newItems = newItems.filter(i => i !== item);
+      } else {
+        if (newItems.length >= 4) {
+          showError("You can configure a maximum of 4 items.");
+          return;
+        }
+        newItems.push(item);
+      }
+      setItems(newItems);
+      return;
     }
   };
 
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
   };
+
+  const handleSelectAllRegions = (checked: boolean) => {
+    const newSelected: Record<string, boolean> = {};
+    const newCounts: Record<string, number> = { ...regionBoxCounts };
+    regions.forEach((r) => {
+      newSelected[r] = !!checked;
+      if (checked && !newCounts[r]) {
+        newCounts[r] = 1;
+      }
+    });
+    setSelectedRegions(newSelected);
+    setRegionBoxCounts(newCounts);
+  };
+
+  const isAllRegionsSelected = regions.length > 0 && regions.every((r) => selectedRegions[r]);
 
   const handleNextStep = () => {
     if (step === 1) {
@@ -300,9 +342,24 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
               {/* Region Mode Configuration */}
               {mode === "REGION" ? (
                 <div className="space-y-4">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Select Regions & Specify Box Quantities
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      Select Regions & Specify Box Quantities
+                    </Label>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="select-all-regions"
+                        checked={isAllRegionsSelected}
+                        onCheckedChange={handleSelectAllRegions}
+                      />
+                      <Label
+                        htmlFor="select-all-regions"
+                        className="text-xs font-bold text-slate-600 cursor-pointer"
+                      >
+                        Select All
+                      </Label>
+                    </div>
+                  </div>
                   <ScrollArea className="h-[250px] border border-slate-100 rounded-xl p-3 bg-slate-50/30">
                     <div className="space-y-3">
                       {regions.map((region) => {

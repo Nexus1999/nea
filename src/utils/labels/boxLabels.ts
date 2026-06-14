@@ -34,7 +34,7 @@ export const renderBoxLabels = (
     const displayRegion = abbreviateRegionName(rawRegion);
     
     // Conditional font size for Dar es Salaam and other long region names
-    const regionFontSize = rawRegion === "DAR ES SALAAM" ? "68px" : "76px";
+    const regionFontSize = rawRegion === "DAR ES SALAAM" ? "69px" : "76px";
     const districtName = label.district ? (label.district || "N/A").toUpperCase() : null;
     const containerNum = label.container_number || "?";
     const totalContainers = label.total_containers || "?";
@@ -64,11 +64,13 @@ export const renderBoxLabels = (
     } else if (itemsList.length === 2) {
       itemsHtml = `
         <div class="items-layout layout-2">
-          <div class="item-box half-width double-item">
-            <div class="item-text">${itemsList[0].toUpperCase()}</div>
-          </div>
-          <div class="item-box half-width double-item">
-            <div class="item-text">${itemsList[1].toUpperCase()}</div>
+          <div class="row">
+            <div class="item-box half-width double-item">
+              <div class="item-text">${itemsList[0].toUpperCase()}</div>
+            </div>
+            <div class="item-box half-width double-item">
+              <div class="item-text">${itemsList[1].toUpperCase()}</div>
+            </div>
           </div>
         </div>
       `;
