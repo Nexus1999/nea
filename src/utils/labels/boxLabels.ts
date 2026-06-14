@@ -20,7 +20,7 @@ export const renderBoxLabels = (
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "42px" : "50px";
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "69px" : "76px";
     const districtName = label.district ? (label.district || "N/A").toUpperCase() : null;
     const containerNum = label.container_number || "?";
     const totalContainers = label.total_containers || "?";
@@ -101,37 +101,35 @@ export const renderBoxLabels = (
 
     return `
       <div class="label-card">
-        <!-- Classic Corner Accents -->
+        <!-- Corner Marks -->
         <div class="corner-tl"></div>
         <div class="corner-tr"></div>
         <div class="corner-bl"></div>
         <div class="corner-br"></div>
+
+        <!-- Watermark -->
         <div class="watermark">${examCode}</div>
 
-        <!-- Top Header Row -->
-        <div class="top-row">
-          <div class="exam-badge-left">
-            <span>${examCode}-${examYear}</span>
-          </div>
-          <div class="category-badge">
-            <span>BOX LABEL</span>
-          </div>
+        <!-- Top badge: exam code + year -->
+        <div class="exam-badge">
+           <span>${examCode}-${examYear}</span>
         </div>
 
-        <!-- Region & District -->
+        <!-- Region (prominent with Elephant font) - dynamic font size -->
         <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
-        ${districtName ? `<div class="district">${districtName}</div>` : '<div class="district-placeholder"></div>'}
+
+        <!-- District (Only if districtName is present) -->
+        ${districtName ? `<div class="district">${districtName}</div>` : ""}
 
         <!-- Adaptive Items Layout -->
         <div class="items-container">
           ${itemsHtml}
         </div>
 
-        <!-- Bottom Row: Box Number & QR Code -->
+        <!-- Bottom row: box number + QR (no text under QR) -->
         <div class="bottom-row">
-          <div class="box-number-container">
-            <div class="box-label">BOX</div>
-            <div class="box-value">${containerNum}/${totalContainers}</div>
+          <div class="box-number">
+            <div class="box-value">BOX ${containerNum}/${totalContainers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -141,33 +139,21 @@ export const renderBoxLabels = (
     `;
   };
 
-  // Group labels into pages of 2
-  const pages: string[] = [];
-  for (let i = 0; i < labels.length; i += 2) {
-    const firstLabel = singleLabel(labels[i]);
-    const secondLabel = i + 1 < labels.length ? singleLabel(labels[i + 1]) : null;
-    const cutLine = secondLabel ? `<div class="cut-line"><span></span></div>` : '';
-    pages.push(`
-      <div class="page-container">
-        ${firstLabel}
-        ${cutLine}
-        ${secondLabel || ''}
-      </div>
-    `);
-  }
-
+  // Build the full HTML document with print‑optimised CSS
   return `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="UTF-8" />
-        <title>Box Labels (2 per page)</title>
+        <title>Box Labels</title>
         <style>
           * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
           }
+
+          /* Hide browser print headers/footers (URL, date, page numbers) */
           @media print {
             @page {
               margin: 0;
@@ -178,102 +164,108 @@ export const renderBoxLabels = (
               padding: 0;
               background: white;
             }
-            .page-container {
-              page-break-after: always;
-              page-break-inside: avoid;
+            .no-print {
+              display: none;
             }
-            .page-container:last-child {
-              page-break-after: avoid;
-            }
+            /* Ensure background colours print (for high contrast) */
             * {
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
             }
           }
+
           body {
-            background: #e2e8f0;
-            font-family: 'Inter', 'Segoe UI', system-ui, Arial, sans-serif;
+            background: #e5e7eb;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 0;
             margin: 0;
+            text-rendering: geometricPrecision;
             font-variant-numeric: tabular-nums;
           }
+
+          /* Each page container holds exactly two labels and a cut line, sized to standard A4 */
           .page-container {
             width: 210mm;
             height: 297mm;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            page-break-after: always;
             background: white;
             padding: 10mm 12mm;
             box-sizing: border-box;
-            overflow: hidden;
           }
+
+          /* Single label card – sized perfectly to fit two on A4 with margins */
           .label-card {
-            border: 3px double #0f172a;
+            border: 2px solid #0f172a;
             border-radius: 24px;
-            background: #fffdf9; /* Classic warm cream background */
-            padding: 18px 24px;
+            background: white;
+            padding: 18px 24px 22px 24px;
             height: 122mm;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: none;
             position: relative;
             box-sizing: border-box;
             overflow: hidden;
-            box-shadow: inset 0 0 40px rgba(15, 23, 42, 0.02);
           }
-          
-          /* Classic Corner Accents */
-          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          
+
+          /* Left decorative line (black & white friendly) */
+          .label-card::before {
+            content: '';
+            position: absolute;
+            top: 24px;
+            bottom: 24px;
+            left: 0;
+            width: 5px;
+            background: #0f172a;
+            border-radius: 0 4px 4px 0;
+          }
+
+          /* Corner Marks */
+          .corner-tl { top: 12px; left: 12px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-tr { top: 12px; right: 12px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+
+          /* Watermark */
           .watermark {
             position: absolute;
             right: 20px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 130px;
+            font-size: 140px;
             font-weight: 900;
-            color: rgba(15, 23, 42, 0.02);
+            color: rgba(15, 23, 42, 0.03);
             pointer-events: none;
-            user-select: none;
             z-index: 0;
+            user-select: none;
           }
-          .top-row {
+
+          .exam-badge {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            z-index: 2;
+            gap: 14px;
+            align-self: center;
+            margin-bottom: 12px;
           }
-          .exam-badge-left {
-            border: 1.5px solid #0f172a;
-            border-radius: 60px;
-            padding: 4px 14px;
-            background: white;
-          }
-          .exam-badge-left span {
-            font-size: 20px;
+
+          .exam-badge span {
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: transparent;
+            border: 1.5px solid #cbd5e1;
+            font-size: 30px;
             font-weight: 800;
-            letter-spacing: 1.5px;
             text-transform: uppercase;
+            letter-spacing: 1.5px;
             color: #0f172a;
           }
-          .category-badge {
-            background: #0f172a;
-            border-radius: 48px;
-            padding: 5px 20px;
-          }
-          .category-badge span {
-            font-size: 18px;
-            font-weight: 900;
-            color: white;
-            letter-spacing: 1.5px;
-          }
+
           .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
@@ -281,27 +273,24 @@ export const renderBoxLabels = (
             color: #0f172a;
             text-align: center;
             letter-spacing: -0.5px;
-            margin-bottom: 4px;
+            margin-bottom: 5px;
             line-height: 1.1;
-            z-index: 2;
+            z-index: 1;
           }
+
           .district {
-            font-size: 35px;
+            font-size: 60px;
             font-weight: 900;
             text-transform: uppercase;
             color: #1e293b;
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             line-height: 1.2;
             word-break: break-word;
             letter-spacing: 0.5px;
-            z-index: 2;
+            z-index: 1;
           }
-          .district-placeholder {
-            height: 12px;
-            margin-bottom: 8px;
-          }
-          
+
           /* Adaptive Items Layout Styles */
           .items-container {
             flex: 1;
@@ -309,7 +298,7 @@ export const renderBoxLabels = (
             flex-direction: column;
             justify-content: center;
             margin-bottom: 10px;
-            z-index: 2;
+            z-index: 1;
           }
           .items-layout {
             display: flex;
@@ -323,14 +312,13 @@ export const renderBoxLabels = (
             width: 100%;
           }
           .item-box {
-            background: white;
-            border: 2px solid #0f172a;
-            border-radius: 12px;
+            background: transparent;
+            border: 2px solid #cbd5e1;
+            border-radius: 18px;
             padding: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
             text-align: center;
           }
           .full-width {
@@ -340,67 +328,68 @@ export const renderBoxLabels = (
             width: 50%;
           }
           .item-text {
-            font-size: 22px;
-            font-weight: 900;
-            color: #0f172a;
-            letter-spacing: 1px;
-          }
-          
-          .bottom-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-            margin-top: auto;
-            z-index: 2;
-          }
-          .box-number-container {
-            flex: 1;
-            border: 2px solid #0f172a;
-            border-radius: 16px;
-            padding: 8px 12px;
-            text-align: center;
-            background: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .box-label {
-            font-size: 14px;
-            font-weight: 800;
-            color: #64748b;
-            letter-spacing: 2px;
-            margin-bottom: 2px;
-          }
-          .box-value {
-            font-size: 46px;
+            font-size: 40px;
             font-weight: 900;
             color: #0f172a;
             line-height: 1;
-            font-family: 'Georgia', serif;
           }
+
+          .bottom-row {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-top: 3px;
+            z-index: 1;
+          }
+
+          .box-number {
+            flex: 1;
+            background: transparent;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 18px;
+            padding: 10px 14px;
+            text-align: center;
+          }
+
+          .box-value {
+            font-size: 75px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            line-height: 0.95;
+            color: #0f172a;
+            font-variant-numeric: tabular-nums;
+          }
+
           .qr-wrapper {
             background: white;
-            border: 2px solid #0f172a;
-            padding: 6px;
-            border-radius: 16px;
+            border: 1.5px solid #cbd5e1;
+            box-shadow:
+              0 1px 3px rgba(0,0,0,.05),
+              inset 0 1px 0 rgba(255,255,255,.8);
+            padding: 10px;
+            border-radius: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
           }
+
           .qr-wrapper img {
-            width: 68px;
-            height: 68px;
+            width: 80px;
+            height: auto;
             display: block;
           }
+
+          /* Cut line between labels */
           .cut-line {
             border-top: 2px dashed #475569;
             width: 100%;
+            margin: 10px 0;
             position: relative;
             text-align: center;
-            margin: 4px 0;
           }
+
           .cut-line span {
             position: absolute;
             top: -12px;
@@ -415,10 +404,26 @@ export const renderBoxLabels = (
             color: #1e293b;
             font-family: monospace;
           }
+
+          /* Ensure no extra text anywhere */
+          body, div, span, p {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
         </style>
       </head>
       <body>
-        ${pages.join("")}
+        ${labels
+          .map((label) => {
+            return `
+              <div class="page-container">
+                ${singleLabel(label)}
+                <div class="cut-line"><span></span></div>
+                ${singleLabel(label)}
+              </div>
+            `;
+          })
+          .join("")}
       </body>
     </html>
   `;
