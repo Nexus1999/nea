@@ -50,7 +50,7 @@ export const renderStationeriesLabels = (
     const regionFontSize = label.region?.toUpperCase() === "DAR ES SALAAM" ? "55px" : "62px";
 
     return `
-      <div class="label-card">
+      <div class="label-card opt-a">
         <!-- Corner Marks -->
         <div class="corner-tl"></div>
         <div class="corner-tr"></div>
@@ -74,49 +74,42 @@ export const renderStationeriesLabels = (
         <!-- Center Info - ENLARGED FONTS -->
         <div class="center-info">
           <div class="center-number">${label.center_number || "N/A"}</div>
-          <div class="center-name">${abbreviateSchoolName(label.center_name)?.toUpperCase() || "N/A"}</div>
+          <div class="center-name" title="${abbreviateSchoolName(label.center_name)?.toUpperCase() || "N/A"}">
+            ${abbreviateSchoolName(label.center_name)?.toUpperCase() || "N/A"}
+          </div>
         </div>
 
         <!-- MODERN & CLASSIC CONTENTS SECTION -->
         <div class="contents-header">
           <div class="contents-title">CONTENTS</div>
-          
         </div>
 
         <!-- Redesigned Stationery Items Grid - Modern & Classic -->
         <div class="stationery-grid">
           <div class="stationery-item">
-         
             <div class="item-info">
               <span class="item-label">NORMAL BOOKLETS</span>
- 
             </div>
             <div class="item-value">${label.normal_booklets || 0}</div>
           </div>
           
           <div class="stationery-item">
-       
             <div class="item-info">
               <span class="item-label">GRAPH BOOKLETS</span>
-           
             </div>
             <div class="item-value">${label.graph_booklets || 0}</div>
           </div>
           
           <div class="stationery-item">
-           
             <div class="item-info">
               <span class="item-label">NORMAL SHEETS</span>
-              
             </div>
             <div class="item-value">${label.normal_loosesheets || 0}</div>
           </div>
           
           <div class="stationery-item">
-           
             <div class="item-info">
               <span class="item-label">GRAPH SHEETS</span>
-             
             </div>
             <div class="item-value">${label.graph_loosesheets || 0}</div>
           </div>
@@ -124,7 +117,6 @@ export const renderStationeriesLabels = (
           <div class="stationery-item highlight">       
             <div class="item-info">
               <span class="item-label">BKM</span>
-            
             </div>
             <div class="item-value">${label.bkm || 0}</div>
           </div>
@@ -325,32 +317,45 @@ export const renderStationeriesLabels = (
           }
 
           /* Center Info - ENLARGED FONTS */
-          .center-info {
-            text-align: center;
+          .opt-a .center-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #0f172a;
+            border-radius: 12px;
             margin-bottom: 3px;
             z-index: 1;
-            padding: 8px;
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border-radius: 16px;
-            border: 1px solid #e2e8f0;
+            width: 100%;
+            box-sizing: border-box;
           }
 
-          .center-number {
-            font-size: 30px;
-            font-weight: 900;
-            color: #000000;
-            margin-bottom: 6px;
-            letter-spacing: 2px;
-           }
-
-          .center-name {
-            font-size: 30px;
+          .opt-a .center-number {
+            font-size: 13px;
             font-weight: 800;
-            color: #000000;
+            letter-spacing: 2.5px;
+            background: #0f172a;
+            color: #fff;
+            padding: 2px 14px;
+            border-radius: 999px;
+            line-height: 1;
+          }
+
+          .opt-a .center-name {
+            font-size: 16px;
+            font-weight: 800;
+            color: #000;
+            text-align: center;
             text-transform: uppercase;
-            word-break: break-word;
-            letter-spacing: 0.5px;
-           }
+            line-height: 1.2;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
 
           /* MODERN & CLASSIC CONTENTS HEADER */
           .contents-header {
@@ -372,8 +377,6 @@ export const renderStationeriesLabels = (
             -webkit-text-fill-color: transparent;
             background-clip: text;
           }
-
-          
 
           /* Redesigned Stationery Grid - Modern & Classic */
           .stationery-grid {
@@ -407,12 +410,9 @@ export const renderStationeriesLabels = (
             background: linear-gradient(180deg, #000000 0%, #000000 100%);
           }
 
-         
-
           .stationery-item.highlight::before {
             background: linear-gradient(180deg, #000000 0%, #000000 100%);
           }
-         
 
           .item-info {
             flex: 1;
@@ -427,7 +427,6 @@ export const renderStationeriesLabels = (
             text-transform: uppercase;
             letter-spacing: 0.5px;
           }
-     
 
           .item-value {
             font-size: 30px;
@@ -454,15 +453,12 @@ export const renderStationeriesLabels = (
 
           .box-number {
             flex: 1;
-   
             background: transparent;
             border: 2px solid #334155;
             border-radius: 16px;
             padding: 8px 12px;
             text-align: center;
           }
-
-          
 
           .box-value {
             font-size: 43px;
