@@ -1,4 +1,5 @@
 "use client";
+import { abbreviateSchoolName } from "./abbreviate";
 
 interface LabelItem {
   id: number;
@@ -73,58 +74,57 @@ export const renderStationeriesLabels = (
         <!-- Center Info - ENLARGED FONTS -->
         <div class="center-info">
           <div class="center-number">${label.center_number || "N/A"}</div>
-          <div class="center-name">${label.center_name?.toUpperCase() || "N/A"}</div>
+          <div class="center-name">${abbreviateSchoolName(label.center_name)?.toUpperCase() || "N/A"}</div>
         </div>
 
         <!-- MODERN & CLASSIC CONTENTS SECTION -->
         <div class="contents-header">
-          <div class="contents-title">📋 CONTENTS</div>
-          <div class="contents-subtitle">STATIONERY MANIFEST</div>
+          <div class="contents-title">CONTENTS</div>
+          
         </div>
 
         <!-- Redesigned Stationery Items Grid - Modern & Classic -->
         <div class="stationery-grid">
           <div class="stationery-item">
-            <div class="item-icon">📘</div>
+         
             <div class="item-info">
               <span class="item-label">NORMAL BOOKLETS</span>
-              <span class="item-code">BK-N</span>
+ 
             </div>
             <div class="item-value">${label.normal_booklets || 0}</div>
           </div>
           
           <div class="stationery-item">
-            <div class="item-icon">📗</div>
+       
             <div class="item-info">
               <span class="item-label">GRAPH BOOKLETS</span>
-              <span class="item-code">BK-G</span>
+           
             </div>
             <div class="item-value">${label.graph_booklets || 0}</div>
           </div>
           
           <div class="stationery-item">
-            <div class="item-icon">📄</div>
+           
             <div class="item-info">
-              <span class="item-label">NORMAL LOOSE SHEETS</span>
-              <span class="item-code">LS-N</span>
+              <span class="item-label">NORMAL SHEETS</span>
+              
             </div>
             <div class="item-value">${label.normal_loosesheets || 0}</div>
           </div>
           
           <div class="stationery-item">
-            <div class="item-icon">📊</div>
+           
             <div class="item-info">
-              <span class="item-label">GRAPH LOOSE SHEETS</span>
-              <span class="item-code">LS-G</span>
+              <span class="item-label">GRAPH SHEETS</span>
+             
             </div>
             <div class="item-value">${label.graph_loosesheets || 0}</div>
           </div>
           
-          <div class="stationery-item highlight">
-            <div class="item-icon">🔴</div>
+          <div class="stationery-item highlight">       
             <div class="item-info">
-              <span class="item-label">BKM RED</span>
-              <span class="item-code">BKM-R</span>
+              <span class="item-label">BKM</span>
+            
             </div>
             <div class="item-value">${label.bkm || 0}</div>
           </div>
@@ -132,9 +132,8 @@ export const renderStationeriesLabels = (
 
         <!-- Bottom row: box number + QR -->
         <div class="bottom-row">
-          <div class="box-number">
-            <div class="box-label">CONTAINER</div>
-            <div class="box-value">${label.container_number}/${label.total_containers}</div>
+          <div class="box-number">     
+            <div class="box-value">BOX ${label.container_number}/${label.total_containers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -153,7 +152,7 @@ export const renderStationeriesLabels = (
       <div class="page-container">
         <div class="labels-row">
           ${singleLabel(currentLabel)}
-          <div class="cut-line"><span>✂ CUT HERE ✂</span></div>
+          <div class="cut-line"></div>
           ${singleLabel(currentLabel)}
         </div>
       </div>
@@ -254,7 +253,7 @@ export const renderStationeriesLabels = (
             bottom: 24px;
             left: 0;
             width: 6px;
-            background: linear-gradient(180deg, #0f172a 0%, #3b82f6 50%, #0f172a 100%);
+            background: linear-gradient(180deg, #000000 0%, #000000 50%, #000000 100%);
             border-radius: 0 4px 4px 0;
           }
 
@@ -283,13 +282,13 @@ export const renderStationeriesLabels = (
             display: flex;
             gap: 14px;
             align-self: center;
-            margin-bottom: 10px;
+            margin-bottom: 2px;
           }
 
           .exam-badge span {
-            padding: 4px 16px;
+            padding: 2px 10px;
             border-radius: 999px;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            background: linear-gradient(135deg, #0b0b0c 0%, #060607 100%);
             border: 1.5px solid #cbd5e1;
             font-size: 24px;
             font-weight: 800;
@@ -303,10 +302,10 @@ export const renderStationeriesLabels = (
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
             text-transform: uppercase;
-            color: #0f172a;
+            color: #000000;
             text-align: center;
             letter-spacing: -0.5px;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             line-height: 1.1;
             z-index: 1;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
@@ -316,9 +315,9 @@ export const renderStationeriesLabels = (
             font-size: 42px;
             font-weight: 900;
             text-transform: uppercase;
-            color: #1e293b;
+            color: #000000;
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 2px;
             line-height: 1.2;
             word-break: break-word;
             letter-spacing: 0.5px;
@@ -328,7 +327,7 @@ export const renderStationeriesLabels = (
           /* Center Info - ENLARGED FONTS */
           .center-info {
             text-align: center;
-            margin-bottom: 16px;
+            margin-bottom: 3px;
             z-index: 1;
             padding: 8px;
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
@@ -337,27 +336,26 @@ export const renderStationeriesLabels = (
           }
 
           .center-number {
-            font-size: 32px;
+            font-size: 30px;
             font-weight: 900;
-            color: #0f172a;
+            color: #000000;
             margin-bottom: 6px;
             letter-spacing: 2px;
-            font-family: 'Courier New', monospace;
-          }
+           }
 
           .center-name {
-            font-size: 20px;
+            font-size: 30px;
             font-weight: 800;
-            color: #1e40af;
+            color: #000000;
             text-transform: uppercase;
             word-break: break-word;
             letter-spacing: 0.5px;
-          }
+           }
 
           /* MODERN & CLASSIC CONTENTS HEADER */
           .contents-header {
             text-align: center;
-            margin-bottom: 14px;
+            margin-bottom: 3px;
             z-index: 1;
             position: relative;
           }
@@ -365,31 +363,24 @@ export const renderStationeriesLabels = (
           .contents-title {
             font-size: 26px;
             font-weight: 900;
-            color: #0f172a;
+            color: #000000;
             letter-spacing: 3px;
             text-transform: uppercase;
-            font-family: 'Georgia', serif;
+            font-family: 'Arial', 'Georgia', serif;
             background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
           }
 
-          .contents-subtitle {
-            font-size: 11px;
-            font-weight: 600;
-            color: #64748b;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-top: 2px;
-          }
+          
 
           /* Redesigned Stationery Grid - Modern & Classic */
           .stationery-grid {
             display: flex;
             flex-direction: column;
             gap: 8px;
-            margin-bottom: 16px;
+            margin-bottom: 5px;
             z-index: 1;
           }
 
@@ -397,7 +388,7 @@ export const renderStationeriesLabels = (
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 12px;
+            padding: 5px 12px;
             background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
             border-radius: 14px;
             border: 1px solid #e2e8f0;
@@ -413,22 +404,15 @@ export const renderStationeriesLabels = (
             top: 0;
             bottom: 0;
             width: 4px;
-            background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(180deg, #000000 0%, #000000 100%);
           }
 
-          .stationery-item.highlight {
-            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-            border-color: #f59e0b;
-          }
+         
 
           .stationery-item.highlight::before {
-            background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+            background: linear-gradient(180deg, #000000 0%, #000000 100%);
           }
-
-          .item-icon {
-            font-size: 22px;
-            margin-right: 12px;
-          }
+         
 
           .item-info {
             flex: 1;
@@ -437,25 +421,18 @@ export const renderStationeriesLabels = (
           }
 
           .item-label {
-            font-size: 14px;
+            font-size: 30px;
             font-weight: 800;
-            color: #1e293b;
+            color: #000000;
             text-transform: uppercase;
             letter-spacing: 0.5px;
           }
-
-          .item-code {
-            font-size: 10px;
-            font-weight: 600;
-            color: #64748b;
-            font-family: monospace;
-            margin-top: 2px;
-          }
+     
 
           .item-value {
-            font-size: 26px;
+            font-size: 30px;
             font-weight: 900;
-            color: #0f172a;
+            color: #000000;
             font-family: 'Courier New', monospace;
             background: #ffffff;
             padding: 4px 12px;
@@ -471,34 +448,28 @@ export const renderStationeriesLabels = (
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            margin-top: auto;
+            margin-top: 2px;
             z-index: 1;
           }
 
           .box-number {
             flex: 1;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+   
+            background: transparent;
             border: 2px solid #334155;
             border-radius: 16px;
             padding: 8px 12px;
             text-align: center;
           }
 
-          .box-label {
-            font-size: 10px;
-            font-weight: 700;
-            color: #94a3b8;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-          }
+          
 
           .box-value {
-            font-size: 32px;
+            font-size: 43px;
             font-weight: 900;
             letter-spacing: -1px;
             line-height: 1;
-            color: #ffffff;
+            color: #000000;
             font-variant-numeric: tabular-nums;
           }
 
