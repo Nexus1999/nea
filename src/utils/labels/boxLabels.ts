@@ -34,7 +34,7 @@ export const renderBoxLabels = (
     const displayRegion = abbreviateRegionName(rawRegion);
     
     // Conditional font size for Dar es Salaam and other long region names
-    const regionFontSize = rawRegion === "DAR ES SALAAM" ? "52px" : "68px";
+    const regionFontSize = rawRegion === "DAR ES SALAAM" ? "69px" : "76px";
     const districtName = label.district ? (label.district || "N/A").toUpperCase() : null;
     const containerNum = label.container_number || "?";
     const totalContainers = label.total_containers || "?";
@@ -51,12 +51,12 @@ export const renderBoxLabels = (
       itemsList = label.item ? label.item.split(",").map((i: string) => i.trim()).filter(Boolean) : [];
     }
 
-    // Generate adaptive items layout HTML
+    // Generate adaptive items layout HTML with conditional styling classes
     let itemsHtml = "";
     if (itemsList.length === 1) {
       itemsHtml = `
         <div class="items-layout layout-1">
-          <div class="item-box full-width">
+          <div class="item-box full-width single-item">
             <div class="item-text">${itemsList[0].toUpperCase()}</div>
           </div>
         </div>
@@ -64,10 +64,10 @@ export const renderBoxLabels = (
     } else if (itemsList.length === 2) {
       itemsHtml = `
         <div class="items-layout layout-2">
-          <div class="item-box half-width">
+          <div class="item-box half-width double-item">
             <div class="item-text">${itemsList[0].toUpperCase()}</div>
           </div>
-          <div class="item-box half-width">
+          <div class="item-box half-width double-item">
             <div class="item-text">${itemsList[1].toUpperCase()}</div>
           </div>
         </div>
@@ -76,15 +76,15 @@ export const renderBoxLabels = (
       itemsHtml = `
         <div class="items-layout layout-3">
           <div class="row">
-            <div class="item-box half-width">
+            <div class="item-box half-width triple-item">
               <div class="item-text">${itemsList[0].toUpperCase()}</div>
             </div>
-            <div class="item-box half-width">
+            <div class="item-box half-width triple-item">
               <div class="item-text">${itemsList[1].toUpperCase()}</div>
             </div>
           </div>
           <div class="row">
-            <div class="item-box full-width">
+            <div class="item-box full-width triple-item-bottom">
               <div class="item-text">${itemsList[2].toUpperCase()}</div>
             </div>
           </div>
@@ -94,18 +94,18 @@ export const renderBoxLabels = (
       itemsHtml = `
         <div class="items-layout layout-4">
           <div class="row">
-            <div class="item-box half-width">
+            <div class="item-box half-width quad-item">
               <div class="item-text">${itemsList[0].toUpperCase()}</div>
             </div>
-            <div class="item-box half-width">
+            <div class="item-box half-width quad-item">
               <div class="item-text">${itemsList[1].toUpperCase()}</div>
             </div>
           </div>
           <div class="row">
-            <div class="item-box half-width">
+            <div class="item-box half-width quad-item">
               <div class="item-text">${itemsList[2].toUpperCase()}</div>
             </div>
-            <div class="item-box half-width">
+            <div class="item-box half-width quad-item">
               <div class="item-text">${itemsList[3].toUpperCase()}</div>
             </div>
           </div>
@@ -341,11 +341,67 @@ export const renderBoxLabels = (
           .half-width {
             width: 50%;
           }
-          .item-text {
-            font-size: 40px;
+          
+          /* Conditional Layout Styling Scenarios */
+          
+          /* 1 Item Scenario */
+          .single-item {
+            border: 3px solid #0f172a;
+            background: #f8fafc;
+            padding: 24px 16px;
+          }
+          .single-item .item-text {
+            font-size: 55px;
             font-weight: 900;
             color: #0f172a;
-            line-height: 1;
+            letter-spacing: 1px;
+          }
+
+          /* 2 Items Scenario */
+          .double-item {
+            border: 2.5px solid #0f172a;
+            background: #ffffff;
+            padding: 18px 12px;
+          }
+          .double-item .item-text {
+            font-size: 46px;
+            font-weight: 900;
+            color: #0f172a;
+          }
+
+          /* 3 Items Scenario */
+          .triple-item {
+            border: 2px solid #cbd5e1;
+            background: #ffffff;
+            padding: 12px 8px;
+          }
+          .triple-item .item-text {
+            font-size: 36px;
+            font-weight: 900;
+            color: #1e293b;
+          }
+          .triple-item-bottom {
+            border: 2.5px solid #0f172a;
+            background: #f8fafc;
+            padding: 14px 10px;
+          }
+          .triple-item-bottom .item-text {
+            font-size: 42px;
+            font-weight: 900;
+            color: #0f172a;
+            letter-spacing: 0.5px;
+          }
+
+          /* 4 Items Scenario */
+          .quad-item {
+            border: 2px solid #cbd5e1;
+            background: #ffffff;
+            padding: 10px 6px;
+          }
+          .quad-item .item-text {
+            font-size: 32px;
+            font-weight: 900;
+            color: #334155;
           }
 
           .bottom-row {
