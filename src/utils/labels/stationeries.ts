@@ -21,6 +21,17 @@ interface LabelItem {
   category: string;
 }
 
+function abbreviateRegionName(region: string): string {
+  if (!region) return "";
+  const upper = region.toUpperCase().trim();
+  if (upper === "KASKAZINI PEMBA") return "KAS/PEMBA";
+  if (upper === "KUSINI PEMBA") return "KUS/PEMBA";
+  if (upper === "KASKAZINI UNGUJA") return "KAS/UNGUJA";
+  if (upper === "KUSINI UNGUJA") return "KUS/UNGUJA";
+  if (upper === "MJINI MAGHARIBI") return "M/MAGHARIBI";
+  return upper;
+}
+
 export const renderStationeriesLabels = (
   labels: LabelItem[],
   examCode: string,
@@ -46,8 +57,27 @@ export const renderStationeriesLabels = (
 
   const singleLabel = (label: LabelItem) => {
     const qrUrl = generateQRData(label);
-    // Condition for region font size
-    const regionFontSize = label.region?.toUpperCase() === "DAR ES SALAAM" ? "55px" : "62px";
+    
+    // Abbreviate region name
+    const displayRegion = abbreviateRegionName(label.region);
+    
+    // Dynamic region font size
+    const regionUpper = (label.region || "").toUpperCase().trim();
+    let regionFontSize = "62px";
+    if (regionUpper === "DAR ES SALAAM") {
+      regionFontSize = "47.5px";
+    } else if (regionUpper === "KILIMANJARO") {
+      regionFontSize = "54px";
+    }
+
+    // Dynamic BKM highlight class based on center number prefix
+    const centerNo = (label.center_number || "").trim().toUpperCase();
+    let bkmClass = "highlight";
+    if (centerNo.startsWith("S")) {
+      bkmClass = "highlight-red";
+    } else if (centerNo.startsWith("P")) {
+      bkmClass = "highlight-pink";
+    }
 
     return `
       <div class="label-card opt-a">
@@ -66,7 +96,7 @@ export const renderStationeriesLabels = (
         </div>
 
         <!-- Region (prominent with Elephant font) - dynamic font size -->
-        <div class="region" style="font-size: ${regionFontSize};">${label.region?.toUpperCase() || "N/A"}</div>
+        <div class="region" style="font-size: ${regionFontSize};">${displayRegion}</div>
 
         <!-- District -->
         <div class="district">${label.district?.toUpperCase() || "N/A"}</div>
@@ -114,7 +144,7 @@ export const renderStationeriesLabels = (
             <div class="item-value">${label.graph_loosesheets || 0}</div>
           </div>
           
-          <div class="stationery-item highlight">       
+          <div class="stationery-item ${bkmClass}">       
             <div class="item-info">
               <span class="item-label">BKM</span>
             </div>
@@ -412,6 +442,39 @@ export const renderStationeriesLabels = (
 
           .stationery-item.highlight::before {
             background: linear-gradient(180deg, #000000 0%, #000000 100%);
+          }
+
+          /* Dynamic BKM Highlight Styles */
+          .stationery-item.highlight-red {
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%);
+            border-color: #fca5a5;
+          }
+          .stationery-item.highlight-red::before {
+            background: #dc2626;
+          }
+          .stationery-item.highlight-red .item-label {
+            color: #991b1b;
+          }
+          .stationery-item.highlight-red .item-value {
+            background: #fee2e2;
+            color: #dc2626;
+            box-shadow: inset 0 1px 3px rgba(220, 38, 38, 0.1);
+          }
+
+          .stationery-item.highlight-pink {
+            background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%);
+            border-color: #fbcfe8;
+          }
+          .stationery-item.highlight-pink::before {
+            background: #db2777;
+          }
+          .stationery-item.highlight-pink .item-label {
+            color: #9d174d;
+          }
+          .stationery-item.highlight-pink .item-value {
+            background: #fdf2f8;
+            color: #db2777;
+            box-shadow: inset 0 1px 3px rgba(219, 39, 119, 0.1);
           }
 
           .item-info {
