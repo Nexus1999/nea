@@ -268,7 +268,7 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
         </DialogHeader>
 
         <div className="p-6 max-h-[60vh] overflow-y-auto space-y-6">
-          {step === 1 && (
+          {step === 1 ? (
             <div className="space-y-6">
               {/* Destination Type Selection */}
               <div className="space-y-3">
@@ -296,7 +296,7 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
               </div>
 
               {/* Region Mode Configuration */}
-              {mode === "REGION" && (
+              {mode === "REGION" ? (
                 <div className="space-y-4">
                   <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">
                     Select Regions & Specify Box Quantities
@@ -357,10 +357,7 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
                     </div>
                   </ScrollArea>
                 </div>
-              )}
-
-              {/* District Mode Configuration */}
-              {mode === "DISTRICT" && (
+              ) : (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -451,9 +448,7 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
                 </div>
               )}
             </div>
-          )}
-
-          {step === 2 && (
+          ) : (
             <div className="space-y-6">
               {/* Preset Items Selection */}
               <div className="space-y-3">
@@ -591,7 +586,7 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
             )}
           </div>
         </DialogFooter>
-      </Dialog>
+      </DialogContent>
     </Dialog>
   );
 };
