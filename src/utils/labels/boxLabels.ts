@@ -34,7 +34,7 @@ export const renderBoxLabels = (
     const displayRegion = abbreviateRegionName(rawRegion);
     
     // Conditional font size for Dar es Salaam and other long region names
-    const regionFontSize = rawRegion === "DAR ES SALAAM" ? "69px" : "76px";
+    const regionFontSize = rawRegion === "DAR ES SALAAM" ? "65px" : "76px";
     const districtName = label.district ? (label.district || "N/A").toUpperCase() : null;
     const containerNum = label.container_number || "?";
     const totalContainers = label.total_containers || "?";
