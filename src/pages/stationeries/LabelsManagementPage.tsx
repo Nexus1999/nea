@@ -51,6 +51,7 @@ import {
 import { MasterSummaryOption, Stationery } from "@/types/stationeries";
 import BoxLimitsDrawer from "@/components/stationeries/BoxLimitsDrawer";
 import KitbagLimitsDrawer from "@/components/stationeries/KitbagLimitsDrawer";
+import { BoxLabelsWizardModal } from "@/components/stationeries/BoxLabelsWizardModal";
 import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,7 @@ import { renderBrailleStationeriesLabels } from "@/utils/labels/brailleStationer
 import { renderBkmLabels } from "@/utils/labels/bkm";
 import { renderKitbagsLabels } from "@/utils/labels/kitbags";
 import { renderTimetablesLabels } from "@/utils/labels/timetables";
+import { renderBoxLabels } from "@/utils/labels/boxLabels";
 
 // ---------- Helper Functions ----------
 function abbreviateSchoolName(name: string): string {
@@ -125,6 +127,7 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "bkm", name: "BKM", icon: Boxes, color: "text-teal-600", bgColor: "bg-teal-50" },
         { id: "kitbags", name: "Kitbags", icon: Briefcase, color: "text-indigo-600", bgColor: "bg-indigo-50" },
         { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
+        { id: "box_labels", name: "Box Labels", icon: Package, color: "text-amber-600", bgColor: "bg-amber-50" },
       ];
     case "FTNA":
       return [
@@ -134,14 +137,17 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
         { id: "bkm", name: "BKM", icon: Boxes, color: "text-teal-600", bgColor: "bg-teal-50" },
         { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
+        { id: "box_labels", name: "Box Labels", icon: Package, color: "text-amber-600", bgColor: "bg-amber-50" },
       ];
     case "PSLE":
-    case "SSNA", "SFNA":
+    case "SSNA":
+    case "SFNA":
       return [
         { id: "district_stationeries", name: "Stationeries", icon: Package, color: "text-blue-600", bgColor: "bg-blue-50" },
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
         { id: "kitbags", name: "Kitbags", icon: Briefcase, color: "text-indigo-600", bgColor: "bg-indigo-50" },
         { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
+        { id: "box_labels", name: "Box Labels", icon: Package, color: "text-amber-600", bgColor: "bg-amber-50" },
       ];
     default:
       return [];
@@ -159,6 +165,7 @@ const categoryQueryMap: Record<string, string[]> = {
   kitbags: ["kitbags", "Kitbags"],
   bkm: ["bkm", "BKM"],
   timetables: ["timetables", "Timetables"],
+  box_labels: ["Box Labels", "box_labels"],
 };
 
 // ---------- React Query Hook for Labels ----------
@@ -207,6 +214,7 @@ const LabelsManagementPage: React.FC = () => {
   // Drawer states
   const [isBoxLimitsDrawerOpen, setIsBoxLimitsDrawerOpen] = useState(false);
   const [isKitbagLimitsDrawerOpen, setIsKitbagLimitsDrawerOpen] = useState(false);
+  const [isBoxLabelsWizardOpen, setIsBoxLabelsWizardOpen] = useState(false);
   const [isGeneratingLabels, setIsGeneratingLabels] = useState(false);
 
   // Print Preview Modal states
@@ -336,7 +344,6 @@ const LabelsManagementPage: React.FC = () => {
   // Table columns depend on active category and exam code
   const getTableColumns = useMemo(() => {
     const examCode = masterSummary?.Code || "";
-    const isPrimary = ["PSLE", "SSNA", "SFNA"].includes(examCode);
 
     if (selectedCategoryId === "stationeries") {
       return [
@@ -465,6 +472,7 @@ const LabelsManagementPage: React.FC = () => {
         { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
       ];
     }
+
     if (selectedCategoryId === "timetables") {
        return [
         { header: "Region", accessor: "region", width: "w-[15%]" },
@@ -473,6 +481,28 @@ const LabelsManagementPage: React.FC = () => {
         { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
         { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
        ];
+    }
+
+    if (selectedCategoryId === "box_labels") {
+      return [
+        { header: "Region", accessor: "region", width: "w-[15%]" },
+        { header: "District", accessor: "district", width: "w-[15%]" },
+        {
+          header: "Items",
+          accessor: "item",
+          width: "w-[30%]",
+          render: (label: LabelItem) => {
+            try {
+              if (label.item.startsWith("[")) {
+                return JSON.parse(label.item).join(", ");
+              }
+            } catch (e) {}
+            return label.item;
+          }
+        },
+        { header: "Box", accessor: "container_number", width: "w-[10%]" },
+        { header: "Boxes", accessor: "total_containers", width: "w-[10%]" },
+      ];
     }
 
     return [
@@ -532,6 +562,9 @@ const LabelsManagementPage: React.FC = () => {
       case "timetables":
         htmlContent = renderTimetablesLabels(labelsToProcess, examCode, examYear);
         break;
+      case "box_labels":
+        htmlContent = renderBoxLabels(labelsToProcess, examCode, examYear);
+        break;
       default:
         showError("Printing is not supported for this category yet.");
         return;
@@ -553,6 +586,13 @@ const LabelsManagementPage: React.FC = () => {
   // ---------- Mutations (Create & Reset Labels) ----------
   const handleCreateLabels = async () => {
     if (!masterSummary || !stationery?.id || !selectedCategoryId) return;
+
+    // Intercept Box Labels to open the wizard modal
+    if (selectedCategoryId === "box_labels") {
+      setIsBoxLabelsWizardOpen(true);
+      return;
+    }
+
     setIsGeneratingLabels(true);
     try {
       let invokeFunction = "";
@@ -975,6 +1015,21 @@ const LabelsManagementPage: React.FC = () => {
             examCode={masterSummary.Code}
           />
         </>
+      )}
+
+      {/* Box Labels Wizard Modal */}
+      {masterSummary && (
+        <BoxLabelsWizardModal
+          open={isBoxLabelsWizardOpen}
+          onOpenChange={setIsBoxLabelsWizardOpen}
+          masterSummaryId={masterSummary.id}
+          examCode={masterSummary.Code}
+          examYear={String(masterSummary.Year)}
+          regions={regions}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["labels", masterSummary.id, selectedCategoryId] });
+          }}
+        />
       )}
 
       {/* Print Preview Modal */}
