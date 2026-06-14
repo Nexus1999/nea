@@ -32,12 +32,13 @@ interface BoxLabelsWizardModalProps {
 }
 
 const PRESET_ITEMS = [
-  "Timetables",
-  "ICT Covers",
-  "Attendance Sheets",
-  "Stationery",
-  "Nominal Rolls",
-  "Packing Lists",
+  "BKM",
+  "BRAILLE SHEETS",
+  "TR",
+  "TWM",
+  "ICT COVERS",
+  "ARABIC BOOKLETS",
+  "FINEARTS BOOKLETS",
 ];
 
 export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
@@ -64,7 +65,7 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
   const [districtsLoading, setDistrictsLoading] = useState(false);
 
   // Step 2: Items States
-  const [items, setItems] = useState<string[]>(["Timetables"]);
+  const [items, setItems] = useState<string[]>(["BKM"]);
   const [customItem, setCustomItem] = useState("");
 
   // Generation State
@@ -248,7 +249,7 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
       setDistrictRegion("");
       setSelectedDistricts({});
       setDistrictBoxCounts({});
-      setItems(["Timetables"]);
+      setItems(["BKM"]);
     } catch (err: any) {
       showError(err.message || "Failed to generate Box Labels.");
     } finally {
