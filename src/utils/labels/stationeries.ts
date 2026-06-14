@@ -66,17 +66,17 @@ export const renderStationeriesLabels = (
     let regionFontSize = "62px";
     if (regionUpper === "DAR ES SALAAM") {
       regionFontSize = "47.5px";
-    } else if (regionUpper === "KILIMANJARO") {
+    } else if (regionUpper === "KILIMANJARO" || regionUpper === "MJINI MAGHARIBI") {
       regionFontSize = "54px";
     }
 
-    // Dynamic BKM highlight class based on center number prefix
+    // Dynamic BKM label text based on center number prefix
     const centerNo = (label.center_number || "").trim().toUpperCase();
-    let bkmClass = "highlight";
+    let bkmLabel = "BKM";
     if (centerNo.startsWith("S")) {
-      bkmClass = "highlight-red";
+      bkmLabel = "BKM RED";
     } else if (centerNo.startsWith("P")) {
-      bkmClass = "highlight-pink";
+      bkmLabel = "BKM PINK";
     }
 
     return `
@@ -144,9 +144,9 @@ export const renderStationeriesLabels = (
             <div class="item-value">${label.graph_loosesheets || 0}</div>
           </div>
           
-          <div class="stationery-item ${bkmClass}">       
+          <div class="stationery-item">       
             <div class="item-info">
-              <span class="item-label">BKM</span>
+              <span class="item-label">${bkmLabel}</span>
             </div>
             <div class="item-value">${label.bkm || 0}</div>
           </div>
@@ -442,39 +442,6 @@ export const renderStationeriesLabels = (
 
           .stationery-item.highlight::before {
             background: linear-gradient(180deg, #000000 0%, #000000 100%);
-          }
-
-          /* Dynamic BKM Highlight Styles */
-          .stationery-item.highlight-red {
-            background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%);
-            border-color: #fca5a5;
-          }
-          .stationery-item.highlight-red::before {
-            background: #dc2626;
-          }
-          .stationery-item.highlight-red .item-label {
-            color: #991b1b;
-          }
-          .stationery-item.highlight-red .item-value {
-            background: #fee2e2;
-            color: #dc2626;
-            box-shadow: inset 0 1px 3px rgba(220, 38, 38, 0.1);
-          }
-
-          .stationery-item.highlight-pink {
-            background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%);
-            border-color: #fbcfe8;
-          }
-          .stationery-item.highlight-pink::before {
-            background: #db2777;
-          }
-          .stationery-item.highlight-pink .item-label {
-            color: #9d174d;
-          }
-          .stationery-item.highlight-pink .item-value {
-            background: #fdf2f8;
-            color: #db2777;
-            box-shadow: inset 0 1px 3px rgba(219, 39, 119, 0.1);
           }
 
           .item-info {
