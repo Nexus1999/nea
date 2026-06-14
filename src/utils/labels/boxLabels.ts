@@ -1,5 +1,16 @@
 "use client";
 
+function abbreviateRegionName(region: string): string {
+  if (!region) return "";
+  const upper = region.toUpperCase().trim();
+  if (upper === "KASKAZINI PEMBA") return "KAS/PEMBA";
+  if (upper === "KUSINI PEMBA") return "KUS/PEMBA";
+  if (upper === "KASKAZINI UNGUJA") return "KAS/UNGUJA";
+  if (upper === "KUSINI UNGUJA") return "KUS/UNGUJA";
+  if (upper === "MJINI MAGHARIBI") return "M/MAGHARIBI";
+  return upper;
+}
+
 export const renderBoxLabels = (
   labels: any[],
   examCode: string,
@@ -19,8 +30,11 @@ export const renderBoxLabels = (
 
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
-    const regionName = (label.region || "N/A").toUpperCase();
-    const regionFontSize = regionName === "DAR ES SALAAM" ? "69px" : "76px";
+    const rawRegion = (label.region || "N/A").toUpperCase().trim();
+    const displayRegion = abbreviateRegionName(rawRegion);
+    
+    // Conditional font size for Dar es Salaam and other long region names
+    const regionFontSize = rawRegion === "DAR ES SALAAM" ? "52px" : "68px";
     const districtName = label.district ? (label.district || "N/A").toUpperCase() : null;
     const containerNum = label.container_number || "?";
     const totalContainers = label.total_containers || "?";
@@ -116,7 +130,7 @@ export const renderBoxLabels = (
         </div>
 
         <!-- Region (prominent with Elephant font) - dynamic font size -->
-        <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
+        <div class="region" style="font-size: ${regionFontSize};">${displayRegion}</div>
 
         <!-- District (Only if districtName is present) -->
         ${districtName ? `<div class="district">${districtName}</div>` : ""}
