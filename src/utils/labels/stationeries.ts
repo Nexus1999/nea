@@ -334,7 +334,7 @@ export const renderStationeriesLabels = (
           }
 
           .opt-a .center-number {
-            font-size: 13px;
+            font-size: 30px;
             font-weight: 800;
             letter-spacing: 2.5px;
             background: #0f172a;
@@ -345,7 +345,7 @@ export const renderStationeriesLabels = (
           }
 
           .opt-a .center-name {
-            font-size: 16px;
+            font-size: 30px;
             font-weight: 800;
             color: #000;
             text-align: center;
