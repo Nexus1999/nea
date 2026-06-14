@@ -51,7 +51,6 @@ import {
 import { MasterSummaryOption, Stationery } from "@/types/stationeries";
 import BoxLimitsDrawer from "@/components/stationeries/BoxLimitsDrawer";
 import KitbagLimitsDrawer from "@/components/stationeries/KitbagLimitsDrawer";
-import { CreateBoxLabelsDrawer } from "@/components/stationeries/CreateBoxLabelsDrawer";
 import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
@@ -67,7 +66,6 @@ import { renderBrailleStationeriesLabels } from "@/utils/labels/brailleStationer
 import { renderBkmLabels } from "@/utils/labels/bkm";
 import { renderKitbagsLabels } from "@/utils/labels/kitbags";
 import { renderTimetablesLabels } from "@/utils/labels/timetables";
-import { renderBoxLabels } from "@/utils/labels/boxLabels";
 
 // ---------- Helper Functions ----------
 function abbreviateSchoolName(name: string): string {
@@ -115,10 +113,6 @@ interface Category {
 // Category definitions per exam code with modern colors
 const getCategoriesForExam = (examCode: string | undefined): Category[] => {
   if (!examCode) return [];
-  const baseCategories = [
-    { id: "box_labels", name: "Box Labels", icon: Boxes, color: "text-rose-600", bgColor: "bg-rose-50" }
-  ];
-
   switch (examCode) {
     case "CSEE":
     case "ACSEE":
@@ -131,7 +125,6 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "bkm", name: "BKM", icon: Boxes, color: "text-teal-600", bgColor: "bg-teal-50" },
         { id: "kitbags", name: "Kitbags", icon: Briefcase, color: "text-indigo-600", bgColor: "bg-indigo-50" },
         { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
-        ...baseCategories,
       ];
     case "FTNA":
       return [
@@ -141,20 +134,17 @@ const getCategoriesForExam = (examCode: string | undefined): Category[] => {
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
         { id: "bkm", name: "BKM", icon: Boxes, color: "text-teal-600", bgColor: "bg-teal-50" },
         { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
-        ...baseCategories,
       ];
     case "PSLE":
-    case "SSNA":
-    case "SFNA":
+    case "SSNA", "SFNA":
       return [
         { id: "district_stationeries", name: "Stationeries", icon: Package, color: "text-blue-600", bgColor: "bg-blue-50" },
         { id: "braille_stationeries", name: "Braille Stationeries", icon: FileText, color: "text-pink-600", bgColor: "bg-pink-50" },
         { id: "kitbags", name: "Kitbags", icon: Briefcase, color: "text-indigo-600", bgColor: "bg-indigo-50" },
         { id: "timetables", name: "Timetables", icon: Calendar, color: "text-green-600", bgColor: "bg-green-50" },
-        ...baseCategories,
       ];
     default:
-      return baseCategories;
+      return [];
   }
 };
 
@@ -169,7 +159,6 @@ const categoryQueryMap: Record<string, string[]> = {
   kitbags: ["kitbags", "Kitbags"],
   bkm: ["bkm", "BKM"],
   timetables: ["timetables", "Timetables"],
-  box_labels: ["Box Labels", "box_labels", "box-labels"],
 };
 
 // ---------- React Query Hook for Labels ----------
@@ -218,7 +207,6 @@ const LabelsManagementPage: React.FC = () => {
   // Drawer states
   const [isBoxLimitsDrawerOpen, setIsBoxLimitsDrawerOpen] = useState(false);
   const [isKitbagLimitsDrawerOpen, setIsKitbagLimitsDrawerOpen] = useState(false);
-  const [isCreateBoxLabelsOpen, setIsCreateBoxLabelsOpen] = useState(false);
   const [isGeneratingLabels, setIsGeneratingLabels] = useState(false);
 
   // Print Preview Modal states
@@ -296,8 +284,7 @@ const LabelsManagementPage: React.FC = () => {
         (label) =>
           (label.center_name && label.center_name.toLowerCase().includes(term)) ||
           (label.center_number && label.center_number.toLowerCase().includes(term)) ||
-          (label.district && label.district.toLowerCase().includes(term)) ||
-          (label.item && label.item.toLowerCase().includes(term))
+          (label.district && label.district.toLowerCase().includes(term))
       );
     }
 
@@ -349,6 +336,7 @@ const LabelsManagementPage: React.FC = () => {
   // Table columns depend on active category and exam code
   const getTableColumns = useMemo(() => {
     const examCode = masterSummary?.Code || "";
+    const isPrimary = ["PSLE", "SSNA", "SFNA"].includes(examCode);
 
     if (selectedCategoryId === "stationeries") {
       return [
@@ -477,7 +465,6 @@ const LabelsManagementPage: React.FC = () => {
         { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
       ];
     }
-
     if (selectedCategoryId === "timetables") {
        return [
         { header: "Region", accessor: "region", width: "w-[15%]" },
@@ -486,16 +473,6 @@ const LabelsManagementPage: React.FC = () => {
         { header: "Envelope", accessor: "container_number", width: "w-[10%]" },
         { header: "Envelopes", accessor: "total_containers", width: "w-[10%]" },
        ];
-    }
-
-    if (selectedCategoryId === "box_labels") {
-      return [
-        { header: "Region", accessor: "region", width: "w-[20%]" },
-        { header: "District", accessor: "district", width: "w-[20%]" },
-        { header: "Items in Box", accessor: "item", width: "w-[30%]" },
-        { header: "Box", accessor: "container_number", width: "w-[10%]" },
-        { header: "Boxes", accessor: "total_containers", width: "w-[10%]" },
-      ];
     }
 
     return [
@@ -555,9 +532,6 @@ const LabelsManagementPage: React.FC = () => {
       case "timetables":
         htmlContent = renderTimetablesLabels(labelsToProcess, examCode, examYear);
         break;
-      case "box_labels":
-        htmlContent = renderBoxLabels(labelsToProcess, examCode, examYear);
-        break;
       default:
         showError("Printing is not supported for this category yet.");
         return;
@@ -579,13 +553,6 @@ const LabelsManagementPage: React.FC = () => {
   // ---------- Mutations (Create & Reset Labels) ----------
   const handleCreateLabels = async () => {
     if (!masterSummary || !stationery?.id || !selectedCategoryId) return;
-
-    // If Box Labels, open the custom configuration drawer instead of running edge functions
-    if (selectedCategoryId === "box_labels") {
-      setIsCreateBoxLabelsOpen(true);
-      return;
-    }
-
     setIsGeneratingLabels(true);
     try {
       let invokeFunction = "";
@@ -793,7 +760,7 @@ const LabelsManagementPage: React.FC = () => {
             disabled={isGeneratingLabels || !selectedCategoryId}
             className="h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs gap-1.5"
           >
-            <PlusCircle className="h-3.5 w-3.5" /> {selectedCategoryId === "box_labels" ? "Configure Labels" : "Create Labels"}
+            <PlusCircle className="h-3.5 w-3.5" /> Create Labels
           </Button>
           <Button
             variant="outline"
@@ -815,7 +782,7 @@ const LabelsManagementPage: React.FC = () => {
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Search by center name, number, district or items..."
+                placeholder="Search by center name, number or district..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 h-10 rounded-xl border-slate-200 bg-white focus-visible:ring-slate-400"
@@ -951,7 +918,7 @@ const LabelsManagementPage: React.FC = () => {
                         ) : col.accessor === "center_name" ? (
                           <span className="text-slate-600">{label.center_name ? abbreviateSchoolName(label.center_name) : "-"}</span>
                         ) : col.accessor === "region" || col.accessor === "district" ? (
-                          <span className="text-slate-500">{label[col.accessor as keyof LabelItem] || "—"}</span>
+                          <span className="text-slate-500">{label[col.accessor as keyof LabelItem]}</span>
                         ) : (
                           <span className="font-semibold text-slate-800">{label[col.accessor as keyof LabelItem]}</span>
                         )}
@@ -1008,18 +975,6 @@ const LabelsManagementPage: React.FC = () => {
             examCode={masterSummary.Code}
           />
         </>
-      )}
-
-      {masterSummary && (
-        <CreateBoxLabelsDrawer
-          open={isCreateBoxLabelsOpen}
-          onOpenChange={setIsCreateBoxLabelsOpen}
-          masterSummaryId={masterSummary.id}
-          regions={regions}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["labels", masterSummary.id, "box_labels"] });
-          }}
-        />
       )}
 
       {/* Print Preview Modal */}
