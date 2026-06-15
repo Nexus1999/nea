@@ -42,27 +42,25 @@ const PRESET_ITEMS = [
 ];
 
 // Helper to resolve subject columns based on selected items and exam code
-const getSubjectColumns = (selectedItems: string[], code: string): string[] => {
+const getItemColumns = (item: string, code: string): string[] => {
   const cols: string[] = [];
   const isSecondary = ["FTNA", "CSEE", "ACSEE"].includes(code);
   if (!isSecondary) return cols;
 
-  selectedItems.forEach(item => {
-    const upper = item.toUpperCase();
-    if (upper === "ICT COVERS") {
-      if (code === "ACSEE") cols.push("136");
-      else if (code === "CSEE") cols.push("036");
-      else if (code === "FTNA") cols.push("398", "841");
-    } else if (upper === "ARABIC BOOKLETS") {
-      if (code === "ACSEE") cols.push("125");
-      else if (code === "CSEE") cols.push("025");
-      else if (code === "FTNA") cols.push("025");
-    } else if (upper === "FINEARTS BOOKLETS" || upper === "FINE ARTS BOOKLETS") {
-      if (code === "ACSEE") cols.push("116");
-      else if (code === "CSEE") cols.push("016");
-      else if (code === "FTNA") cols.push("016");
-    }
-  });
+  const upper = item.toUpperCase();
+  if (upper === "ICT COVERS") {
+    if (code === "ACSEE") cols.push("136");
+    else if (code === "CSEE") cols.push("036");
+    else if (code === "FTNA") cols.push("398", "841");
+  } else if (upper === "ARABIC BOOKLETS") {
+    if (code === "ACSEE") cols.push("125");
+    else if (code === "CSEE") cols.push("025");
+    else if (code === "FTNA") cols.push("025");
+  } else if (upper === "FINEARTS BOOKLETS" || upper === "FINE ARTS BOOKLETS") {
+    if (code === "ACSEE") cols.push("116");
+    else if (code === "CSEE") cols.push("016");
+    else if (code === "FTNA") cols.push("016");
+  }
   return cols;
 };
 
@@ -97,13 +95,21 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
   const [candidateCounts, setCandidateCounts] = useState<Record<string, number>>({});
   const [loadingCandidates, setLoadingCandidates] = useState(false);
 
-  const activeSubjectCols = useMemo(() => getSubjectColumns(items, examCode), [items, examCode]);
-  const hasSpecialItems = activeSubjectCols.length > 0;
+  const activeSpecialItems = useMemo(() => {
+    return items.filter(item =>
+      ["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS", "FINE ARTS BOOKLETS"].includes(item.toUpperCase())
+    );
+  }, [items]);
 
-  // Fetch candidate counts for selected special items
+  const hasSpecialItems = activeSpecialItems.length > 0;
+
+  // Fetch candidate counts for selected special items enforcing AND condition
   const fetchCandidateCounts = async (selectedItems: string[]) => {
-    const cols = getSubjectColumns(selectedItems, examCode);
-    if (cols.length === 0) {
+    const specialItems = selectedItems.filter(item =>
+      ["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS", "FINE ARTS BOOKLETS"].includes(item.toUpperCase())
+    );
+
+    if (specialItems.length === 0) {
       setCandidateCounts({});
       return;
     }
@@ -114,26 +120,76 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
         ? "secondarymastersummaries"
         : "primarymastersummary";
 
+      // Gather all columns to select
+      const allCols: string[] = [];
+      specialItems.forEach(item => {
+        allCols.push(...getItemColumns(item, examCode));
+      });
+
+      if (allCols.length === 0) {
+        setCandidateCounts({});
+        setLoadingCandidates(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from(tableName)
-        .select(`region, district, ${cols.join(",")}`)
+        .select(`region, district, ${allCols.join(",")}`)
         .eq("mid", masterSummaryId)
         .eq("is_latest", true);
 
       if (error) throw error;
 
-      const counts: Record<string, number> = {};
+      // Structure to hold sums per special item per region/district
+      const regionData: Record<string, Record<string, number>> = {};
+      const districtData: Record<string, Record<string, number>> = {};
+
       data?.forEach((row: any) => {
         const reg = row.region;
         const dist = row.district;
-        
-        const sum = cols.reduce((acc, col) => acc + Number(row[col] || 0), 0);
-        
-        if (sum > 0) {
-          counts[reg] = (counts[reg] || 0) + sum;
-          if (dist) {
-            counts[`${reg}_${dist}`] = (counts[`${reg}_${dist}`] || 0) + sum;
+
+        if (!regionData[reg]) {
+          regionData[reg] = {};
+          specialItems.forEach(item => { regionData[reg][item] = 0; });
+        }
+        if (dist) {
+          const key = `${reg}_${dist}`;
+          if (!districtData[key]) {
+            districtData[key] = {};
+            specialItems.forEach(item => { districtData[key][item] = 0; });
           }
+        }
+
+        specialItems.forEach(item => {
+          const cols = getItemColumns(item, examCode);
+          const sum = cols.reduce((acc, col) => acc + Number(row[col] || 0), 0);
+          regionData[reg][item] += sum;
+          if (dist) {
+            districtData[`${reg}_${dist}`][item] += sum;
+          }
+        });
+      });
+
+      // Apply AND condition: all selected special items must have sum > 0
+      const counts: Record<string, number> = {};
+
+      // For regions
+      Object.entries(regionData).forEach(([reg, itemSums]) => {
+        const allPresent = specialItems.every(item => itemSums[item] > 0);
+        if (allPresent) {
+          counts[reg] = Object.values(itemSums).reduce((a, b) => a + b, 0);
+        } else {
+          counts[reg] = 0;
+        }
+      });
+
+      // For districts
+      Object.entries(districtData).forEach(([key, itemSums]) => {
+        const allPresent = specialItems.every(item => itemSums[item] > 0);
+        if (allPresent) {
+          counts[key] = Object.values(itemSums).reduce((a, b) => a + b, 0);
+        } else {
+          counts[key] = 0;
         }
       });
 
@@ -540,7 +596,7 @@ export const BoxLabelsWizardModal: React.FC<BoxLabelsWizardModalProps> = ({
                   <div className="space-y-1">
                     <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider">Smart Candidate Filter Active</h4>
                     <p className="text-xs text-emerald-700 leading-relaxed">
-                      We detected special subjects in your box contents. You can auto-select only the destinations that have registered candidates.
+                      We detected special subjects in your box contents. You can auto-select only the destinations that have registered candidates for <strong>all</strong> selected special subjects.
                     </p>
                     <Button
                       type="button"
