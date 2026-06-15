@@ -62,18 +62,39 @@ export const renderBoxLabels = (
         </div>
       `;
     } else if (itemsList.length === 2) {
-      itemsHtml = `
-        <div class="items-layout layout-2">
-          <div class="row">
-            <div class="item-box half-width double-item">
-              <div class="item-text">${itemsList[0].toUpperCase()}</div>
+      const specialItems = ["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS", "FINE ARTS BOOKLETS"];
+      const isSpecialTwoItems = specialItems.includes(itemsList[0].toUpperCase()) && 
+                                specialItems.includes(itemsList[1].toUpperCase());
+
+      if (isSpecialTwoItems) {
+        itemsHtml = `
+          <div class="items-layout layout-2">
+            <div class="row">
+              <div class="item-box full-width double-item" style="padding: 12px 12px;">
+                <div class="item-text" style="font-size: 38px;">${itemsList[0].toUpperCase()}</div>
+              </div>
             </div>
-            <div class="item-box half-width double-item">
-              <div class="item-text">${itemsList[1].toUpperCase()}</div>
+            <div class="row">
+              <div class="item-box full-width double-item" style="padding: 12px 12px;">
+                <div class="item-text" style="font-size: 38px;">${itemsList[1].toUpperCase()}</div>
+              </div>
             </div>
           </div>
-        </div>
-      `;
+        `;
+      } else {
+        itemsHtml = `
+          <div class="items-layout layout-2">
+            <div class="row">
+              <div class="item-box half-width double-item">
+                <div class="item-text">${itemsList[0].toUpperCase()}</div>
+              </div>
+              <div class="item-box half-width double-item">
+                <div class="item-text">${itemsList[1].toUpperCase()}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
     } else if (itemsList.length === 3) {
       itemsHtml = `
         <div class="items-layout layout-3">
