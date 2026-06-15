@@ -104,23 +104,38 @@ export const renderBoxLabels = (
       const isSpecial1 = ["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS", "FINE ARTS BOOKLETS"].includes(item1);
       const isSpecial2 = ["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS", "FINE ARTS BOOKLETS"].includes(item2);
 
-      const style0 = isSpecial0 ? 'style="padding: 6px 4px; font-size: 26px;"' : '';
-      const style1 = isSpecial1 ? 'style="padding: 6px 4px; font-size: 26px;"' : '';
-      const style2 = isSpecial2 ? 'style="padding: 8px 6px; font-size: 32px;"' : '';
+      // Dynamically balance widths if one is ICT COVERS (short) and the other is ARABIC/FINEARTS (long)
+      let width0 = "50%";
+      let width1 = "50%";
+      if (item0 === "ICT COVERS" && (item1 === "ARABIC BOOKLETS" || item1 === "FINEARTS BOOKLETS" || item1 === "FINE ARTS BOOKLETS")) {
+        width0 = "35%";
+        width1 = "65%";
+      } else if (item1 === "ICT COVERS" && (item0 === "ARABIC BOOKLETS" || item0 === "FINEARTS BOOKLETS" || item0 === "FINE ARTS BOOKLETS")) {
+        width0 = "65%";
+        width1 = "35%";
+      }
+
+      // Apply custom padding and font sizes directly to prevent specificity overrides
+      const styleBox0 = `style="width: ${width0}; padding: 6px 4px;"`;
+      const styleBox1 = `style="width: ${width1}; padding: 6px 4px;"`;
+
+      const styleText0 = isSpecial0 ? (item0 === "ICT COVERS" ? 'style="font-size: 24px;"' : `style="font-size: ${width0 === "65%" ? "24px" : "20px"};"`) : '';
+      const styleText1 = isSpecial1 ? (item1 === "ICT COVERS" ? 'style="font-size: 24px;"' : `style="font-size: ${width1 === "65%" ? "24px" : "20px"};"`) : '';
+      const styleText2 = isSpecial2 ? 'style="font-size: 32px;"' : '';
 
       itemsHtml = `
         <div class="items-layout layout-3">
           <div class="row">
-            <div class="item-box half-width triple-item" ${style0}>
-              <div class="item-text">${item0}</div>
+            <div class="item-box triple-item" ${styleBox0}>
+              <div class="item-text" ${styleText0}>${item0}</div>
             </div>
-            <div class="item-box half-width triple-item" ${style1}>
-              <div class="item-text">${item1}</div>
+            <div class="item-box triple-item" ${styleBox1}>
+              <div class="item-text" ${styleText1}>${item1}</div>
             </div>
           </div>
           <div class="row">
-            <div class="item-box full-width triple-item-bottom" ${style2}>
-              <div class="item-text">${item2}</div>
+            <div class="item-box full-width triple-item-bottom" style="padding: 8px 6px;">
+              <div class="item-text" ${styleText2}>${item2}</div>
             </div>
           </div>
         </div>
