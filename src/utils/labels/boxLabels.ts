@@ -96,19 +96,31 @@ export const renderBoxLabels = (
         `;
       }
     } else if (itemsList.length === 3) {
+      const item0 = itemsList[0].toUpperCase();
+      const item1 = itemsList[1].toUpperCase();
+      const item2 = itemsList[2].toUpperCase();
+
+      const isSpecial0 = ["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS", "FINE ARTS BOOKLETS"].includes(item0);
+      const isSpecial1 = ["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS", "FINE ARTS BOOKLETS"].includes(item1);
+      const isSpecial2 = ["ICT COVERS", "ARABIC BOOKLETS", "FINEARTS BOOKLETS", "FINE ARTS BOOKLETS"].includes(item2);
+
+      const style0 = isSpecial0 ? 'style="padding: 6px 4px; font-size: 26px;"' : '';
+      const style1 = isSpecial1 ? 'style="padding: 6px 4px; font-size: 26px;"' : '';
+      const style2 = isSpecial2 ? 'style="padding: 8px 6px; font-size: 32px;"' : '';
+
       itemsHtml = `
         <div class="items-layout layout-3">
           <div class="row">
-            <div class="item-box half-width triple-item">
-              <div class="item-text">${itemsList[0].toUpperCase()}</div>
+            <div class="item-box half-width triple-item" ${style0}>
+              <div class="item-text">${item0}</div>
             </div>
-            <div class="item-box half-width triple-item">
-              <div class="item-text">${itemsList[1].toUpperCase()}</div>
+            <div class="item-box half-width triple-item" ${style1}>
+              <div class="item-text">${item1}</div>
             </div>
           </div>
           <div class="row">
-            <div class="item-box full-width triple-item-bottom">
-              <div class="item-text">${itemsList[2].toUpperCase()}</div>
+            <div class="item-box full-width triple-item-bottom" ${style2}>
+              <div class="item-text">${item2}</div>
             </div>
           </div>
         </div>
