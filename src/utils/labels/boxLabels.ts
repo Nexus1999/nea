@@ -119,9 +119,21 @@ export const renderBoxLabels = (
       const styleBox0 = `style="width: ${width0}; padding: 6px 4px;"`;
       const styleBox1 = `style="width: ${width1}; padding: 6px 4px;"`;
 
-      const styleText0 = isSpecial0 ? (item0 === "ICT COVERS" ? 'style="font-size: 24px;"' : `style="font-size: ${width0 === "65%" ? "24px" : "20px"};"`) : '';
-      const styleText1 = isSpecial1 ? (item1 === "ICT COVERS" ? 'style="font-size: 24px;"' : `style="font-size: ${width1 === "65%" ? "24px" : "20px"};"`) : '';
-      const styleText2 = isSpecial2 ? 'style="font-size: 32px;"' : '';
+      // Check if TR, TWM, and RATIBA/TIMETABLES are selected together
+      const hasTR = itemsList.some(i => i.toUpperCase() === "TR");
+      const hasTWM = itemsList.some(i => i.toUpperCase() === "TWM");
+      const hasRatiba = itemsList.some(i => i.toUpperCase().includes("RATIBA") || i.toUpperCase().includes("TIMETABLE"));
+      const isTrTwmRatiba = hasTR && hasTWM && hasRatiba;
+
+      let styleText0 = isSpecial0 ? (item0 === "ICT COVERS" ? 'style="font-size: 24px;"' : `style="font-size: ${width0 === "65%" ? "24px" : "20px"};"`) : '';
+      let styleText1 = isSpecial1 ? (item1 === "ICT COVERS" ? 'style="font-size: 24px;"' : `style="font-size: ${width1 === "65%" ? "24px" : "20px"};"`) : '';
+      let styleText2 = isSpecial2 ? 'style="font-size: 32px;"' : '';
+
+      if (isTrTwmRatiba) {
+        styleText0 = 'style="font-size: 30px;"';
+        styleText1 = 'style="font-size: 30px;"';
+        styleText2 = 'style="font-size: 34px;"';
+      }
 
       itemsHtml = `
         <div class="items-layout layout-3">
