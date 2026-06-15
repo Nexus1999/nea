@@ -430,7 +430,7 @@ const StationerySummaryPage: React.FC = () => {
             }
             
             totalWeightedStreamsForBKM = bkmStreams * subjects;
-            totalWeightedStreamsForFBM1 = fbmStreams * subjects;
+            totalWeightedStreamsForFBM1 = 2*(fbmStreams * subjects);
             totalWeightedStreamsForFBM2 = fbmStreams * subjects;
           } else if (examCode === 'CSEE' || examCode === 'FTNA') {
             const activeDoubleList = (examCode === 'CSEE') ? CSEE_DOUBLE_PAPER_SUBJECTS : FTNA_DOUBLE_PAPER_SUBJECTS;
