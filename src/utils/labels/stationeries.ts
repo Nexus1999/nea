@@ -310,13 +310,13 @@ export const renderStationeriesLabels = (
           .exam-badge span {
             padding: 2px 10px;
             border-radius: 999px;
-            background: linear-gradient(135deg, #0b0b0c 0%, #060607 100%);
-            border: 1.5px solid #cbd5e1;
+            background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
+            border: 1.5px solid #000000;
             font-size: 24px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 2px;
-            color: #ffffff;
+            color: #000000;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
           }
 
@@ -393,6 +393,7 @@ export const renderStationeriesLabels = (
             margin-bottom: 3px;
             z-index: 1;
             position: relative;
+            color: #000000;
           }
 
           .contents-title {
