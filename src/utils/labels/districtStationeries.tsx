@@ -20,7 +20,7 @@ export const renderDistrictStationeriesLabels = (
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
     // Condition for region font size
-    const regionFontSize = label.region?.toUpperCase() === "DAR ES SALAAM" ? "69px" : "76px";
+    const regionFontSize = label.region?.toUpperCase() === "DAR ES SALAAM" ? "67px" : "76px";
 
     return `
       <div class="label-card">
