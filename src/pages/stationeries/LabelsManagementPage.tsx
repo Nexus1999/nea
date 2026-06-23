@@ -206,6 +206,7 @@ const LabelsManagementPage: React.FC = () => {
   // UI state
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string>("All");
+  const [selectedItem, setSelectedItem] = useState<string>("All");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -280,11 +281,26 @@ const LabelsManagementPage: React.FC = () => {
     isFetching: labelsFetching,
   } = useLabels(masterSummary?.id, selectedCategoryId);
 
+  // Extract unique items for District Stationeries
+  const uniqueItems = useMemo(() => {
+    if (selectedCategoryId !== "district_stationeries") return [];
+    const itemsSet = new Set<string>();
+    allLabels.forEach((label) => {
+      if (label.item) {
+        itemsSet.add(label.item);
+      }
+    });
+    return Array.from(itemsSet).sort();
+  }, [allLabels, selectedCategoryId]);
+
   // Client-side filtering, sorting + pagination
   const filteredLabels = useMemo(() => {
     let filtered = [...allLabels];
     if (selectedRegion !== "All") {
       filtered = filtered.filter((label) => label.region === selectedRegion);
+    }
+    if (selectedCategoryId === "district_stationeries" && selectedItem !== "All") {
+      filtered = filtered.filter((label) => label.item === selectedItem);
     }
     if (debouncedSearchTerm) {
       const term = debouncedSearchTerm.toLowerCase();
@@ -325,7 +341,7 @@ const LabelsManagementPage: React.FC = () => {
     });
 
     return filtered;
-  }, [allLabels, selectedRegion, debouncedSearchTerm]);
+  }, [allLabels, selectedRegion, selectedItem, selectedCategoryId, debouncedSearchTerm]);
 
   const totalPages = Math.ceil(filteredLabels.length / itemsPerPage);
   const currentLabels = filteredLabels.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -339,7 +355,12 @@ const LabelsManagementPage: React.FC = () => {
   // Reset page when filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedRegion, debouncedSearchTerm, selectedCategoryId]);
+  }, [selectedRegion, selectedItem, debouncedSearchTerm, selectedCategoryId]);
+
+  // Reset item filter when category changes
+  useEffect(() => {
+    setSelectedItem("All");
+  }, [selectedCategoryId]);
 
   // Table columns depend on active category and exam code
   const getTableColumns = useMemo(() => {
@@ -707,6 +728,9 @@ const LabelsManagementPage: React.FC = () => {
         .eq("mid", masterSummary.id)
         .in("category", dbCategories);
       if (selectedRegion !== "All") query.eq("region", selectedRegion);
+      if (selectedCategoryId === "district_stationeries" && selectedItem !== "All") {
+        query.eq("item", selectedItem);
+      }
       await query;
       showSuccess("Labels reset successfully!");
       await queryClient.invalidateQueries({ queryKey: ["labels", masterSummary.id, selectedCategoryId] });
@@ -870,6 +894,26 @@ const LabelsManagementPage: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Item Selector (Only for District Stationeries) */}
+            {selectedCategoryId === "district_stationeries" && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Item:</span>
+                <Select value={selectedItem} onValueChange={setSelectedItem}>
+                  <SelectTrigger className="w-48 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
+                    <SelectValue placeholder="Select item" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="All" className="rounded-lg font-medium">All Items</SelectItem>
+                    {uniqueItems.map((item) => (
+                      <SelectItem key={item} value={item} className="rounded-lg font-medium">
+                        {item}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </div>
 
