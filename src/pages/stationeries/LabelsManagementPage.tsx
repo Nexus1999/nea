@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils";
 import { generateLabelsHtml } from "@/utils/labels/printEngine";
 import { renderStationeriesLabels } from "@/utils/labels/stationeries";
 import { renderDistrictStationeriesLabels } from "@/utils/labels/districtStationeries";
+import { renderFtnaDistrictStationeriesLabels } from "@/utils/labels/ftnaDistrictStationeries";
 import { renderArabicBookletsLabels } from "@/utils/labels/arabicBooklets";
 import { renderIctCoversLabels } from "@/utils/labels/ictCovers";
 import { renderFineArtsBookletsLabels } from "@/utils/labels/fineArtsBooklets";
@@ -96,6 +97,8 @@ interface LabelItem {
   normal_loosesheets: number;
   graph_loosesheets: number;
   bkm: number;
+  bkm_red?: number;
+  bkm_pink?: number;
   container_type: string;
   container_number: string; // Matches DB schema (text null)
   total_containers: number;
@@ -388,6 +391,72 @@ const LabelsManagementPage: React.FC = () => {
     }
 
     if (selectedCategoryId === "district_stationeries") {
+      // 1. FTNA Custom columns as requested: Region, District, TR, TWM, BKM RED, BKM PINK, Box, Boxes, Actions
+      if (examCode === "FTNA") {
+        return [
+          { header: "Region", accessor: "region", width: "w-[12%]" },
+          { header: "District", accessor: "district", width: "w-[12%]" },
+          {
+            header: "TR",
+            accessor: "tr",
+            width: "w-[8%]",
+            render: (label: LabelItem) => label.item === "TR" ? <span className="font-bold text-slate-800">{label.quantity}</span> : "-"
+          },
+          {
+            header: "TWM",
+            accessor: "twm",
+            width: "w-[8%]",
+            render: (label: LabelItem) => label.item === "TWM" ? <span className="font-bold text-slate-800">{label.quantity}</span> : "-"
+          },
+          {
+            header: "BKM RED",
+            accessor: "bkm_red",
+            width: "w-[10%]",
+            render: (label: LabelItem) => label.item === "BKM" ? <span className="font-bold text-red-600">{label.bkm_red ?? 0}</span> : "-"
+          },
+          {
+            header: "BKM PINK",
+            accessor: "bkm_pink",
+            width: "w-[10%]",
+            render: (label: LabelItem) => label.item === "BKM" ? <span className="font-bold text-pink-600">{label.bkm_pink ?? 0}</span> : "-"
+          },
+          { header: "Box/Env", accessor: "container_number", width: "w-[10%]" },
+          { header: "Total Boxes", accessor: "total_containers", width: "w-[10%]" },
+        ];
+      }
+
+      // 2. Standard CSEE / ACSEE co-packed BKM columns
+      const isSecondaryDistrict = ["CSEE", "ACSEE"].includes(examCode);
+      if (isSecondaryDistrict) {
+        return [
+          { header: "Region", accessor: "region", width: "w-[12%]" },
+          { header: "District", accessor: "district", width: "w-[12%]" },
+          { header: "Item", accessor: "item", width: "w-[10%]" },
+          {
+            header: "Quantity",
+            accessor: "quantity",
+            width: "w-[20%]",
+            render: (label: LabelItem) => {
+              if (label.item === "BKM") {
+                const red = label.bkm_red || 0;
+                const pink = label.bkm_pink || 0;
+                return (
+                  <div className="flex flex-col items-center justify-center text-xs">
+                    <span className="font-bold text-red-600">RED: {red}</span>
+                    <span className="font-bold text-pink-600">PINK: {pink}</span>
+                    <span className="text-[10px] text-slate-400">(Total: {label.quantity})</span>
+                  </div>
+                );
+              }
+              return label.quantity;
+            }
+          },
+          { header: "Box/Env", accessor: "container_number", width: "w-[10%]" },
+          { header: "Total", accessor: "total_containers", width: "w-[10%]" },
+        ];
+      }
+
+      // 3. Keep standard primary display
       return [
         { header: "Region", accessor: "region", width: "w-[15%]" },
         { header: "District", accessor: "district", width: "w-[15%]" },
@@ -560,7 +629,11 @@ const LabelsManagementPage: React.FC = () => {
         htmlContent = renderStationeriesLabels(labelsToProcess, examCode, examYear);
         break;
       case "district_stationeries":
-        htmlContent = renderDistrictStationeriesLabels(labelsToProcess, examCode, examYear);
+        if (examCode === "FTNA") {
+          htmlContent = renderFtnaDistrictStationeriesLabels(labelsToProcess, examCode, examYear);
+        } else {
+          htmlContent = renderDistrictStationeriesLabels(labelsToProcess, examCode, examYear);
+        }
         break;
       case "arabic_booklets":
         htmlContent = renderArabicBookletsLabels(labelsToProcess, examCode, examYear);
