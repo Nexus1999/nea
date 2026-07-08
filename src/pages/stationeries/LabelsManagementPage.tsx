@@ -96,6 +96,8 @@ interface LabelItem {
   normal_loosesheets: number;
   graph_loosesheets: number;
   bkm: number;
+  bkm_red?: number;
+  bkm_pink?: number;
   container_type: string;
   container_number: string; // Matches DB schema (text null)
   total_containers: number;
@@ -392,7 +394,25 @@ const LabelsManagementPage: React.FC = () => {
         { header: "Region", accessor: "region", width: "w-[15%]" },
         { header: "District", accessor: "district", width: "w-[15%]" },
         { header: "Item", accessor: "item", width: "w-[15%]" },
-        { header: "Quantity", accessor: "quantity", width: "w-[15%]" },
+        {
+          header: "Quantity",
+          accessor: "quantity",
+          width: "w-[15%]",
+          render: (label: LabelItem) => {
+            if (label.item === "BKM" && ["FTNA", "CSEE", "ACSEE"].includes(examCode)) {
+              const red = label.bkm_red || 0;
+              const pink = label.bkm_pink || 0;
+              return (
+                <div className="flex flex-col items-center justify-center text-xs">
+                  <span className="font-bold">{label.quantity} Total</span>
+                  <span className="text-[10px] text-red-600 font-semibold">Red: {red}</span>
+                  <span className="text-[10px] text-pink-600 font-semibold">Pink: {pink}</span>
+                </div>
+              );
+            }
+            return label.quantity;
+          }
+        },
         { header: "Box", accessor: "container_number", width: "w-[10%]" },
         { header: "Boxes", accessor: "total_containers", width: "w-[10%]" },
       ];
