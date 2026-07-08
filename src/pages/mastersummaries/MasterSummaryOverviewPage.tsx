@@ -148,16 +148,22 @@ const MasterSummaryOverviewPage = () => {
         streams = Math.ceil(registered / 40);
       } 
       else if (isSecondary) {
-        const subjectCode = (code === "ACSEE") ? "111" : "011";
         const isPrivate = detail.center_number?.startsWith('P');
-        registered = isPrivate 
-          ? Math.max(
-              ...Object.keys(detail)
-                .filter(k => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k))
-                .map(k => Number(detail[k]) || 0),
-              0
-            )
-          : (Number(detail[subjectCode]) || 0);
+        if (isPrivate) {
+          registered = Math.max(
+            ...Object.keys(detail)
+              .filter(k => !['id','mid','region','district','center_name','center_number','is_latest','version','created_at'].includes(k))
+              .map(k => Number(detail[k]) || 0),
+            0
+          );
+        } else {
+          if (code === "CSEE" || code === "FTNA") {
+            registered = (Number(detail['011']) || 0) + (Number(detail['060']) || 0);
+          } else {
+            const subjectCode = (code === "ACSEE") ? "111" : "011";
+            registered = Number(detail[subjectCode]) || 0;
+          }
+        }
         streams = Math.ceil(registered / 40);
       } 
       else {
