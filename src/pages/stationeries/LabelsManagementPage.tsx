@@ -96,8 +96,6 @@ interface LabelItem {
   normal_loosesheets: number;
   graph_loosesheets: number;
   bkm: number;
-  bkm_red?: number;
-  bkm_pink?: number;
   container_type: string;
   container_number: string; // Matches DB schema (text null)
   total_containers: number;
@@ -390,35 +388,6 @@ const LabelsManagementPage: React.FC = () => {
     }
 
     if (selectedCategoryId === "district_stationeries") {
-      const isSecondaryDistrict = ["FTNA", "CSEE", "ACSEE"].includes(examCode);
-      if (isSecondaryDistrict) {
-        return [
-          { header: "Region", accessor: "region", width: "w-[12%]" },
-          { header: "District", accessor: "district", width: "w-[12%]" },
-          { header: "Item", accessor: "item", width: "w-[10%]" },
-          {
-            header: "Quantity",
-            accessor: "quantity",
-            width: "w-[20%]",
-            render: (label: LabelItem) => {
-              if (label.item === "BKM") {
-                const red = label.bkm_red || 0;
-                const pink = label.bkm_pink || 0;
-                return (
-                  <div className="flex flex-col items-center justify-center text-xs">
-                    <span className="font-bold text-red-600">RED: {red}</span>
-                    <span className="font-bold text-pink-600">PINK: {pink}</span>
-                    <span className="text-[10px] text-slate-400">(Total: {label.quantity})</span>
-                  </div>
-                );
-              }
-              return label.quantity;
-            }
-          },
-          { header: "Box/Env", accessor: "container_number", width: "w-[10%]" },
-          { header: "Total", accessor: "total_containers", width: "w-[10%]" },
-        ];
-      }
       return [
         { header: "Region", accessor: "region", width: "w-[15%]" },
         { header: "District", accessor: "district", width: "w-[15%]" },
