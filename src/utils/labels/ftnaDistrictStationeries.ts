@@ -113,19 +113,31 @@ export const renderFtnaDistrictStationeriesLabels = (
     `;
   };
 
-  // Group labels into pages of 2
+  // Group labels into pages:
+  // BKM => duplicate the same label twice per page.
+  // Everything else (TR, TWM, etc.) => one label per page.
   const pages: string[] = [];
-  for (let i = 0; i < labels.length; i += 2) {
-    const firstLabel = singleLabel(labels[i]);
-    const secondLabel = i + 1 < labels.length ? singleLabel(labels[i + 1]) : null;
-    const cutLine = secondLabel ? `<div class="cut-line"><span></span></div>` : '';
-    pages.push(`
-      <div class="page-container">
-        ${firstLabel}
-        ${cutLine}
-        ${secondLabel || ''}
-      </div>
-    `);
+  for (let i = 0; i < labels.length; i++) {
+    const label = labels[i];
+    const itemType = (label.item || "").toUpperCase();
+    const isBkm = itemType === "BKM";
+
+    if (isBkm) {
+      const labelHtml = singleLabel(label);
+      pages.push(`
+        <div class="page-container">
+          ${labelHtml}
+          <div class="cut-line"><span></span></div>
+          ${labelHtml}
+        </div>
+      `);
+    } else {
+      pages.push(`
+        <div class="page-container single-page">
+          ${singleLabel(label)}
+        </div>
+      `);
+    }
   }
 
   return `
@@ -182,6 +194,9 @@ export const renderFtnaDistrictStationeriesLabels = (
             padding: 10mm 12mm;
             box-sizing: border-box;
             overflow: hidden;
+          }
+          .page-container.single-page {
+            justify-content: flex-start;
           }
           .label-card {
             height: 122mm;
