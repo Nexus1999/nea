@@ -1,88 +1,87 @@
 import { abbreviateSchoolName } from "./abbreviate";
 
-export const renderFtnaDistrictStationeriesLabels = (
-  labels: any[],
-  examCode: string,
-  examYear: string
-): string => {
-  const generateQRData = (label: any): string => {
-    const payload = [
-      `EXAM:${examCode}`,
-      `YEAR:${examYear}`,
-      `REGION:${label.region || ""}`,
-      `DISTRICT:${label.district || ""}`,
-      label.bkm_red ? `BLUE:${label.bkm_red}` : "",
-      label.bkm_pink ? `PINK:${label.bkm_pink}` : "",
-      `ITEM:${label.item || ""}`,
-      `QTY:${label.quantity || 0}`,
-      `BOX:${label.container_number}/${label.total_containers}`,
-    ].filter(Boolean).join(" | ");
-    return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
-  };
+// ==========================================
+// TYPES & INTERFACES
+// ==========================================
+interface LabelData {
+  region?: string;
+  district?: string;
+  bkm_red?: number;
+  bkm_pink?: number;
+  item?: string;
+  quantity?: number;
+  container_number?: string | number;
+  total_containers?: string | number;
+}
 
-  const singleLabel = (label: any) => {
-    const qrUrl = generateQRData(label);
+// ==========================================
+// STICKER ENGINE TYPES
+// ==========================================
+class BkmSticker {
+  static render(label: LabelData, examCode: string, examYear: string, qrUrl: string): string {
     const regionName = (label.region || "N/A").toUpperCase();
     const districtName = (label.district || "N/A").toUpperCase();
-    const itemType = (label.item || "").toUpperCase();
-    const isBkmSplit = itemType === "BKM";
+    const regionFontSize = regionName === "DAR ES SALAAM" ? "60px" : "68px";
+    const blueQty = label.bkm_red || 0;
+    const pinkQty = label.bkm_pink || 0;
     const containerNum = label.container_number || "?";
     const totalContainers = label.total_containers || "?";
 
-    if (isBkmSplit) {
-      // ---- BKM style: Stacked row system without the top header banner ----
-      const regionFontSize = regionName === "DAR ES SALAAM" ? "60px" : "68px";
-      const blueQty = label.bkm_red || 0;
-      const pinkQty = label.bkm_pink || 0;
+    return `
+      <div class="label-card card-district bkm-sticker-variant">
+        <div class="corner-tl"></div>
+        <div class="corner-tr"></div>
+        <div class="corner-bl"></div>
+        <div class="corner-br"></div>
+        <div class="watermark">${examCode}</div>
 
-      return `
-        <div class="label-card card-district">
-          <div class="corner-tl"></div>
-          <div class="corner-tr"></div>
-          <div class="corner-bl"></div>
-          <div class="corner-br"></div>
-          <div class="watermark">${examCode}</div>
+        <div class="exam-badge">
+          <span>FTNA-${examYear}</span>
+        </div>
 
-          <div class="exam-badge">
-            <span>FTNA-${examYear}</span>
+        <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
+        <div class="district">${districtName}</div>
+
+        <div class="stationery-grid bkm-grid">
+          <div class="stationery-item stacked-item blue-item">
+            <div class="item-info">
+              <span class="item-label">BLUE</span>
+            </div>
+            <div class="item-value">${blueQty}</div>
           </div>
-
-          <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
-          <div class="district">${districtName}</div>
-
-          <div class="stationery-grid">
-            <div class="stationery-item stacked-item">
-              <div class="item-info">
-                <span class="item-label">BLUE</span>
-              </div>
-              <div class="item-value">${blueQty}</div>
+          <div class="stationery-item stacked-item pink-item">
+            <div class="item-info">
+              <span class="item-label">PINK</span>
             </div>
-            <div class="stationery-item stacked-item">
-              <div class="item-info">
-                <span class="item-label">PINK</span>
-              </div>
-              <div class="item-value">${pinkQty}</div>
-            </div>
-          </div>
-
-          <div class="bottom-row">
-            <div class="box-number">
-              <div class="box-value">BOX ${containerNum}/${totalContainers}</div>
-            </div>
-            <div class="qr-wrapper">
-              <img src="${qrUrl}" alt="QR Code" />
-            </div>
+            <div class="item-value">${pinkQty}</div>
           </div>
         </div>
-      `;
-    }
 
-    // ---- Classic card for TR / TWM ----
-    const regionFontSize = "50px";
+        <div class="bottom-row">
+          <div class="box-number">
+            <div class="box-value">BOX ${containerNum}/${totalContainers}</div>
+          </div>
+          <div class="qr-wrapper">
+            <img src="${qrUrl}" alt="QR Code" />
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+class ClassicSticker {
+  static render(label: LabelData, examCode: string, examYear: string, qrUrl: string): string {
+    const regionName = (label.region || "N/A").toUpperCase();
+    const districtName = (label.district || "N/A").toUpperCase();
+    const itemType = (label.item || "").toUpperCase();
     const qty = label.quantity || 0;
+    const containerNum = label.container_number || "?";
+    const totalContainers = label.total_containers || "?";
+    const regionFontSize = "50px";
 
     return `
-      <div class="label-card card-classic">
+      <div class="label-card card-classic classic-sticker-variant">
         <div class="corner-tl"></div>
         <div class="corner-tr"></div>
         <div class="corner-bl"></div>
@@ -98,8 +97,8 @@ export const renderFtnaDistrictStationeriesLabels = (
         <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
         <div class="district">${districtName}</div>
 
-        <div class="stationery-grid">
-          <div class="stationery-item">
+        <div class="stationery-grid classic-grid">
+          <div class="stationery-item standard-item">
             <div class="item-info">
               <span class="item-label">${itemType || "N/A"}</span>
             </div>
@@ -117,9 +116,43 @@ export const renderFtnaDistrictStationeriesLabels = (
         </div>
       </div>
     `;
+  }
+}
+
+// ==========================================
+// MAIN RENDER FUNCTION
+// ==========================================
+export const renderFtnaDistrictStationeriesLabels = (
+  labels: LabelData[],
+  examCode: string,
+  examYear: string
+): string => {
+  
+  const generateQRData = (label: LabelData): string => {
+    const payload = [
+      `EXAM:${examCode}`,
+      `YEAR:${examYear}`,
+      `REGION:${label.region || ""}`,
+      `DISTRICT:${label.district || ""}`,
+      label.bkm_red ? `BLUE:${label.bkm_red}` : "",
+      label.bkm_pink ? `PINK:${label.bkm_pink}` : "",
+      `ITEM:${label.item || ""}`,
+      `QTY:${label.quantity || 0}`,
+      `BOX:${label.container_number}/${label.total_containers}`,
+    ].filter(Boolean).join(" | ");
+    return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
   };
 
-  // ---- Pagination ----
+  const dispatchLabelRender = (label: LabelData): string => {
+    const qrUrl = generateQRData(label);
+    const isBkm = (label.item || "").toUpperCase() === "BKM";
+    
+    return isBkm 
+      ? BkmSticker.render(label, examCode, examYear, qrUrl)
+      : ClassicSticker.render(label, examCode, examYear, qrUrl);
+  };
+
+  // ---- Pagination Logic ----
   const getGroup = (item: any): "BKM" | "OTHER" =>
     (item || "").toUpperCase() === "BKM" ? "BKM" : "OTHER";
 
@@ -129,7 +162,7 @@ export const renderFtnaDistrictStationeriesLabels = (
     const group = getGroup(labels[i].item);
 
     if (group === "BKM") {
-      const labelHtml = singleLabel(labels[i]);
+      const labelHtml = dispatchLabelRender(labels[i]);
       pages.push(`
         <div class="page-container">
           ${labelHtml}
@@ -147,16 +180,16 @@ export const renderFtnaDistrictStationeriesLabels = (
         const second = labels[i + 1];
         pages.push(`
           <div class="page-container">
-            ${singleLabel(first)}
+            ${dispatchLabelRender(first)}
             <div class="cut-line"><span></span></div>
-            ${singleLabel(second)}
+            ${dispatchLabelRender(second)}
           </div>
         `);
         i += 2;
       } else {
         pages.push(`
           <div class="page-container single-page">
-            ${singleLabel(first)}
+            ${dispatchLabelRender(first)}
           </div>
         `);
         i += 1;
@@ -303,34 +336,34 @@ export const renderFtnaDistrictStationeriesLabels = (
             text-align: center;
           }
 
-          /* ============ CLASSIC style — TR / TWM ============ */
-          .card-classic {
+          /* ============ CLASSIC STICKER VARIANT SPECIFIC STYLE ============ */
+          .classic-sticker-variant {
             border: 3px double #000;
             border-radius: 24px;
             background: #ffffff;
             padding: 18px 24px;
           }
-          .card-classic .top-row {
+          .classic-sticker-variant .top-row {
             display: flex;
             justify-content: center;
             align-items: center;
             margin-bottom: 8px;
             z-index: 2;
           }
-          .card-classic .exam-badge-left {
+          .classic-sticker-variant .exam-badge-left {
             border: 1.5px solid #000;
             border-radius: 60px;
             padding: 4px 14px;
             background: white;
           }
-          .card-classic .exam-badge-left span {
+          .classic-sticker-variant .exam-badge-left span {
             font-size: 22px;
             font-weight: 800;
             letter-spacing: 1.5px;
             text-transform: uppercase;
             color: #000;
           }
-          .card-classic .region {
+          .classic-sticker-variant .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
             text-transform: uppercase;
@@ -341,7 +374,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             line-height: 1.1;
             z-index: 2;
           }
-          .card-classic .district {
+          .classic-sticker-variant .district {
             font-size: 35px;
             font-weight: 900;
             text-transform: uppercase;
@@ -353,7 +386,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             letter-spacing: 0.5px;
             z-index: 2;
           }
-          .card-classic .bottom-row {
+          .classic-sticker-variant .bottom-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -361,7 +394,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             margin-top: auto;
             z-index: 2;
           }
-          .card-classic .box-number-container {
+          .classic-sticker-variant .box-number-container {
             flex: 1;
             border: 2px solid #000;
             border-radius: 16px;
@@ -372,14 +405,14 @@ export const renderFtnaDistrictStationeriesLabels = (
             flex-direction: column;
             justify-content: center;
           }
-          .card-classic .box-value {
+          .classic-sticker-variant .box-value {
             font-size: 44px;
             font-weight: 900;
             color: #000;
             line-height: 1;
             font-family: 'arial', 'Georgia', serif;
           }
-          .card-classic .qr-wrapper {
+          .classic-sticker-variant .qr-wrapper {
             background: white;
             border: 2px solid #000;
             padding: 6px;
@@ -388,26 +421,26 @@ export const renderFtnaDistrictStationeriesLabels = (
             align-items: center;
             justify-content: center;
           }
-          .card-classic .qr-wrapper img {
+          .classic-sticker-variant .qr-wrapper img {
             width: 68px;
             height: 68px;
             display: block;
           }
 
-          /* ============ DISTRICT style — BKM ============ */
-          .card-district {
+          /* ============ BKM STICKER VARIANT SPECIFIC STYLE ============ */
+          .bkm-sticker-variant {
             border: 2px solid #000;
             border-radius: 24px;
             background: white;
             padding: 18px 24px 22px 24px;
           }
-          .card-district .exam-badge {
+          .bkm-sticker-variant .exam-badge {
             display: flex;
             gap: 14px;
             align-self: center;
             margin-bottom: 12px;
           }
-          .card-district .exam-badge span {
+          .bkm-sticker-variant .exam-badge span {
             padding: 6px 14px;
             border-radius: 999px;
             background: transparent;
@@ -418,7 +451,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             letter-spacing: 1.5px;
             color: #000;
           }
-          .card-district .region {
+          .bkm-sticker-variant .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
             text-transform: uppercase;
@@ -429,7 +462,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             line-height: 1.1;
             z-index: 1;
           }
-          .card-district .district {
+          .bkm-sticker-variant .district {
             font-size: 50px;
             font-weight: 900;
             text-transform: uppercase;
@@ -441,7 +474,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             letter-spacing: 0.5px;
             z-index: 1;
           }
-          .card-district .bottom-row {
+          .bkm-sticker-variant .bottom-row {
             display: flex;
             flex-direction: row;
             align-items: center;
@@ -450,7 +483,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             margin-top: auto;
             z-index: 1;
           }
-          .card-district .box-number {
+          .bkm-sticker-variant .box-number {
             flex: 1;
             background: transparent;
             border: 1.5px solid #000;
@@ -458,7 +491,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             padding: 10px 14px;
             text-align: center;
           }
-          .card-district .box-value {
+          .bkm-sticker-variant .box-value {
             font-size: 60px;
             font-weight: 900;
             letter-spacing: -2px;
@@ -466,7 +499,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             color: #000;
             font-variant-numeric: tabular-nums;
           }
-          .card-district .qr-wrapper {
+          .bkm-sticker-variant .qr-wrapper {
             background: white;
             border: 1.5px solid #000;
             padding: 10px;
@@ -475,7 +508,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             align-items: center;
             justify-content: center;
           }
-          .card-district .qr-wrapper img {
+          .bkm-sticker-variant .qr-wrapper img {
             width: 68px;
             height: 68px;
             display: block;
