@@ -1149,6 +1149,7 @@ const LabelsManagementPage: React.FC = () => {
             stationery={stationery}
             onSuccess={() => {}}
             examCode={masterSummary.Code}
+            category={selectedCategoryId}
           />
           <KitbagLimitsDrawer
             open={isKitbagLimitsDrawerOpen}

@@ -58,9 +58,10 @@ interface BoxLimitsDrawerProps {
   stationery: Stationery | null;
   onSuccess: () => void;
   examCode: string;
+  category?: string | null;
 }
 
-const BoxLimitsDrawer: React.FC<BoxLimitsDrawerProps> = ({ open, onOpenChange, stationery, onSuccess, examCode }) => {
+const BoxLimitsDrawer: React.FC<BoxLimitsDrawerProps> = ({ open, onOpenChange, stationery, onSuccess, examCode, category }) => {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [existingId, setExistingId] = useState<number | undefined>(undefined);
@@ -71,6 +72,9 @@ const BoxLimitsDrawer: React.FC<BoxLimitsDrawerProps> = ({ open, onOpenChange, s
   });
 
   const fieldsToRender = useMemo(() => {
+    if (category === "supervisors_forms") {
+      return ['tr', 'twm'] as (keyof BoxLimitsFormValues)[];
+    }
     if (!examCode) return [];
     if (['ACSEE', 'CSEE'].includes(examCode)) {
       return ['normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets', 'bkm'] as (keyof BoxLimitsFormValues)[];
@@ -80,7 +84,7 @@ const BoxLimitsDrawer: React.FC<BoxLimitsDrawerProps> = ({ open, onOpenChange, s
       return ['fbm1', 'fbm2', 'tr', 'twm', 'bkm'] as (keyof BoxLimitsFormValues)[];
     }
     return [];
-  }, [examCode]);
+  }, [examCode, category]);
 
   const loadData = useCallback(async (id: number) => {
     setLoading(true);
