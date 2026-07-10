@@ -11,7 +11,7 @@ export const renderFtnaDistrictStationeriesLabels = (
       `YEAR:${examYear}`,
       `REGION:${label.region || ""}`,
       `DISTRICT:${label.district || ""}`,
-      label.bkm_red ? `RED:${label.bkm_red}` : "",
+      label.bkm_red ? `BLUE:${label.bkm_red}` : "",
       label.bkm_pink ? `PINK:${label.bkm_pink}` : "",
       `ITEM:${label.item || ""}`,
       `QTY:${label.quantity || 0}`,
@@ -30,9 +30,9 @@ export const renderFtnaDistrictStationeriesLabels = (
     const totalContainers = label.total_containers || "?";
 
     if (isBkmSplit) {
-      // ---- District-Stationeries style (corner marks + item-quantity-panel) ----
+      // ---- BKM style: Stacked row system without the top header banner ----
       const regionFontSize = regionName === "DAR ES SALAAM" ? "60px" : "68px";
-      const redQty = label.bkm_red || 0;
+      const blueQty = label.bkm_red || 0;
       const pinkQty = label.bkm_pink || 0;
 
       return `
@@ -50,14 +50,18 @@ export const renderFtnaDistrictStationeriesLabels = (
           <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
           <div class="district">${districtName}</div>
 
-          <div class="item-quantity-panel split-panel">
-            <div class="item-box split-box red-split">
-              <div class="split-label font-red">RED (SCHOOL)</div>
-              <div class="item-value text-red">${redQty}</div>
+          <div class="stationery-grid">
+            <div class="stationery-item stacked-item">
+              <div class="item-info">
+                <span class="item-label">BLUE</span>
+              </div>
+              <div class="item-value">${blueQty}</div>
             </div>
-            <div class="qty-box split-box pink-split">
-              <div class="split-label font-pink">PINK (PRIVATE)</div>
-              <div class="qty-value text-pink">${pinkQty}</div>
+            <div class="stationery-item stacked-item">
+              <div class="item-info">
+                <span class="item-label">PINK</span>
+              </div>
+              <div class="item-value">${pinkQty}</div>
             </div>
           </div>
 
@@ -73,7 +77,7 @@ export const renderFtnaDistrictStationeriesLabels = (
       `;
     }
 
-    // ---- Arabic-Booklets style (classic cream card + stat-block) for TR/TWM ----
+    // ---- Classic card for TR / TWM ----
     const regionFontSize = "50px";
     const qty = label.quantity || 0;
 
@@ -94,10 +98,12 @@ export const renderFtnaDistrictStationeriesLabels = (
         <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
         <div class="district">${districtName}</div>
 
-        <div class="stats-grid">
-          <div class="stat-block item-block">
-            <div class="stat-header">${itemType || "N/A"} QUANTITY</div>
-            <div class="stat-value">${qty}</div>
+        <div class="stationery-grid">
+          <div class="stationery-item">
+            <div class="item-info">
+              <span class="item-label">${itemType || "N/A"}</span>
+            </div>
+            <div class="item-value">${qty}</div>
           </div>
         </div>
 
@@ -113,17 +119,17 @@ export const renderFtnaDistrictStationeriesLabels = (
     `;
   };
 
-  // Group labels into pages:
-  // BKM => duplicate the same label twice per page.
-  // Everything else (TR, TWM, etc.) => one label per page.
-  const pages: string[] = [];
-  for (let i = 0; i < labels.length; i++) {
-    const label = labels[i];
-    const itemType = (label.item || "").toUpperCase();
-    const isBkm = itemType === "BKM";
+  // ---- Pagination ----
+  const getGroup = (item: any): "BKM" | "OTHER" =>
+    (item || "").toUpperCase() === "BKM" ? "BKM" : "OTHER";
 
-    if (isBkm) {
-      const labelHtml = singleLabel(label);
+  const pages: string[] = [];
+  let i = 0;
+  while (i < labels.length) {
+    const group = getGroup(labels[i].item);
+
+    if (group === "BKM") {
+      const labelHtml = singleLabel(labels[i]);
       pages.push(`
         <div class="page-container">
           ${labelHtml}
@@ -131,12 +137,30 @@ export const renderFtnaDistrictStationeriesLabels = (
           ${labelHtml}
         </div>
       `);
+      i += 1;
     } else {
-      pages.push(`
-        <div class="page-container single-page">
-          ${singleLabel(label)}
-        </div>
-      `);
+      const first = labels[i];
+      const hasNextInSameGroup =
+        i + 1 < labels.length && getGroup(labels[i + 1].item) === "OTHER";
+
+      if (hasNextInSameGroup) {
+        const second = labels[i + 1];
+        pages.push(`
+          <div class="page-container">
+            ${singleLabel(first)}
+            <div class="cut-line"><span></span></div>
+            ${singleLabel(second)}
+          </div>
+        `);
+        i += 2;
+      } else {
+        pages.push(`
+          <div class="page-container single-page">
+            ${singleLabel(first)}
+          </div>
+        `);
+        i += 1;
+      }
     }
   }
 
@@ -208,10 +232,10 @@ export const renderFtnaDistrictStationeriesLabels = (
           }
 
           /* ============ Shared corner accents & watermark ============ */
-          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
+          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #000; border-left: 3px solid #000; position: absolute; width: 16px; height: 16px; }
+          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #000; border-right: 3px solid #000; position: absolute; width: 16px; height: 16px; }
+          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #000; border-left: 3px solid #000; position: absolute; width: 16px; height: 16px; }
+          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #000; border-right: 3px solid #000; position: absolute; width: 16px; height: 16px; }
           .watermark {
             position: absolute;
             right: 20px;
@@ -219,29 +243,82 @@ export const renderFtnaDistrictStationeriesLabels = (
             transform: translateY(-50%);
             font-size: 130px;
             font-weight: 900;
-            color: rgba(15, 23, 42, 0.02);
+            color: rgba(0, 0, 0, 0.02);
             pointer-events: none;
             user-select: none;
             z-index: 0;
           }
 
-          /* ============ CLASSIC (Arabic-Booklets) style — TR / TWM ============ */
+          /* ============ STATIONERY ROW SYSTEM ============ */
+          .stationery-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+            margin-bottom: 10px;
+            z-index: 2;
+          }
+          .stationery-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 14px;
+            background: #ffffff;
+            border-radius: 14px;
+            border: 2px solid #000000;
+            position: relative;
+            overflow: hidden;
+          }
+          .stationery-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background: #000000;
+          }
+          .item-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+          }
+          .item-label {
+            font-size: 26px;
+            font-weight: 800;
+            color: #000000;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .item-value {
+            font-size: 28px;
+            font-weight: 900;
+            color: #000000;
+            font-family: 'Courier New', monospace;
+            background: #ffffff;
+            padding: 4px 14px;
+            border: 1.5px solid #000;
+            border-radius: 12px;
+            min-width: 65px;
+            text-align: center;
+          }
+
+          /* ============ CLASSIC style — TR / TWM ============ */
           .card-classic {
-            border: 3px double #0f172a;
+            border: 3px double #000;
             border-radius: 24px;
-            background: #fffdf9;
+            background: #ffffff;
             padding: 18px 24px;
-            box-shadow: inset 0 0 40px rgba(15, 23, 42, 0.02);
           }
           .card-classic .top-row {
             display: flex;
-            justify-content: flex-start;
+            justify-content: center;
             align-items: center;
             margin-bottom: 8px;
             z-index: 2;
           }
           .card-classic .exam-badge-left {
-            border: 1.5px solid #0f172a;
+            border: 1.5px solid #000;
             border-radius: 60px;
             padding: 4px 14px;
             background: white;
@@ -251,13 +328,13 @@ export const renderFtnaDistrictStationeriesLabels = (
             font-weight: 800;
             letter-spacing: 1.5px;
             text-transform: uppercase;
-            color: #0f172a;
+            color: #000;
           }
           .card-classic .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
             text-transform: uppercase;
-            color: #0f172a;
+            color: #000;
             text-align: center;
             letter-spacing: -0.5px;
             margin-bottom: 4px;
@@ -268,49 +345,13 @@ export const renderFtnaDistrictStationeriesLabels = (
             font-size: 35px;
             font-weight: 900;
             text-transform: uppercase;
-            color: #1e293b;
+            color: #000;
             text-align: center;
             margin-bottom: 12px;
             line-height: 1.2;
             word-break: break-word;
             letter-spacing: 0.5px;
             z-index: 2;
-          }
-          .card-classic .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 14px;
-            margin-bottom: 10px;
-            z-index: 2;
-          }
-          .card-classic .stat-block {
-            background: white;
-            border: 2px solid #0f172a;
-            border-radius: 16px;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-          }
-          .card-classic .item-block {
-            border-top: 6px solid #059669;
-          }
-          .card-classic .stat-header {
-            font-size: 14px;
-            font-weight: 800;
-            color: #64748b;
-            letter-spacing: 1px;
-            margin-bottom: 4px;
-            text-align: center;
-          }
-          .card-classic .stat-value {
-            font-size: 50px;
-            font-weight: 900;
-            font-family: 'Georgia', serif;
-            color: #0f172a;
-            line-height: 1;
           }
           .card-classic .bottom-row {
             display: flex;
@@ -322,7 +363,7 @@ export const renderFtnaDistrictStationeriesLabels = (
           }
           .card-classic .box-number-container {
             flex: 1;
-            border: 2px solid #0f172a;
+            border: 2px solid #000;
             border-radius: 16px;
             padding: 8px 12px;
             text-align: center;
@@ -334,19 +375,18 @@ export const renderFtnaDistrictStationeriesLabels = (
           .card-classic .box-value {
             font-size: 44px;
             font-weight: 900;
-            color: #0f172a;
+            color: #000;
             line-height: 1;
             font-family: 'arial', 'Georgia', serif;
           }
           .card-classic .qr-wrapper {
             background: white;
-            border: 2px solid #0f172a;
+            border: 2px solid #000;
             padding: 6px;
             border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
           }
           .card-classic .qr-wrapper img {
             width: 68px;
@@ -354,23 +394,12 @@ export const renderFtnaDistrictStationeriesLabels = (
             display: block;
           }
 
-          /* ============ DISTRICT-STATIONERIES style — BKM ============ */
+          /* ============ DISTRICT style — BKM ============ */
           .card-district {
-            border: 2px solid #0f172a;
+            border: 2px solid #000;
             border-radius: 24px;
             background: white;
             padding: 18px 24px 22px 24px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-          }
-          .card-district::before {
-            content: '';
-            position: absolute;
-            top: 24px;
-            bottom: 24px;
-            left: 0;
-            width: 5px;
-            background: #0f172a;
-            border-radius: 0 4px 4px 0;
           }
           .card-district .exam-badge {
             display: flex;
@@ -382,18 +411,18 @@ export const renderFtnaDistrictStationeriesLabels = (
             padding: 6px 14px;
             border-radius: 999px;
             background: transparent;
-            border: 1.5px solid #cbd5e1;
+            border: 1.5px solid #000;
             font-size: 26px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 1.5px;
-            color: #0f172a;
+            color: #000;
           }
           .card-district .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
             text-transform: uppercase;
-            color: #0f172a;
+            color: #000;
             text-align: center;
             letter-spacing: -0.5px;
             margin-bottom: 5px;
@@ -404,7 +433,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             font-size: 50px;
             font-weight: 900;
             text-transform: uppercase;
-            color: #1e293b;
+            color: #000;
             text-align: center;
             margin-bottom: 10px;
             line-height: 1.2;
@@ -412,59 +441,19 @@ export const renderFtnaDistrictStationeriesLabels = (
             letter-spacing: 0.5px;
             z-index: 1;
           }
-          .card-district .item-quantity-panel {
-            display: flex;
-            flex-direction: row;
-            border-radius: 18px;
-            border: 2px solid #cbd5e1;
-            background: transparent;
-            margin-bottom: 6px;
-            overflow: hidden;
-            z-index: 1;
-          }
-          .card-district .item-box,
-          .card-district .qty-box {
-            flex: 1;
-            padding: 8px 10px;
-            text-align: center;
-            background: transparent;
-          }
-          .card-district .item-box {
-            border-right: 2px solid #cbd5e1;
-          }
-          .card-district .item-value,
-          .card-district .qty-value {
-            font-size: 42px;
-            font-weight: 900;
-            color: #0f172a;
-            line-height: 1;
-          }
-          .card-district .split-label {
-            font-size: 13px;
-            font-weight: 800;
-            letter-spacing: 1px;
-            margin-bottom: 4px;
-            text-align: center;
-          }
-          .card-district .font-red { color: #ef4444 !important; }
-          .card-district .font-pink { color: #ec4899 !important; }
-          .card-district .text-red { color: #dc2626 !important; }
-          .card-district .text-pink { color: #db2777 !important; }
-          .card-district .red-split { border-top: 4px solid #dc2626; }
-          .card-district .pink-split { border-top: 4px solid #ec4899; }
           .card-district .bottom-row {
             display: flex;
             flex-direction: row;
             align-items: center;
             justify-content: space-between;
             gap: 20px;
-            margin-top: 3px;
+            margin-top: auto;
             z-index: 1;
           }
           .card-district .box-number {
             flex: 1;
             background: transparent;
-            border: 1.5px solid #cbd5e1;
+            border: 1.5px solid #000;
             border-radius: 18px;
             padding: 10px 14px;
             text-align: center;
@@ -474,15 +463,12 @@ export const renderFtnaDistrictStationeriesLabels = (
             font-weight: 900;
             letter-spacing: -2px;
             line-height: 0.95;
-            color: #0f172a;
+            color: #000;
             font-variant-numeric: tabular-nums;
           }
           .card-district .qr-wrapper {
             background: white;
-            border: 1.5px solid #cbd5e1;
-            box-shadow:
-              0 1px 3px rgba(0,0,0,.05),
-              inset 0 1px 0 rgba(255,255,255,.8);
+            border: 1.5px solid #000;
             padding: 10px;
             border-radius: 18px;
             display: flex;
@@ -497,7 +483,7 @@ export const renderFtnaDistrictStationeriesLabels = (
 
           /* ============ Shared cut-line ============ */
           .cut-line {
-            border-top: 2px dashed #475569;
+            border-top: 2px dashed #000;
             width: 100%;
             position: relative;
             text-align: center;
@@ -514,7 +500,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             letter-spacing: 4px;
             font-weight: 800;
             text-transform: uppercase;
-            color: #1e293b;
+            color: #000;
             font-family: monospace;
           }
         </style>
