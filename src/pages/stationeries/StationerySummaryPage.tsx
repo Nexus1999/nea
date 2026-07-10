@@ -121,7 +121,7 @@ const FTNA_DOUBLE_PAPER_SUBJECTS = [
 // BKM weights for ACSEE
 const ACSEE_BKM_WEIGHTS: Record<string, number> = {
   "111": 1, "112": 2, "113": 2, "114": 2, "115": 2, "116": 2, "118": 2, "121": 2, "122": 2, "123": 2, "125": 2, "126": 2,
-  "131": 5, "132": 5, "133": 5, "134": 5, "136": 2, "137": 1, "141": 1, "142": 6, "151": 2, "152": 2, "153": 2, "155": 3, "161": 1
+  "131": 5, "132": 5, "133": 5, "134": 5, "136": 5, "137": 2, "141": 1, "142": 6, "151": 2, "152": 2, "153": 2, "155": 3, "161": 2
 };
 
 // Subject-aware mapping for ICT/Arabic/Fine Arts
@@ -157,6 +157,10 @@ const getFieldVisual = (field: string) => {
       return { icon: Layers, color: 'text-violet-600', bg: 'bg-violet-50/60', border: 'border-violet-100', gradient: 'from-violet-400 to-fuchsia-500' };
     case 'bkm':
       return { icon: Boxes, color: 'text-emerald-600', bg: 'bg-emerald-50/60', border: 'border-emerald-100', gradient: 'from-emerald-400 to-teal-500' };
+    case 'bkm_red':
+      return { icon: Boxes, color: 'text-red-600', bg: 'bg-red-50/60', border: 'border-red-100', gradient: 'from-red-400 to-rose-500' };
+    case 'bkm_pink':
+      return { icon: Boxes, color: 'text-pink-600', bg: 'bg-pink-50/60', border: 'border-pink-100', gradient: 'from-pink-400 to-rose-400' };
     case 'tr':
       return { icon: ClipboardList, color: 'text-rose-600', bg: 'bg-rose-50/60', border: 'border-rose-100', gradient: 'from-rose-400 to-red-500' };
     case 'twm':
@@ -186,32 +190,6 @@ const formatNumber = (num: number) => {
   return new Intl.NumberFormat('en-US').format(num);
 };
 
-const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, icon: Icon, colorClass, gradient }) => {
-  return (
-    <Card className="relative overflow-hidden border-none shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group bg-white">
-      <div className={`absolute inset-0 opacity-10 bg-gradient-to-br ${gradient}`} />
-      
-      <CardContent className="p-6 relative z-10">
-        <div className="flex justify-between items-center mb-4">
-          <div className="p-3 rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
-            <Icon className={`h-6 w-6 ${colorClass}`} />
-          </div>
-          <Badge className={cn("bg-white border-current font-bold text-[10px]", colorClass)}>
-            TOTAL
-          </Badge>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider truncate">{title}</p>
-          <h3 className="text-3xl font-black tracking-tight text-slate-900">
-            {formatNumber(value)}
-          </h3>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
 const StationerySummaryPage: React.FC = () => {
   const { stationeryId } = useParams<{ stationeryId: string }>();
   const navigate = useNavigate();
@@ -232,10 +210,10 @@ const StationerySummaryPage: React.FC = () => {
       case 'CSEE':
         return [
           'normalbooklets', 'graphbooklets', 'normalloosesheets', 'graphloosesheets',
-          'bkm', 'tr', 'twm', 'brsheets', 'brbkm', 'arabicbooklets', 'ictcovers', 'finearts', 'timetables'
+          'bkm', 'bkm_red', 'bkm_pink', 'tr', 'twm', 'brsheets', 'brbkm', 'arabicbooklets', 'ictcovers', 'finearts', 'timetables'
         ];
       case 'FTNA':
-        return ['bkm', 'ictcovers', 'finearts', 'tr', 'twm', 'brsheets', 'brbkm', 'timetables'];
+        return ['bkm', 'bkm_red', 'bkm_pink', 'ictcovers', 'finearts', 'tr', 'twm', 'brsheets', 'brbkm', 'timetables'];
       case 'PSLE':
       case 'SSNA':
       case 'SFNA':
@@ -252,6 +230,8 @@ const StationerySummaryPage: React.FC = () => {
       'normalloosesheets': 'Normal Loose Sheets',
       'graphloosesheets': 'Graph Loose Sheets',
       'bkm': 'BKM',
+      'bkm_red': 'BKM Red',
+      'bkm_pink': 'BKM Pink',
       'tr': 'TR',
       'twm': 'TWM',
       'brsheets': 'Braille Sheets',
@@ -363,6 +343,8 @@ const StationerySummaryPage: React.FC = () => {
           normalloosesheets: number;
           graphloosesheets: number;
           bkm: number;
+          bkm_red: number;
+          bkm_pink: number;
           tr: number;
           twm: number;
           fbm1?: number;
@@ -378,11 +360,14 @@ const StationerySummaryPage: React.FC = () => {
         let regionBaseIctQty = 0;
         let regionBaseFineArtsQty = 0;
         let regionBaseTotalBkm = 0;
+        let regionBaseTotalBkmRed = 0;
+        let regionBaseTotalBkmPink = 0;
         let regionBaseTotalFBM1 = 0;
         let regionBaseTotalFBM2 = 0;
 
         for (const school of (detailedData || [])) {
           const district = String(school.district || 'UNKNOWN');
+          const centerNo = String(school.center_number || "").toUpperCase();
 
           let maxRegisteredForTRTWM = 0;
           let totalNormal = 0;
@@ -468,9 +453,22 @@ const StationerySummaryPage: React.FC = () => {
           const supervisors = maxRegisteredForTRTWM > 0 ? Math.ceil(maxRegisteredForTRTWM / 30) + 2 : 0;
           
           // BKM calculation matching edge function
-          const centerBkm = !isPrimary && bkmPct > 0
+          const calculatedBkm = !isPrimary && bkmPct > 0
             ? Math.ceil(totalWeightedStreamsForBKM * (1 + bkmPct / 100))
             : Math.ceil(totalWeightedStreamsForBKM);
+
+          let centerBkmRed = 0;
+          let centerBkmPink = 0;
+
+          if (!isPrimary) {
+            if (centerNo.startsWith("P")) {
+              centerBkmPink = calculatedBkm;
+            } else {
+              centerBkmRed = calculatedBkm;
+            }
+          }
+
+          const centerBkm = isPrimary ? calculatedBkm : (centerBkmRed + centerBkmPink);
 
           const normalWithPct = nPct > 0 ? Math.ceil(totalNormal + totalNormal * (nPct / 100)) : Math.ceil(totalNormal);
           const graphWithPct = gPct > 0 ? Math.ceil(totalGraph + totalGraph * (gPct / 100)) : Math.ceil(totalGraph);
@@ -487,7 +485,7 @@ const StationerySummaryPage: React.FC = () => {
                 const qtyArabic = Math.ceil(regArabic + regArabic * (arabicPct / 100));
                 regionBaseArabicQty += qtyArabic;
                 if (!districtAggregates.has(district)) {
-                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0, timetables: 0 });
+                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, bkm_red: 0, bkm_pink: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0, timetables: 0 });
                 }
                 districtAggregates.get(district)!.arabicbooklets = (districtAggregates.get(district)!.arabicbooklets || 0) + qtyArabic;
               }
@@ -503,7 +501,7 @@ const StationerySummaryPage: React.FC = () => {
                 const qtyIct = Math.ceil(regIct + regIct * (ictPct / 100));
                 regionBaseIctQty += qtyIct;
                 if (!districtAggregates.has(district)) {
-                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0, timetables: 0 });
+                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, bkm_red: 0, bkm_pink: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0, timetables: 0 });
                 }
                 districtAggregates.get(district)!.ictcovers = (districtAggregates.get(district)!.ictcovers || 0) + qtyIct;
               }
@@ -514,7 +512,7 @@ const StationerySummaryPage: React.FC = () => {
                 const qtyFine = Math.ceil(regFine + regFine * (fineArtsPct / 100));
                 regionBaseFineArtsQty += qtyFine;
                 if (!districtAggregates.has(district)) {
-                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0, timetables: 0 });
+                  districtAggregates.set(district, { district, normalbooklets: 0, graphbooklets: 0, normalloosesheets: 0, graphloosesheets: 0, bkm: 0, bkm_red: 0, bkm_pink: 0, tr: 0, twm: 0, fbm1: 0, fbm2: 0, arabicbooklets: 0, ictcovers: 0, finearts: 0, timetables: 0 });
                 }
                 districtAggregates.get(district)!.finearts = (districtAggregates.get(district)!.finearts || 0) + qtyFine;
               }
@@ -529,6 +527,8 @@ const StationerySummaryPage: React.FC = () => {
               normalloosesheets: 0,
               graphloosesheets: 0,
               bkm: 0,
+              bkm_red: 0,
+              bkm_pink: 0,
               tr: 0,
               twm: 0,
               fbm1: 0,
@@ -544,6 +544,8 @@ const StationerySummaryPage: React.FC = () => {
           current.tr += supervisors;
           current.twm += supervisors;
           current.bkm += centerBkm;
+          current.bkm_red += centerBkmRed;
+          current.bkm_pink += centerBkmPink;
           current.normalbooklets += normalWithPct;
           current.graphbooklets += graphWithPct;
           current.normalloosesheets += lsNorm;
@@ -554,6 +556,8 @@ const StationerySummaryPage: React.FC = () => {
           }
 
           regionBaseTotalBkm += centerBkm;
+          regionBaseTotalBkmRed += centerBkmRed;
+          regionBaseTotalBkmPink += centerBkmPink;
           regionBaseTotalFBM1 += centerFBM1;
           regionBaseTotalFBM2 += centerFBM2;
           regionTotalTRTWM += supervisors * 2;
@@ -576,6 +580,8 @@ const StationerySummaryPage: React.FC = () => {
             tr: agg.tr + tr_buffer, 
             twm: agg.twm + twm_buffer,
             bkm: agg.bkm + bkm_buffer,
+            bkm_red: agg.bkm_red, // Secondary requires no buffer markup lines
+            bkm_pink: agg.bkm_pink,
             fbm1: isPrimary ? agg.fbm1! + fbm1_buffer : 0,
             fbm2: isPrimary ? agg.fbm2! + fbm2_buffer : 0,
             timetables: timetablesVal
@@ -584,6 +590,8 @@ const StationerySummaryPage: React.FC = () => {
 
         // Base region totals (non-braille)
         let regionBaseTotalBkmBuffered = 0;
+        let regionBaseTotalBkmRedBuffered = 0;
+        let regionBaseTotalBkmPinkBuffered = 0;
         let regionBaseFBM1Buffered = 0;
         let regionBaseFBM2Buffered = 0;
         let regionBaseNormalBooklets = 0;
@@ -594,6 +602,8 @@ const StationerySummaryPage: React.FC = () => {
 
         finalDistrictData.forEach(d => {
           regionBaseTotalBkmBuffered += d.bkm;
+          regionBaseTotalBkmRedBuffered += d.bkm_red;
+          regionBaseTotalBkmPinkBuffered += d.bkm_pink;
           regionBaseFBM1Buffered += d.fbm1 || 0;
           regionBaseFBM2Buffered += d.fbm2 || 0;
           regionBaseNormalBooklets += d.normalbooklets;
@@ -608,6 +618,8 @@ const StationerySummaryPage: React.FC = () => {
         const reoExtraTR = Math.ceil(baseRegionSupervisors * (Number(reoDeoExtra?.tr || 0) / 100));
         const reoExtraTWM = Math.ceil(baseRegionSupervisors * (Number(reoDeoExtra?.twm || 0) / 100));
         const reoExtraBKM = Math.ceil(regionBaseTotalBkm * (Number(reoDeoExtra?.bkm || 0) / 100));
+        const reoExtraBkmRed = Math.ceil(regionBaseTotalBkmRed * (Number(reoDeoExtra?.bkm || 0) / 100));
+        const reoExtraBkmPink = Math.ceil(regionBaseTotalBkmPink * (Number(reoDeoExtra?.bkm || 0) / 100));
         const reoExtraNormalBooklets = Math.ceil(regionBaseNormalBooklets * (Number(reoDeoExtra?.normalbooklets || 0) / 100));
         const reoExtraGraphBooklets = Math.ceil(regionBaseGraphBooklets * (Number(reoDeoExtra?.graphbooklets || 0) / 100));
         const reoExtraNormalLooseSheets = Math.ceil(regionBaseNormalLooseSheets * (Number(reoDeoExtra?.normalloosesheets || 0) / 100));
@@ -694,6 +706,8 @@ const StationerySummaryPage: React.FC = () => {
         regionTotals.tr = baseRegionSupervisors + reoExtraTR;
         regionTotals.twm = baseRegionSupervisors + reoExtraTWM;
         regionTotals.bkm = regionBaseTotalBkmBuffered + reoExtraBKM;
+        regionTotals.bkm_red = regionBaseTotalBkmRedBuffered + reoExtraBkmRed;
+        regionTotals.bkm_pink = regionBaseTotalBkmPinkBuffered + reoExtraBkmPink;
 
         // Booklets & Loose sheets
         if (!isPrimary) {
@@ -729,6 +743,8 @@ const StationerySummaryPage: React.FC = () => {
           fields.forEach(f => { totals[f] = 0; });
 
           totals.bkm = d.bkm;
+          totals.bkm_red = d.bkm_red;
+          totals.bkm_pink = d.bkm_pink;
           totals.tr = d.tr;
           totals.twm = d.twm;
           totals.normalbooklets = d.normalbooklets;
@@ -761,6 +777,8 @@ const StationerySummaryPage: React.FC = () => {
         nectaExtraTotals.tr = reoExtraTR;
         nectaExtraTotals.twm = reoExtraTWM;
         nectaExtraTotals.bkm = reoExtraBKM;
+        nectaExtraTotals.bkm_red = reoExtraBkmRed;
+        nectaExtraTotals.bkm_pink = reoExtraBkmPink;
         nectaExtraTotals.normalbooklets = reoExtraNormalBooklets;
         nectaExtraTotals.graphbooklets = reoExtraGraphBooklets;
         nectaExtraTotals.normalloosesheets = reoExtraNormalLooseSheets;
@@ -875,9 +893,6 @@ const StationerySummaryPage: React.FC = () => {
         <CardContent className="p-6">
           <p className="text-center text-slate-500">No stationery entry found for ID: {stationeryId}.</p>
           <div className="text-center mt-6">
-            {/* <Button variant="outline" onClick={() => navigate('/dashboard/stationeries')} className="rounded-xl">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Stationeries
-            </Button> */}
           </div>
         </CardContent>
       </Card>
@@ -890,14 +905,6 @@ const StationerySummaryPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            {/* <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => navigate('/dashboard/stationeries')} 
-              className="h-8 px-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" /> Back
-            </Button>*/}
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 py-1 px-3 rounded-full">
               <Info className="h-3 w-3 mr-2" /> {stationery.examination_code} {stationery.examination_year}
             </Badge>
