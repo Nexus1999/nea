@@ -45,15 +45,15 @@ class BkmSticker {
         <div class="stationery-grid bkm-grid">
           <div class="stationery-item stacked-item blue-item">
             <div class="item-info">
-              <span class="item-label">BKM BLUE</span>
+              <span class="item-label-bkm">BKM BLUE</span>
             </div>
-            <div class="item-value">${blueQty}</div>
+            <div class="item-value-bkm">${blueQty}</div>
           </div>
           <div class="stationery-item stacked-item pink-item">
             <div class="item-info">
-              <span class="item-label">BKM PINK</span>
+              <span class="item-label-bkm">BKM PINK</span>
             </div>
-            <div class="item-value">${pinkQty}</div>
+            <div class="item-value-bkm">${pinkQty}</div>
           </div>
         </div>
 
@@ -289,7 +289,11 @@ export const renderFtnaDistrictStationeriesLabels = (
             gap: 8px;
             width: 100%;
             margin-bottom: 10px;
+            margin-top: 17px;
             z-index: 2;
+          }
+          .stationery-grid.bkm-grid {
+            flex-direction: row;
           }
           .stationery-item {
             display: flex;
@@ -301,6 +305,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             border: 2px solid #000000;
             position: relative;
             overflow: hidden;
+            flex: 1;
           }
           .stationery-item::before {
             content: '';
@@ -317,7 +322,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             flex-direction: column;
           }
           .item-label-bkm {
-            font-size: 26px;
+            font-size: 32px;
             font-weight: 800;
             color: #000000;
             text-transform: uppercase;
@@ -335,7 +340,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             min-width: 65px;
             text-align: center;
           }
-            .item-label-tr {
+          .item-label-tr {
             font-size: 66px;
             font-weight: 800;
             color: #000000;
@@ -425,7 +430,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             justify-content: center;
           }
           .classic-sticker-variant .box-value {
-            font-size: 44px;
+            font-size: 48px;
             font-weight: 900;
             color: #000;
             line-height: 1;
@@ -519,7 +524,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             font-variant-numeric: tabular-nums;
           }
           .box-value-tr {
-            font-size: 55px;
+            font-size: 58px;
             font-weight: 900;
             letter-spacing: -2px;
             line-height: 0.95;
