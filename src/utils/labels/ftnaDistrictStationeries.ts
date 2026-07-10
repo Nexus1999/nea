@@ -45,13 +45,13 @@ class BkmSticker {
         <div class="stationery-grid bkm-grid">
           <div class="stationery-item stacked-item blue-item">
             <div class="item-info">
-              <span class="item-label">BLUE</span>
+              <span class="item-label">BKM BLUE</span>
             </div>
             <div class="item-value">${blueQty}</div>
           </div>
           <div class="stationery-item stacked-item pink-item">
             <div class="item-info">
-              <span class="item-label">PINK</span>
+              <span class="item-label">BKM PINK</span>
             </div>
             <div class="item-value">${pinkQty}</div>
           </div>
@@ -100,15 +100,15 @@ class ClassicSticker {
         <div class="stationery-grid classic-grid">
           <div class="stationery-item standard-item">
             <div class="item-info">
-              <span class="item-label">${itemType || "N/A"}</span>
+              <span class="item-label-tr">${itemType || "N/A"}</span>
             </div>
-            <div class="item-value">${qty}</div>
+            <div class="item-value-tr">${qty}</div>
           </div>
         </div>
 
         <div class="bottom-row">
           <div class="box-number-container">
-            <div class="box-value">${containerNum}/${totalContainers}</div>
+            <div class="box-value-tr">${containerNum}/${totalContainers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -316,15 +316,34 @@ export const renderFtnaDistrictStationeriesLabels = (
             display: flex;
             flex-direction: column;
           }
-          .item-label {
+          .item-label-bkm {
             font-size: 26px;
             font-weight: 800;
             color: #000000;
             text-transform: uppercase;
             letter-spacing: 0.5px;
           }
-          .item-value {
+          .item-value-bkm {
             font-size: 28px;
+            font-weight: 900;
+            color: #000000;
+            font-family: 'Courier New', monospace;
+            background: #ffffff;
+            padding: 4px 14px;
+            border: 1.5px solid #000;
+            border-radius: 12px;
+            min-width: 65px;
+            text-align: center;
+          }
+            .item-label-tr {
+            font-size: 66px;
+            font-weight: 800;
+            color: #000000;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .item-value-tr {
+            font-size: 64px;
             font-weight: 900;
             color: #000000;
             font-family: 'Courier New', monospace;
@@ -438,7 +457,7 @@ export const renderFtnaDistrictStationeriesLabels = (
             display: flex;
             gap: 14px;
             align-self: center;
-            margin-bottom: 12px;
+            margin-bottom: 05px;
           }
           .bkm-sticker-variant .exam-badge span {
             padding: 6px 14px;
@@ -493,6 +512,14 @@ export const renderFtnaDistrictStationeriesLabels = (
           }
           .bkm-sticker-variant .box-value {
             font-size: 60px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            line-height: 0.95;
+            color: #000;
+            font-variant-numeric: tabular-nums;
+          }
+          .box-value-tr {
+            font-size: 55px;
             font-weight: 900;
             letter-spacing: -2px;
             line-height: 0.95;
