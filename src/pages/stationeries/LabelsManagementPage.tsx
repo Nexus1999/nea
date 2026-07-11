@@ -23,7 +23,6 @@ import {
   Maximize2,
   Minimize2,
   Calendar,
-  Layout,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,7 +42,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import {
@@ -61,7 +59,6 @@ import { cn } from "@/lib/utils";
 // Import Print Utilities
 import { generateLabelsHtml } from "@/utils/labels/printEngine";
 import { renderStationeriesLabels } from "@/utils/labels/stationeries";
-import { renderStationeriesCustomLabels } from "@/utils/labels/stationeriesCustom";
 import { renderDistrictStationeriesLabels } from "@/utils/labels/districtStationeries";
 import { renderFtnaDistrictStationeriesLabels } from "@/utils/labels/ftnaDistrictStationeries";
 import { renderArabicBookletsLabels } from "@/utils/labels/arabicBooklets";
@@ -219,10 +216,6 @@ const LabelsManagementPage: React.FC = () => {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
-  // Custom Template states
-  const [useCustomTemplate, setUseCustomTemplate] = useState(false);
-  const [includedFields, setIncludedFields] = useState<string[]>(["normal_booklets", "graph_booklets", "normal_loosesheets", "graph_loosesheets", "bkm"]);
 
   // Drawer states
   const [isBoxLimitsDrawerOpen, setIsBoxLimitsDrawerOpen] = useState(false);
@@ -664,11 +657,7 @@ const LabelsManagementPage: React.FC = () => {
     let htmlContent = "";
     switch (selectedCategoryId) {
       case "stationeries":
-        if (useCustomTemplate) {
-          htmlContent = renderStationeriesCustomLabels(labelsToProcess, examCode, examYear, includedFields);
-        } else {
-          htmlContent = renderStationeriesLabels(labelsToProcess, examCode, examYear);
-        }
+        htmlContent = renderStationeriesLabels(labelsToProcess, examCode, examYear);
         break;
       case "supervisors_forms":
         htmlContent = renderDistrictStationeriesLabels(labelsToProcess, examCode, examYear);
@@ -959,140 +948,80 @@ const LabelsManagementPage: React.FC = () => {
       {/* Card Content */}
       <CardContent className="p-6">
         {/* Filters Toolbar */}
-        <div className="flex flex-col gap-4 mb-6 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1 max-w-md">
-              <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search by center name, number or district..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 h-10 rounded-xl border-slate-200 bg-white focus-visible:ring-slate-400"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Category Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Category:</span>
-                <Select value={selectedCategoryId || ""} onValueChange={setSelectedCategoryId}>
-                  <SelectTrigger className="w-56 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id} className="rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className={`p-1 rounded-md ${cat.bgColor} ${cat.color}`}>
-                            <cat.icon className="h-3.5 w-3.5" />
-                          </div>
-                          <span className="font-medium text-slate-700">{cat.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Region Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Region:</span>
-                <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                  <SelectTrigger className="w-48 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
-                    <SelectValue placeholder="Select region" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="All" className="rounded-lg font-medium">All Regions</SelectItem>
-                    {regions.map((r) => (
-                      <SelectItem key={r} value={r} className="rounded-lg font-medium">
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Item Selector (Only for District Stationeries and Supervisors Forms) */}
-              {(selectedCategoryId === "district_stationeries" || selectedCategoryId === "supervisors_forms") && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Item:</span>
-                  <Select value={selectedItem} onValueChange={setSelectedItem}>
-                    <SelectTrigger className="w-48 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="All" className="rounded-lg font-medium">All Items</SelectItem>
-                      {uniqueItems.map((item) => (
-                        <SelectItem key={item} value={item} className="rounded-lg font-medium">
-                          {item}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+          <div className="flex items-center gap-3 flex-1 max-w-md">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search by center name, number or district..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-10 rounded-xl border-slate-200 bg-white focus-visible:ring-slate-400"
+              />
             </div>
           </div>
 
-          {/* Custom Template & Field Selection Controls (Stationeries Only) */}
-          {selectedCategoryId === "stationeries" && (
-            <div className="flex flex-col gap-3 pt-3 border-t border-slate-200/60">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-700">
-                    <Layout className="h-3.5 w-3.5" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Template Engine</span>
-                  </div>
-                  <div className="flex items-center gap-2 cursor-pointer group">
-                    <Checkbox 
-                      id="use-custom"
-                      checked={useCustomTemplate}
-                      onCheckedChange={(checked) => setUseCustomTemplate(!!checked)}
-                      className="rounded border-slate-300 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
-                    />
-                    <label htmlFor="use-custom" className="text-xs font-bold text-slate-600 uppercase tracking-wide cursor-pointer group-hover:text-slate-900 transition-colors">
-                      Use Custom Dynamic Template
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {useCustomTemplate && (
-                <div className="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select Items to Include on Label:</span>
-                  <div className="flex flex-wrap gap-4">
-                    {[
-                      { key: "normal_booklets", label: "Normal Booklets" },
-                      { key: "graph_booklets", label: "Graph Booklets" },
-                      { key: "normal_loosesheets", label: "Normal Sheets" },
-                      { key: "graph_loosesheets", label: "Graph Sheets" },
-                      { key: "bkm", label: "BKM" }
-                    ].map(field => (
-                      <div key={field.key} className="flex items-center gap-2 cursor-pointer group">
-                        <Checkbox 
-                          id={`field-${field.key}`}
-                          checked={includedFields.includes(field.key)}
-                          onCheckedChange={(checked) => {
-                            if (checked) setIncludedFields([...includedFields, field.key]);
-                            else setIncludedFields(includedFields.filter(f => f !== field.key));
-                          }}
-                          className="rounded border-slate-300 data-[state=checked]:bg-slate-900 data-[state=checked]:border-slate-900"
-                        />
-                        <label htmlFor={`field-${field.key}`} className="text-[10px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer group-hover:text-slate-800 transition-colors">
-                          {field.label}
-                        </label>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Category Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Category:</span>
+              <Select value={selectedCategoryId || ""} onValueChange={setSelectedCategoryId}>
+                <SelectTrigger className="w-56 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id} className="rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-1 rounded-md ${cat.bgColor} ${cat.color}`}>
+                          <cat.icon className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="font-medium text-slate-700">{cat.name}</span>
                       </div>
-                    ))}
-                  </div>
-                  <p className="text-[9px] font-medium text-slate-400 italic">
-                    Note: Omitted items will allow the remaining ones to automatically scale and fill the available space.
-                  </p>
-                </div>
-              )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+
+            {/* Region Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Region:</span>
+              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                <SelectTrigger className="w-48 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
+                  <SelectValue placeholder="Select region" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="All" className="rounded-lg font-medium">All Regions</SelectItem>
+                  {regions.map((r) => (
+                    <SelectItem key={r} value={r} className="rounded-lg font-medium">
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Item Selector (Only for District Stationeries and Supervisors Forms) */}
+            {(selectedCategoryId === "district_stationeries" || selectedCategoryId === "supervisors_forms") && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Item:</span>
+                <Select value={selectedItem} onValueChange={setSelectedItem}>
+                  <SelectTrigger className="w-48 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
+                    <SelectValue placeholder="Select item" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="All" className="rounded-lg font-medium">All Items</SelectItem>
+                    {uniqueItems.map((item) => (
+                      <SelectItem key={item} value={item} className="rounded-lg font-medium">
+                        {item}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Table Section */}
