@@ -190,6 +190,32 @@ const formatNumber = (num: number) => {
   return new Intl.NumberFormat('en-US').format(num);
 };
 
+const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, icon: Icon, colorClass, gradient }) => {
+  return (
+    <Card className="relative overflow-hidden border-none shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group bg-white">
+      <div className={`absolute inset-0 opacity-10 bg-gradient-to-br ${gradient}`} />
+      
+      <CardContent className="p-6 relative z-10">
+        <div className="flex justify-between items-center mb-4">
+          <div className="p-3 rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+            <Icon className={`h-6 w-6 ${colorClass}`} />
+          </div>
+          <Badge className={cn("bg-white border-current font-bold text-[10px]", colorClass)}>
+            TOTAL
+          </Badge>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider truncate">{title}</p>
+          <h3 className="text-3xl font-black tracking-tight text-slate-900">
+            {formatNumber(value)}
+          </h3>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const StationerySummaryPage: React.FC = () => {
   const { stationeryId } = useParams<{ stationeryId: string }>();
   const navigate = useNavigate();
