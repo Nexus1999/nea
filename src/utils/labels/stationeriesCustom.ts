@@ -84,7 +84,7 @@ export const renderStationeriesCustomLabels = (
   {
     key: "bkm",
     label: bkmLabel,
-    value: centerNo.startsWith("S") ? 0 : (label.bkm || 0),
+    value: centerNo.startsWith("S") || centerNo.startsWith("N") ? 0 : (label.bkm || 0),
   },
 ];
 
@@ -321,13 +321,19 @@ export const renderStationeriesCustomLabels = (
             line-height: 1;
           }
 
-          .center-name {
+       
+
+
+           .center-name {
             font-size: 30px;
             font-weight: 800;
             color: #000;
             text-align: center;
             text-transform: uppercase;
             line-height: 1.2;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
             white-space: nowrap;
           }
 
