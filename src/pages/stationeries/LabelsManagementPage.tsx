@@ -59,6 +59,7 @@ import { cn } from "@/lib/utils";
 // Import Print Utilities
 import { generateLabelsHtml } from "@/utils/labels/printEngine";
 import { renderStationeriesLabels } from "@/utils/labels/stationeries";
+import { renderStationeriesCustomLabels } from "@/utils/labels/stationeriesCustom";
 import { renderDistrictStationeriesLabels } from "@/utils/labels/districtStationeries";
 import { renderFtnaDistrictStationeriesLabels } from "@/utils/labels/ftnaDistrictStationeries";
 import { renderArabicBookletsLabels } from "@/utils/labels/arabicBooklets";
@@ -216,6 +217,16 @@ const LabelsManagementPage: React.FC = () => {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Stationery Label Style States (Default vs Custom)
+  const [stationeryLabelStyle, setStationeryLabelStyle] = useState<"default" | "custom">("default");
+  const [selectedCustomFields, setSelectedCustomFields] = useState<string[]>([
+    "normal_booklets",
+    "graph_booklets",
+    "normal_loosesheets",
+    "graph_loosesheets",
+    "bkm"
+  ]);
 
   // Drawer states
   const [isBoxLimitsDrawerOpen, setIsBoxLimitsDrawerOpen] = useState(false);
@@ -657,7 +668,11 @@ const LabelsManagementPage: React.FC = () => {
     let htmlContent = "";
     switch (selectedCategoryId) {
       case "stationeries":
-        htmlContent = renderStationeriesLabels(labelsToProcess, examCode, examYear);
+        if (stationeryLabelStyle === "custom" && (examCode === "CSEE" || examCode === "ACSEE")) {
+          htmlContent = renderStationeriesCustomLabels(labelsToProcess, examCode, examYear, selectedCustomFields);
+        } else {
+          htmlContent = renderStationeriesLabels(labelsToProcess, examCode, examYear);
+        }
         break;
       case "supervisors_forms":
         htmlContent = renderDistrictStationeriesLabels(labelsToProcess, examCode, examYear);
@@ -1023,6 +1038,78 @@ const LabelsManagementPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Stationery Label Style Configuration Bar */}
+        {selectedCategoryId === "stationeries" && (masterSummary.Code === "CSEE" || masterSummary.Code === "ACSEE") && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-blue-50/30 p-4 rounded-2xl border border-blue-100/50">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Label Template:</span>
+              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setStationeryLabelStyle("default")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                    stationeryLabelStyle === "default"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  )}
+                >
+                  Default Template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStationeryLabelStyle("custom")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                    stationeryLabelStyle === "custom"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  )}
+                >
+                  Custom Template
+                </button>
+              </div>
+            </div>
+
+            {stationeryLabelStyle === "custom" && (
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Included Fields:</span>
+                <div className="flex items-center gap-3 flex-wrap">
+                  {[
+                    { key: "normal_booklets", label: "Normal Booklets" },
+                    { key: "graph_booklets", label: "Graph Booklets" },
+                    { key: "normal_loosesheets", label: "Normal Sheets" },
+                    { key: "graph_loosesheets", label: "Graph Sheets" },
+                    { key: "bkm", label: "BKM" },
+                  ].map((field) => {
+                    const isChecked = selectedCustomFields.includes(field.key);
+                    return (
+                      <label
+                        key={field.key}
+                        className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setSelectedCustomFields(selectedCustomFields.filter((f) => f !== field.key));
+                            } else {
+                              setSelectedCustomFields([...selectedCustomFields, field.key]);
+                            }
+                          }}
+                          className="rounded border-slate-300 text-slate-900 focus:ring-slate-900 h-3.5 w-3.5"
+                        />
+                        <span>{field.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Table Section */}
         <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-sm bg-white">
