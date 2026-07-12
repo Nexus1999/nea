@@ -76,13 +76,17 @@ export const renderStationeriesCustomLabels = (
     }
 
     // Define all potential items
-    const allItems = [
-      { key: "normal_booklets", label: "NORMAL BOOKLETS", value: label.normal_booklets || 0 },
-      { key: "graph_booklets", label: "GRAPH BOOKLETS", value: label.graph_booklets || 0 },
-      { key: "normal_loosesheets", label: "NORMAL SHEETS", value: label.normal_loosesheets || 0 },
-      { key: "graph_loosesheets", label: "GRAPH SHEETS", value: label.graph_loosesheets || 0 },
-      { key: "bkm", label: bkmLabel, value: label.bkm || 0 },
-    ];
+   const allItems = [
+  { key: "normal_booklets", label: "NORMAL BOOKLETS", value: label.normal_booklets || 0 },
+  { key: "graph_booklets", label: "GRAPH BOOKLETS", value: label.graph_booklets || 0 },
+  { key: "normal_loosesheets", label: "NORMAL SHEETS", value: label.normal_loosesheets || 0 },
+  { key: "graph_loosesheets", label: "GRAPH SHEETS", value: label.graph_loosesheets || 0 },
+  {
+    key: "bkm",
+    label: bkmLabel,
+    value: centerNo.startsWith("S") ? 0 : (label.bkm || 0),
+  },
+];
 
     const activeItems = allItems.filter(item => includedFields.includes(item.key));
 
