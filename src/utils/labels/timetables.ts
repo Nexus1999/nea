@@ -50,7 +50,7 @@ export const renderTimetablesLabels = (
         <div class="stationery-grid classic-grid">
           <div class="stationery-item standard-item">
             <div class="item-info">
-              <span class="item-label-tr">TIMETABLES</span>
+              <span class="item-label-tr">RATIBA</span>
             </div>
             <div class="item-value-tr">${qty}</div>
           </div>
