@@ -36,7 +36,7 @@ class BkmSticker {
         <div class="watermark">${examCode}</div>
 
         <div class="exam-badge">
-          <span>FTNA-${examYear}</span>
+          <span>${examCode}-${examYear}</span>
         </div>
 
         <div class="region" style="font-size: ${regionFontSize};">${regionName}</div>
@@ -90,7 +90,7 @@ class ClassicSticker {
 
         <div class="top-row">
           <div class="exam-badge-left">
-            <span>FTNA-${examYear}</span>
+            <span>${examCode}-${examYear}</span>
           </div>
         </div>
 
