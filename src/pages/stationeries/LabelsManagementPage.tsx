@@ -23,6 +23,9 @@ import {
   Maximize2,
   Minimize2,
   Calendar,
+  Edit,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +45,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import {
@@ -52,6 +65,7 @@ import { MasterSummaryOption, Stationery } from "@/types/stationeries";
 import BoxLimitsDrawer from "@/components/stationeries/BoxLimitsDrawer";
 import KitbagLimitsDrawer from "@/components/stationeries/KitbagLimitsDrawer";
 import { BoxLabelsWizardModal } from "@/components/stationeries/BoxLabelsWizardModal";
+import EditLabelModal from "@/components/stationeries/EditLabelModal";
 import PaginationControls from "@/components/ui/pagination-controls";
 import Spinner from "@/components/Spinner";
 import { cn } from "@/lib/utils";
@@ -227,6 +241,13 @@ const LabelsManagementPage: React.FC = () => {
     "graph_loosesheets",
     "bkm"
   ]);
+
+  // Action states
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [labelToEdit, setLabelToEdit] = useState<LabelItem | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [labelToDelete, setLabelToDelete] = useState<LabelItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Drawer states
   const [isBoxLimitsDrawerOpen, setIsBoxLimitsDrawerOpen] = useState(false);
@@ -863,6 +884,27 @@ const LabelsManagementPage: React.FC = () => {
     }
   };
 
+  const handleDeleteLabel = async () => {
+    if (!labelToDelete) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("labels")
+        .delete()
+        .eq("id", labelToDelete.id);
+
+      if (error) throw error;
+
+      showSuccess("Label deleted successfully!");
+      await queryClient.invalidateQueries({ queryKey: ["labels", masterSummary?.id, selectedCategoryId] });
+      setIsDeleteDialogOpen(false);
+    } catch (err: any) {
+      showError(err.message || "Failed to delete label.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Current category object
   const currentCategory = getCategoriesForExam(masterSummary?.Code).find((c) => c.id === selectedCategoryId);
 
@@ -1203,14 +1245,41 @@ const LabelsManagementPage: React.FC = () => {
                       </TableCell>
                     ))}
                     <TableCell className="text-right py-4 pr-6">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handlePrint(label)}
-                        className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                      >
-                        <Printer className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePrint(label)}
+                          className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                          title="Print Label"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setLabelToEdit(label);
+                            setIsEditModalOpen(true);
+                          }}
+                          className="h-8 w-8 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                          title="Edit Label"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setLabelToDelete(label);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                          className="h-8 w-8 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50"
+                          title="Delete Label"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -1256,20 +1325,60 @@ const LabelsManagementPage: React.FC = () => {
         </>
       )}
 
-      {/* Box Labels Wizard Modal */}
+      {/* Modals */}
       {masterSummary && (
-        <BoxLabelsWizardModal
-          open={isBoxLabelsWizardOpen}
-          onOpenChange={setIsBoxLabelsWizardOpen}
-          masterSummaryId={masterSummary.id}
-          examCode={masterSummary.Code}
-          examYear={String(masterSummary.Year)}
-          regions={regions}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["labels", masterSummary.id, selectedCategoryId] });
-          }}
-        />
+        <>
+          <BoxLabelsWizardModal
+            open={isBoxLabelsWizardOpen}
+            onOpenChange={setIsBoxLabelsWizardOpen}
+            masterSummaryId={masterSummary.id}
+            examCode={masterSummary.Code}
+            examYear={String(masterSummary.Year)}
+            regions={regions}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["labels", masterSummary.id, selectedCategoryId] });
+            }}
+          />
+          <EditLabelModal
+            open={isEditModalOpen}
+            onOpenChange={setIsEditModalOpen}
+            label={labelToEdit}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["labels", masterSummary.id, selectedCategoryId] });
+            }}
+          />
+        </>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-2xl max-w-[400px]">
+          <AlertDialogHeader>
+            <div className="flex flex-col items-center text-center gap-2 mb-2">
+              <div className="p-3 bg-red-50 rounded-full text-red-600 mb-2">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <AlertDialogTitle className="text-xl font-bold">Delete Label?</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-500">
+                Are you sure you want to delete this label? This action cannot be undone.
+              </AlertDialogDescription>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex items-center gap-2 mt-4">
+            <AlertDialogCancel className="flex-1 rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteLabel();
+              }}
+              disabled={isDeleting}
+              className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete Label"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Print Preview Modal */}
       {isPreviewOpen && previewUrl && (
