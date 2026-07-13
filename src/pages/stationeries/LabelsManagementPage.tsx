@@ -696,7 +696,7 @@ const LabelsManagementPage: React.FC = () => {
         }
         break;
       case "supervisors_forms":
-        htmlContent = renderDistrictStationeriesLabels(labelsToProcess, examCode, examYear);
+        htmlContent = renderFtnaDistrictStationeriesLabels(labelsToProcess, examCode, examYear);
         break;
       case "district_stationeries":
         if (examCode === "FTNA") {
