@@ -426,31 +426,24 @@ const LabelsManagementPage: React.FC = () => {
 
     if (selectedCategoryId === "supervisors_forms") {
       return [
-        { header: "Region", accessor: "region", width: "w-[12%]" },
-        { header: "District", accessor: "district", width: "w-[12%]" },
-        { header: "Item", accessor: "item", width: "w-[10%]" },
-        {
-          header: "Quantity",
-          accessor: "quantity",
-          width: "w-[20%]",
-          render: (label: LabelItem) => {
-            if (label.item === "BKM") {
-              const red = label.bkm_red || 0;
-              const pink = label.bkm_pink || 0;
-              return (
-                <div className="flex flex-col items-center justify-center text-xs">
-                  <span className="font-bold text-red-600">RED: {red}</span>
-                  <span className="font-bold text-pink-600">PINK: {pink}</span>
-                  <span className="text-[10px] text-slate-400">(Total: {label.quantity})</span>
-                </div>
-              );
-            }
-            return label.quantity;
-          }
-        },
-        { header: "Box/Env", accessor: "container_number", width: "w-[10%]" },
-        { header: "Total Boxes", accessor: "total_containers", width: "w-[10%]" },
-      ];
+        { header: "Region", accessor: "region", width: "w-[17%]" },
+          { header: "District", accessor: "district", width: "w-[17%]" },
+          {
+            header: "TR",
+            accessor: "tr",
+            width: "w-[12%]",
+            render: (label: LabelItem) => label.item === "TR" ? <span className="font-bold text-slate-800">{label.quantity}</span> : "-"
+          },
+          {
+            header: "TWM",
+            accessor: "twm",
+            width: "w-[12%]",
+            render: (label: LabelItem) => label.item === "TWM" ? <span className="font-bold text-slate-800">{label.quantity}</span> : "-"
+          },
+         
+          { header: "Envelope", accessor: "container_number", width: "w-[12%]" },
+          { header: "Envelopes", accessor: "total_containers", width: "w-[12%]" },
+        ];
     }
 
     if (selectedCategoryId === "district_stationeries") {

@@ -27,7 +27,7 @@ export const renderTimetablesLabels = (
     const qty = label.quantity || 0;
 
     return `
-      <div class="label-card">
+      <div class="label-card card-classic classic-sticker-variant">
         <!-- Classic Corner Accents -->
         <div class="corner-tl"></div>
         <div class="corner-tr"></div>
@@ -47,17 +47,19 @@ export const renderTimetablesLabels = (
         <div class="district">${districtName}</div>
 
         <!-- Enlarged & Beautiful Classic Stats Block (Single Item) -->
-        <div class="stats-grid">
-          <div class="stat-block timetable-block">
-            <div class="stat-header">TIMETABLES</div>
-            <div class="stat-value">${qty}</div>
+        <div class="stationery-grid classic-grid">
+          <div class="stationery-item standard-item">
+            <div class="item-info">
+              <span class="item-label-tr">TIMETABLES</span>
+            </div>
+            <div class="item-value-tr">${qty}</div>
           </div>
         </div>
 
         <!-- Bottom Row: Box Number & QR Code -->
         <div class="bottom-row">
           <div class="box-number-container">
-            <div class="box-value">${containerNum}/${totalContainers}</div>
+            <div class="box-value-tr">${containerNum}/${totalContainers}</div>
           </div>
           <div class="qr-wrapper">
             <img src="${qrUrl}" alt="QR Code" />
@@ -138,9 +140,9 @@ export const renderTimetablesLabels = (
             overflow: hidden;
           }
           .label-card {
-            border: 3px double #0f172a;
+            border: 3px double #000;
             border-radius: 24px;
-            background: #fffdf9; /* Classic warm cream background */
+            background: #ffffff;
             padding: 18px 24px;
             height: 122mm;
             display: flex;
@@ -148,15 +150,13 @@ export const renderTimetablesLabels = (
             position: relative;
             box-sizing: border-box;
             overflow: hidden;
-            box-shadow: inset 0 0 40px rgba(15, 23, 42, 0.02);
           }
           
-          /* Classic Corner Accents */
-          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #0f172a; border-left: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #0f172a; border-right: 3px solid #0f172a; position: absolute; width: 16px; height: 16px; }
-          
+          /* Corner accents & watermark */
+          .corner-tl { top: 10px; left: 10px; border-top: 3px solid #000; border-left: 3px solid #000; position: absolute; width: 16px; height: 16px; }
+          .corner-tr { top: 10px; right: 10px; border-top: 3px solid #000; border-right: 3px solid #000; position: absolute; width: 16px; height: 16px; }
+          .corner-bl { bottom: 10px; left: 10px; border-bottom: 3px solid #000; border-left: 3px solid #000; position: absolute; width: 16px; height: 16px; }
+          .corner-br { bottom: 10px; right: 10px; border-bottom: 3px solid #000; border-right: 3px solid #000; position: absolute; width: 16px; height: 16px; }
           .watermark {
             position: absolute;
             right: 20px;
@@ -164,11 +164,12 @@ export const renderTimetablesLabels = (
             transform: translateY(-50%);
             font-size: 130px;
             font-weight: 900;
-            color: rgba(15, 23, 42, 0.02);
+            color: rgba(0, 0, 0, 0.02);
             pointer-events: none;
             user-select: none;
             z-index: 0;
           }
+
           .top-row {
             display: flex;
             justify-content: center;
@@ -177,7 +178,7 @@ export const renderTimetablesLabels = (
             z-index: 2;
           }
           .exam-badge-left {
-            border: 1.5px solid #0f172a;
+            border: 1.5px solid #000;
             border-radius: 60px;
             padding: 4px 14px;
             background: white;
@@ -187,13 +188,14 @@ export const renderTimetablesLabels = (
             font-weight: 800;
             letter-spacing: 1.5px;
             text-transform: uppercase;
-            color: #0f172a;
+            color: #000;
           }
+
           .region {
             font-family: 'Elephant', 'Impact', 'Georgia', serif;
             font-weight: 900;
             text-transform: uppercase;
-            color: #0f172a;
+            color: #000;
             text-align: center;
             letter-spacing: -0.5px;
             margin-bottom: 4px;
@@ -204,53 +206,71 @@ export const renderTimetablesLabels = (
             font-size: 35px;
             font-weight: 900;
             text-transform: uppercase;
-            color: #1e293b;
+            color: #000;
             text-align: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             line-height: 1.2;
             word-break: break-word;
             letter-spacing: 0.5px;
             z-index: 2;
           }
-          
-          /* Enlarged & Classic Stats Grid (Single Column) */
-          .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 14px;
-            margin-bottom: 10px;
-            z-index: 2;
-          }
-          .stat-block {
-            background: white;
-            border: 2px solid #0f172a;
-            border-radius: 16px;
-            padding: 12px;
+
+          /* STATIONERY ROW SYSTEM */
+          .stationery-grid {
             display: flex;
             flex-direction: column;
+            gap: 8px;
+            width: 100%;
+            margin-bottom: 10px;
+            margin-top: 17px;
+            z-index: 2;
+          }
+          .stationery-item {
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            padding: 8px 14px;
+            background: #ffffff;
+            border-radius: 14px;
+            border: 2px solid #000000;
+            position: relative;
+            overflow: hidden;
+            flex: 1;
           }
-          .timetable-block {
-            border-top: 6px solid #16a34a; /* Green Accent */
+          .stationery-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background: #000000;
           }
-          .stat-header {
-            font-size: 22px;
+          .item-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+          }
+          .item-label-tr {
+            font-size: 60px;
             font-weight: 800;
-            color: #64748b;
-            letter-spacing: 1.5px;
-            margin-bottom: 4px;
+            color: #000000;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .item-value-tr {
+            font-size: 64px;
+            font-weight: 900;
+            color: #000000;
+            font-family: 'Courier New', monospace;
+            background: #ffffff;
+            padding: 4px 14px;
+            border: 1.5px solid #000;
+            border-radius: 12px;
+            min-width: 65px;
             text-align: center;
           }
-          .stat-value {
-            font-size: 50px;
-            font-weight: 900;
-            font-family: 'Georgia', serif;
-            color: #0f172a;
-            line-height: 1;
-          }
-          
+
           .bottom-row {
             display: flex;
             align-items: center;
@@ -261,7 +281,7 @@ export const renderTimetablesLabels = (
           }
           .box-number-container {
             flex: 1;
-            border: 2px solid #0f172a;
+            border: 2px solid #000;
             border-radius: 16px;
             padding: 8px 12px;
             text-align: center;
@@ -270,30 +290,32 @@ export const renderTimetablesLabels = (
             flex-direction: column;
             justify-content: center;
           }
-          .box-value {
-            font-size: 50px;
+          .box-value-tr {
+            font-size: 58px;
             font-weight: 900;
-            color: #0f172a;
-            line-height: 1;
+            letter-spacing: -2px;
+            line-height: 0.95;
+            color: #000;
+            font-variant-numeric: tabular-nums;
             font-family: 'arial', 'Georgia', serif;
           }
           .qr-wrapper {
             background: white;
-            border: 2px solid #0f172a;
+            border: 2px solid #000;
             padding: 6px;
             border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
           }
           .qr-wrapper img {
             width: 68px;
             height: 68px;
             display: block;
           }
+
           .cut-line {
-            border-top: 2px dashed #475569;
+            border-top: 2px dashed #000;
             width: 100%;
             position: relative;
             text-align: center;
@@ -310,7 +332,7 @@ export const renderTimetablesLabels = (
             letter-spacing: 4px;
             font-weight: 800;
             text-transform: uppercase;
-            color: #1e293b;
+            color: #000;
             font-family: monospace;
           }
         </style>
