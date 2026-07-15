@@ -222,10 +222,12 @@ const LabelsManagementPage: React.FC = () => {
   const [stationery, setStationery] = useState<Stationery | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [regions, setRegions] = useState<string[]>([]);
+  const [districts, setDistricts] = useState<string[]>([]);
 
   // UI state
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string>("All");
+  const [selectedDistrict, setSelectedDistrict] = useState<string>("All");
   const [selectedItem, setSelectedItem] = useState<string>("All");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>("");
@@ -311,6 +313,43 @@ const LabelsManagementPage: React.FC = () => {
     load();
   }, [masterSummaryId]);
 
+  // Fetch districts when region changes
+  useEffect(() => {
+    const fetchDistricts = async () => {
+      if (!masterSummary) return;
+      try {
+        const tableName = ["FTNA", "CSEE", "ACSEE"].includes(masterSummary.Code)
+          ? "secondarymastersummaries"
+          : "primarymastersummary";
+        
+        let query = supabase
+          .from(tableName)
+          .select("district")
+          .eq("mid", masterSummary.id)
+          .eq("is_latest", true);
+          
+        if (selectedRegion !== "All") {
+          query = query.eq("region", selectedRegion);
+        }
+        
+        const { data: dists } = await query;
+        if (dists) {
+          const distinct = Array.from(new Set(dists.map((d: any) => d.district).filter(Boolean))).sort((a, b) =>
+            a.localeCompare(b)
+          ) as string[];
+          setDistricts(distinct);
+        } else {
+          setDistricts([]);
+        }
+      } catch (error) {
+        console.error("Error fetching districts:", error);
+      }
+    };
+    
+    fetchDistricts();
+    setSelectedDistrict("All"); // Reset district filter when region changes
+  }, [selectedRegion, masterSummary]);
+
   // React Query for labels of the selected category
   const {
     data: allLabels = [],
@@ -335,6 +374,9 @@ const LabelsManagementPage: React.FC = () => {
     let filtered = [...allLabels];
     if (selectedRegion !== "All") {
       filtered = filtered.filter((label) => label.region === selectedRegion);
+    }
+    if (selectedDistrict !== "All" && selectedCategoryId === "stationeries" && ["CSEE", "ACSEE"].includes(masterSummary?.Code || "")) {
+      filtered = filtered.filter((label) => label.district === selectedDistrict);
     }
     if ((selectedCategoryId === "district_stationeries" || selectedCategoryId === "supervisors_forms") && selectedItem !== "All") {
       filtered = filtered.filter((label) => label.item === selectedItem);
@@ -378,7 +420,7 @@ const LabelsManagementPage: React.FC = () => {
     });
 
     return filtered;
-  }, [allLabels, selectedRegion, selectedItem, selectedCategoryId, debouncedSearchTerm]);
+  }, [allLabels, selectedRegion, selectedDistrict, selectedItem, selectedCategoryId, debouncedSearchTerm, masterSummary]);
 
   const totalPages = Math.ceil(filteredLabels.length / itemsPerPage);
   const currentLabels = filteredLabels.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -392,7 +434,7 @@ const LabelsManagementPage: React.FC = () => {
   // Reset page when filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedRegion, selectedItem, debouncedSearchTerm, selectedCategoryId]);
+  }, [selectedRegion, selectedDistrict, selectedItem, debouncedSearchTerm, selectedCategoryId]);
 
   // Reset item filter when category changes
   useEffect(() => {
@@ -761,6 +803,7 @@ const LabelsManagementPage: React.FC = () => {
         region: selectedRegion !== "All" ? selectedRegion : null,
         region_id: selectedRegion !== "All" ? selectedRegion : null,
         regionId: selectedRegion !== "All" ? selectedRegion : null,
+        district: selectedDistrict !== "All" ? selectedDistrict : null,
       };
 
       if (selectedCategoryId === "stationeries") {
@@ -864,6 +907,9 @@ const LabelsManagementPage: React.FC = () => {
         .eq("mid", masterSummary.id)
         .in("category", dbCategories);
       if (selectedRegion !== "All") query.eq("region", selectedRegion);
+      if (selectedDistrict !== "All" && selectedCategoryId === "stationeries" && ["CSEE", "ACSEE"].includes(masterSummary.Code)) {
+        query.eq("district", selectedDistrict);
+      }
       if ((selectedCategoryId === "district_stationeries" || selectedCategoryId === "supervisors_forms") && selectedItem !== "All") {
         query.eq("item", selectedItem);
       }
@@ -1051,6 +1097,26 @@ const LabelsManagementPage: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* District Selector (Only for Stationeries category in CSEE/ACSEE) */}
+            {selectedCategoryId === "stationeries" && ["CSEE", "ACSEE"].includes(masterSummary?.Code || "") && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">District:</span>
+                <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                  <SelectTrigger className="w-48 h-10 rounded-xl border-slate-200 bg-white font-medium text-slate-700">
+                    <SelectValue placeholder="Select district" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="All" className="rounded-lg font-medium">All Districts</SelectItem>
+                    {districts.map((d) => (
+                      <SelectItem key={d} value={d} className="rounded-lg font-medium">
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Item Selector (Only for District Stationeries and Supervisors Forms) */}
             {(selectedCategoryId === "district_stationeries" || selectedCategoryId === "supervisors_forms") && (
