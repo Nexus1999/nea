@@ -103,38 +103,34 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
   };
 
   const batchCheckDuplicates = async (rows: any[]) => {
-    const phones = new Set<string>();
-    const nins = new Set<string>();
-    const chequeNos = new Set<string>();
-    const indexYearPairs = new Set<string>();
-    const nameCenterPairs = new Set<string>();
-    
-    rows.forEach(({ row, sanitizedPhone, sanitizedIndex, sanitizedCenter }) => {
-      if (sanitizedPhone) phones.add(sanitizedPhone);
-      if (row.nin) nins.add(row.nin);
-      if (row.cheque_no) chequeNos.add(row.cheque_no);
-      if (sanitizedIndex && row.csee_year) indexYearPairs.add(`${sanitizedIndex}|${row.csee_year}`);
-      nameCenterPairs.add(`${row.first_name}|${row.last_name}|${sanitizedCenter}`);
-    });
+    // Single database fetch for all columns used in validation
+    const { data: existingSups, error } = await supabase
+      .from('supervisors')
+      .select('phone, nin, cheque_no, index_no, csee_year, first_name, last_name, center_no');
 
-    const [phoneResults, ninResults, chequeResults, indexResults, nameResults] = await Promise.all([
-      phones.size > 0 ? supabase.from('supervisors').select('phone').in('phone', Array.from(phones)) : Promise.resolve({ data: [] }),
-      nins.size > 0 ? supabase.from('supervisors').select('nin').in('nin', Array.from(nins)) : Promise.resolve({ data: [] }),
-      chequeNos.size > 0 ? supabase.from('supervisors').select('cheque_no').in('cheque_no', Array.from(chequeNos)) : Promise.resolve({ data: [] }),
-      indexYearPairs.size > 0 ? supabase.from('supervisors').select('index_no, csee_year').or(
-        Array.from(indexYearPairs).map(pair => {
-          const [idx, year] = pair.split('|');
-          return `and(index_no.eq.${idx},csee_year.eq.${year})`;
-        }).join(',')
-      ) : Promise.resolve({ data: [] }),
-      supabase.from('supervisors').select('first_name, last_name, center_no')
-    ]);
+    if (error) {
+      console.error("Error loading existing supervisors for duplicate validation:", error);
+    }
 
-    const existingPhones = new Set(phoneResults.data?.map(r => r.phone) || []);
-    const existingNins = new Set(ninResults.data?.map(r => r.nin) || []);
-    const existingCheques = new Set(chequeResults.data?.map(r => r.cheque_no) || []);
-    const existingIndexYears = new Set(indexResults.data?.map(r => `${r.index_no}|${r.csee_year}`) || []);
-    const existingNameCenters = new Set(nameResults.data?.map(r => `${r.first_name}|${r.last_name}|${r.center_no}`) || []);
+    const existingPhones = new Set<string>();
+    const existingNins = new Set<string>();
+    const existingCheques = new Set<string>();
+    const existingIndexYears = new Set<string>();
+    const existingNameCenters = new Set<string>();
+
+    if (existingSups) {
+      existingSups.forEach(s => {
+        if (s.phone) existingPhones.add(s.phone);
+        if (s.nin) existingNins.add(s.nin);
+        if (s.cheque_no) existingCheques.add(s.cheque_no);
+        if (s.index_no && s.csee_year) {
+          existingIndexYears.add(`${s.index_no}|${s.csee_year}`);
+        }
+        if (s.first_name && s.last_name && s.center_no) {
+          existingNameCenters.add(`${s.first_name}|${s.last_name}|${s.center_no}`);
+        }
+      });
+    }
 
     return ({ row, sanitizedPhone, sanitizedIndex, sanitizedCenter }: any) => {
       if (sanitizedPhone && existingPhones.has(sanitizedPhone)) return true;
