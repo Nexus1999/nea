@@ -165,13 +165,32 @@ export const ImportSupervisorsModal = ({ open, onOpenChange, onSuccess }: { open
         setProgress(5);
 
         const centerCache = new Map();
+        
+        // 1. Query secondaryschools table
         const { data: secSchools } = await supabase.from('secondaryschools').select('center_no, region, district, center_type').in('center_no', uniqueCenterNos).eq('status', 'active');
         secSchools?.forEach(center => centerCache.set(center.center_no, center));
 
-        const notFoundCenters = uniqueCenterNos.filter(cn => !centerCache.has(cn));
+        // 2. Query teacherscolleges table for remaining missing centers
+        let notFoundCenters = uniqueCenterNos.filter(cn => !centerCache.has(cn));
         if (notFoundCenters.length > 0) {
           const { data: tcSchools } = await supabase.from('teacherscolleges').select('center_no, region, district').in('center_no', notFoundCenters).eq('status', 'active');
           tcSchools?.forEach(center => centerCache.set(center.center_no, { ...center, center_type: 'public' }));
+        }
+
+        // 3. Query secondarymastersummaries table for any dynamically generated/imported centers
+        notFoundCenters = uniqueCenterNos.filter(cn => !centerCache.has(cn));
+        if (notFoundCenters.length > 0) {
+          const { data: secMasterSchools } = await supabase.from('secondarymastersummaries').select('center_number, region, district').in('center_number', notFoundCenters).eq('is_latest', true);
+          secMasterSchools?.forEach(center => {
+            if (center.center_number) {
+              centerCache.set(center.center_number, {
+                center_no: center.center_number,
+                region: center.region,
+                district: center.district,
+                center_type: 'public'
+              });
+            }
+          });
         }
         setProgress(15);
 
