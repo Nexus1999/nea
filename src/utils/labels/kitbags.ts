@@ -8,13 +8,23 @@ export const renderKitbagsLabels = (
     const payload = [
       `EXAM:${examCode}`,
       `YEAR:${examYear}`,
-      `REGION:${label.region || ""}`,
+      `REGION:${abbreviateRegionName(label.region) || ""}`,
       `ITEM:${label.item || "KITBAGS"}`,
       `QTY:${label.quantity || 0}`,
       `BOX:${label.container_number}/${label.total_containers}`,
     ].join(" | ");
     return `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=120&margin=2&ecLevel=M`;
   };
+  function abbreviateRegionName(region: string): string {
+  if (!region) return "";
+  const upper = region.toUpperCase().trim();
+  if (upper === "KASKAZINI PEMBA") return "KAS/PEMBA";
+  if (upper === "KUSINI PEMBA") return "KUS/PEMBA";
+  if (upper === "KASKAZINI UNGUJA") return "KAS/UNGUJA";
+  if (upper === "KUSINI UNGUJA") return "KUS/UNGUJA";
+  if (upper === "MJINI MAGHARIBI") return "M/MAGHARIBI";
+  return upper;
+}
 
   const singleLabel = (label: any) => {
     const qrUrl = generateQRData(label);
@@ -38,7 +48,7 @@ export const renderKitbagsLabels = (
         </div>
 
         <!-- Region (prominent with Elephant font) - dynamic font size -->
-        <div class="region" style="font-size: ${regionFontSize}; margin-bottom: 24px;">${label.region || "N/A"}</div>
+        <div class="region" style="font-size: ${regionFontSize}; margin-bottom: 24px;">${abbreviateRegionName(label.region) || "N/A"}</div>
 
         <!-- Item code + quantity (side by side) -->
         <div class="item-quantity-panel">
